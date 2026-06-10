@@ -1,0 +1,241 @@
+"use client";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { supabase, type LineaAltice, ACCION_COLORS, ESTADO_LINEA_COLORS } from "@/lib/supabase";
+import * as XLSX from "xlsx";
+import toast from "react-hot-toast";
+
+const ACCIONES = ["", "BAJA", "ALTA", "CAMBIO SOLICITADO", "SE MANTIENE", "REVISAR"];
+const ESTADOS = ["", "CONFIRMADA", "POR CONFIRMAR", "PENDIENTE", "OK", "RESPONDIÓ", "SIN RESPUESTA"];
+const TIPOS = ["", "EMPLEADO", "EMPLEADO 2", "FAMILIAR", "PASTORES", "DEPARTAMENTAL", "INSTITUCION", "JUBILADO", "EXTERNO", "UD", "DESVINCULAR", "N/D", "CONFLICTO"];
+
+function FieldEditable({ value, onSave, multiline = false }: { value: string; onSave: (v: string) => void; multiline?: boolean }) {
+    const [editing, setEditing] = useState(false);
+    const [draft, setDraft] = useState(value);
+    const ref = useRef<HTMLTextAreaElement | HTMLInputElement>(null);
+
+    useEffect(() => { if (editing && ref.current) ref.current.focus(); }, [editing]);
+
+    function commit() {
+        setEditing(false);
+        if (draft !== value) onSave(draft);
+    }
+
+    if (!editing) return (
+        <span className="cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded px-1 py-0.5 block min-w-[60px] whitespace-pre-wrap"
+            onClick={() => { setDraft(value); setEditing(true); }}>
+            {value || <span className="text-slate-300 dark:text-slate-600 italic">—</span>}
+        </span>
+    );
+
+    if (multiline) return (
+        <textarea ref={ref as any} value={draft} onChange={e => setDraft(e.target.value)}
+            onBlur={commit} onKeyDown={e => e.key === "Escape" && setEditing(false)}
+            rows={3} className="w-full text-xs border border-blue-400 rounded-lg p-1 bg-white dark:bg-slate-700 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+    );
+
+    return (
+        <input ref={ref as any} value={draft} onChange={e => setDraft(e.target.value)}
+            onBlur={commit} onKeyDown={e => { if (e.key === "Enter") commit(); if (e.key === "Escape") setEditing(false); }}
+            className="w-full text-xs border border-blue-400 rounded-lg p-1 bg-white dark:bg-slate-700 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+    );
+}
+
+export default function LineasTab() {
+    const [all, setAll] = useState<LineaAltice[]>([]);
+    const [filtered, setFiltered] = useState<LineaAltice[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [search, setSearch] = useState("");
+    const [filterAccion, setFilterAccion] = useState("");
+    const [filterEstado, setFilterEstado] = useState("");
+    const [filterTipo, setFilterTipo] = useState("");
+    const [expandedId, setExpandedId] = useState<string | null>(null);
+
+    const loadData = useCallback(async () => {
+        setLoading(true);
+        const { data } = await supabase.from("lineas_altice").select("*").order("titular_responsable");
+        setAll((data ?? []) as LineaAltice[]);
+        setLoading(false);
+    }, []);
+
+    useEffect(() => { loadData(); }, [loadData]);
+
+    useEffect(() => {
+        let f = all;
+        if (filterAccion) f = f.filter(r => r.accion_2026 === filterAccion);
+        if (filterEstado) f = f.filter(r => r.estado === filterEstado);
+        if (filterTipo) f = f.filter(r => r.tipo === filterTipo);
+        if (search) {
+            const q = search.toLowerCase();
+            f = f.filter(r =>
+                r.usuario_linea.toLowerCase().includes(q) ||
+                r.titular_responsable.toLowerCase().includes(q) ||
+                r.telefono.includes(q) ||
+                r.seguimiento.toLowerCase().includes(q)
+            );
+        }
+        setFiltered(f);
+    }, [all, filterAccion, filterEstado, filterTipo, search]);
+
+    async function updateField(id: string, field: keyof LineaAltice, value: string) {
+        const { error } = await supabase.from("lineas_altice").update({ [field]: value }).eq("id", id);
+        if (error) { toast.error("Error guardando"); return; }
+        setAll(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r));
+        toast.success("Guardado ✓", { duration: 1200 });
+    }
+
+    function exportExcel() {
+        const rows = filtered.map(r => ({
+            "Teléfono": r.telefono,
+            "Usuario": r.usuario_linea,
+            "Titular Responsable": r.titular_responsable,
+            "Tipo": r.tipo,
+            "Acción 2026": r.accion_2026,
+            "GB Antes": r.gb_antes,
+            "GB Solicitado": r.gb_solicitado,
+            "Min Antes": r.min_antes,
+            "Min Solicitados": r.min_solicitados,
+            "Dispositivo 2026": r.dispositivo_2026,
+            "Estado": r.estado,
+            "Próxima Acción": r.proxima_accion,
+            "Observaciones": r.observaciones,
+            "Seguimiento": r.seguimiento,
+        }));
+        const ws = XLSX.utils.json_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Líneas Altice 2026");
+        XLSX.writeFile(wb, `Lineas-Altice-2026-${new Date().toISOString().split("T")[0]}.xlsx`);
+        toast.success("Excel exportado");
+    }
+
+    if (loading) return <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>;
+
+    return (
+        <div className="space-y-4">
+            {/* Header */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h2 className="text-lg font-bold text-slate-800 dark:text-white">Líneas del Contrato</h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">{filtered.length} de {all.length} líneas</p>
+                </div>
+                <button onClick={exportExcel}
+                    className="text-sm bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-xl font-semibold transition-colors">
+                    📊 Exportar Excel
+                </button>
+            </div>
+
+            {/* Filtros */}
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 flex flex-wrap gap-3">
+                <input value={search} onChange={e => setSearch(e.target.value)}
+                    placeholder="🔍 Buscar nombre, titular, teléfono, seguimiento..."
+                    className="flex-1 min-w-52 border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <select value={filterAccion} onChange={e => setFilterAccion(e.target.value)}
+                    className="border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Todas las acciones</option>
+                    {ACCIONES.filter(Boolean).map(a => <option key={a} value={a}>{a}</option>)}
+                </select>
+                <select value={filterEstado} onChange={e => setFilterEstado(e.target.value)}
+                    className="border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Todos los estados</option>
+                    {ESTADOS.filter(Boolean).map(a => <option key={a} value={a}>{a}</option>)}
+                </select>
+                <select value={filterTipo} onChange={e => setFilterTipo(e.target.value)}
+                    className="border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Todos los tipos</option>
+                    {TIPOS.filter(Boolean).map(a => <option key={a} value={a}>{a}</option>)}
+                </select>
+                {(filterAccion || filterEstado || filterTipo || search) && (
+                    <button onClick={() => { setFilterAccion(""); setFilterEstado(""); setFilterTipo(""); setSearch(""); }}
+                        className="text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 underline">
+                        Limpiar filtros
+                    </button>
+                )}
+            </div>
+
+            {/* Tabla */}
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                        <thead className="bg-slate-50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10">
+                            <tr>
+                                {["Teléfono", "Usuario / Titular", "Tipo", "Acción 2026", "GB Antes → 2026", "Min", "Dispositivo 2026", "Estado", "Seguimiento"].map(h => (
+                                    <th key={h} className="p-2.5 text-left font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">{h}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                            {filtered.map(r => (
+                                <>
+                                    <tr key={r.id}
+                                        className="hover:bg-slate-50 dark:hover:bg-slate-700/30 cursor-pointer"
+                                        onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}>
+                                        <td className="p-2.5 font-mono font-medium text-slate-700 dark:text-slate-200 whitespace-nowrap">
+                                            {r.telefono === "NUEVA" ? <span className="text-green-600 font-bold">NUEVA</span> : r.telefono}
+                                        </td>
+                                        <td className="p-2.5">
+                                            <p className="font-medium text-slate-800 dark:text-white">{r.usuario_linea || "—"}</p>
+                                            <p className="text-slate-400 text-[11px]">{r.titular_responsable || <span className="text-red-400">Sin titular</span>}</p>
+                                        </td>
+                                        <td className="p-2.5 text-slate-500 dark:text-slate-400 whitespace-nowrap">{r.tipo || "—"}</td>
+                                        <td className="p-2.5 whitespace-nowrap">
+                                            <select value={r.accion_2026}
+                                                onClick={e => e.stopPropagation()}
+                                                onChange={e => updateField(r.id, "accion_2026", e.target.value)}
+                                                className={`text-xs font-semibold px-2 py-1 rounded-lg border-0 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer ${ACCION_COLORS[r.accion_2026] ?? "bg-slate-100 text-slate-500"}`}>
+                                                {ACCIONES.map(a => <option key={a} value={a}>{a || "(sin acción)"}</option>)}
+                                            </select>
+                                        </td>
+                                        <td className="p-2.5 whitespace-nowrap text-slate-600 dark:text-slate-300">
+                                            {r.gb_antes} → <span className="font-medium">{r.gb_solicitado || "—"}</span>
+                                        </td>
+                                        <td className="p-2.5 whitespace-nowrap text-slate-500 dark:text-slate-400">
+                                            {r.min_antes}{r.min_solicitados && r.min_solicitados !== "—" ? ` → ${r.min_solicitados}` : ""}
+                                        </td>
+                                        <td className="p-2.5 text-slate-600 dark:text-slate-300 max-w-[160px]">
+                                            <span className="line-clamp-2">{r.dispositivo_2026 || "—"}</span>
+                                        </td>
+                                        <td className="p-2.5 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                                            <select value={r.estado}
+                                                onChange={e => updateField(r.id, "estado", e.target.value)}
+                                                className={`text-xs font-semibold px-2 py-1 rounded-lg border-0 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer ${ESTADO_LINEA_COLORS[r.estado] ?? "bg-slate-100 text-slate-500"}`}>
+                                                {ESTADOS.map(a => <option key={a} value={a}>{a || "(sin estado)"}</option>)}
+                                            </select>
+                                        </td>
+                                        <td className="p-2.5 min-w-[180px]" onClick={e => e.stopPropagation()}>
+                                            <FieldEditable value={r.seguimiento} onSave={v => updateField(r.id, "seguimiento", v)} multiline />
+                                        </td>
+                                    </tr>
+                                    {expandedId === r.id && (
+                                        <tr key={r.id + "-exp"} className="bg-blue-50/50 dark:bg-blue-900/10">
+                                            <td colSpan={9} className="p-4">
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+                                                    <div>
+                                                        <p className="font-bold text-slate-500 dark:text-slate-400 mb-1">PRÓXIMA ACCIÓN</p>
+                                                        <FieldEditable value={r.proxima_accion} onSave={v => updateField(r.id, "proxima_accion", v)} multiline />
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-slate-500 dark:text-slate-400 mb-1">OBSERVACIONES</p>
+                                                        <p className="text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{r.observaciones || "—"}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-slate-500 dark:text-slate-400 mb-1">DETALLE / ORIGEN</p>
+                                                        <p className="text-slate-600 dark:text-slate-300">{r.detalle_origen || "—"}</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                </>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+                {filtered.length === 0 && (
+                    <div className="py-16 text-center text-slate-400">
+                        <p className="text-4xl mb-2">🔍</p>
+                        <p>No hay líneas con esos filtros</p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
