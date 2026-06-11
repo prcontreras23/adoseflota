@@ -52,6 +52,13 @@ export default function LineasTab() {
     const [filterDispositivo, setFilterDispositivo] = useState("");
     const [filterGb, setFilterGb] = useState("");
     const [filterMin, setFilterMin] = useState("");
+    const [filterProximaAccion, setFilterProximaAccion] = useState("");
+    const [filterTitular, setFilterTitular] = useState("");
+    // Quick chips (toggles)
+    const [chipSinTitular, setChipSinTitular] = useState(false);
+    const [chipSinDispositivo, setChipSinDispositivo] = useState(false);
+    const [chipSinMonto, setChipSinMonto] = useState(false);
+    const [chipConSeguimiento, setChipConSeguimiento] = useState(false);
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [showNueva, setShowNueva] = useState(false);
     const [importing, setImporting] = useState(false);
@@ -74,17 +81,25 @@ export default function LineasTab() {
         if (filterDispositivo) f = f.filter(r => r.dispositivo_2026?.trim() === filterDispositivo);
         if (filterGb) f = f.filter(r => (r.gb_solicitado?.trim() || r.gb_antes?.trim()) === filterGb);
         if (filterMin) f = f.filter(r => (r.min_solicitados?.trim() || r.min_antes?.trim()) === filterMin);
+        if (filterProximaAccion) f = f.filter(r => r.proxima_accion === filterProximaAccion);
+        if (filterTitular) f = f.filter(r => r.titular_responsable === filterTitular);
+        if (chipSinTitular) f = f.filter(r => !r.titular_responsable?.trim());
+        if (chipSinDispositivo) f = f.filter(r => !r.dispositivo_2026?.trim() || r.dispositivo_2026.trim() === "SIN CAMBIO" || r.dispositivo_2026.trim() === "—");
+        if (chipSinMonto) f = f.filter(r => !r.monto_mensual?.trim() || parseFloat(r.monto_mensual.replace(/[^0-9.]/g, "")) === 0);
+        if (chipConSeguimiento) f = f.filter(r => !!r.seguimiento?.trim());
         if (search) {
             const q = search.toLowerCase();
             f = f.filter(r =>
                 r.usuario_linea.toLowerCase().includes(q) ||
                 r.titular_responsable.toLowerCase().includes(q) ||
                 r.telefono.includes(q) ||
-                r.seguimiento.toLowerCase().includes(q)
+                r.seguimiento.toLowerCase().includes(q) ||
+                r.observaciones.toLowerCase().includes(q)
             );
         }
         setFiltered(f);
-    }, [all, filterAccion, filterEstado, filterTipo, filterDispositivo, filterGb, filterMin, search]);
+    }, [all, filterAccion, filterEstado, filterTipo, filterDispositivo, filterGb, filterMin,
+        filterProximaAccion, filterTitular, chipSinTitular, chipSinDispositivo, chipSinMonto, chipConSeguimiento, search]);
 
     async function updateField(id: string, field: keyof LineaAltice, value: string) {
         const { error } = await supabase.from("lineas_altice").update({ [field]: value }).eq("id", id);
@@ -298,43 +313,99 @@ export default function LineasTab() {
                 const opcionesDispositivo = [...new Set(all.map(r => r.dispositivo_2026?.trim()).filter(Boolean))].sort() as string[];
                 const opcionesGb = [...new Set(all.map(r => r.gb_solicitado?.trim() || r.gb_antes?.trim()).filter(Boolean))].sort((a, b) => parseFloat(a!) - parseFloat(b!)) as string[];
                 const opcionesMin = [...new Set(all.map(r => r.min_solicitados?.trim() || r.min_antes?.trim()).filter(Boolean))].sort((a, b) => parseFloat(a!) - parseFloat(b!)) as string[];
-                const hayFiltros = !!(filterAccion || filterEstado || filterTipo || filterDispositivo || filterGb || filterMin || search);
+                const opcionesTitular = [...new Set(all.map(r => r.titular_responsable).filter(Boolean))].sort() as string[];
+                const hayFiltros = !!(filterAccion || filterEstado || filterTipo || filterDispositivo || filterGb || filterMin || filterProximaAccion || filterTitular || search || chipSinTitular || chipSinDispositivo || chipSinMonto || chipConSeguimiento);
                 const selCls = "border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
+
+                const limpiarTodo = () => {
+                    setFilterAccion(""); setFilterEstado(""); setFilterTipo("");
+                    setFilterDispositivo(""); setFilterGb(""); setFilterMin("");
+                    setFilterProximaAccion(""); setFilterTitular(""); setSearch("");
+                    setChipSinTitular(false); setChipSinDispositivo(false);
+                    setChipSinMonto(false); setChipConSeguimiento(false);
+                };
+
+                const chipCls = (active: boolean) => `text-xs font-semibold px-3 py-1.5 rounded-full border cursor-pointer transition-all select-none ${
+                    active
+                        ? "bg-blue-600 text-white border-blue-600"
+                        : "bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:border-blue-400 hover:text-blue-600"
+                }`;
+
                 return (
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 flex flex-wrap gap-3">
-                        <input value={search} onChange={e => setSearch(e.target.value)}
-                            placeholder="🔍 Buscar nombre, titular, teléfono, seguimiento..."
-                            className={`flex-1 min-w-52 ${selCls}`} />
-                        <select value={filterAccion} onChange={e => setFilterAccion(e.target.value)} className={selCls}>
-                            <option value="">Todas las acciones</option>
-                            {ACCIONES.filter(Boolean).map(a => <option key={a} value={a}>{a}</option>)}
-                        </select>
-                        <select value={filterEstado} onChange={e => setFilterEstado(e.target.value)} className={selCls}>
-                            <option value="">Todos los estados</option>
-                            {ESTADOS.filter(Boolean).map(a => <option key={a} value={a}>{a}</option>)}
-                        </select>
-                        <select value={filterTipo} onChange={e => setFilterTipo(e.target.value)} className={selCls}>
-                            <option value="">Todos los tipos</option>
-                            {TIPOS.filter(Boolean).map(a => <option key={a} value={a}>{a}</option>)}
-                        </select>
-                        <select value={filterDispositivo} onChange={e => setFilterDispositivo(e.target.value)} className={selCls}>
-                            <option value="">📱 Todos los equipos</option>
-                            {opcionesDispositivo.map(d => <option key={d} value={d}>{d}</option>)}
-                        </select>
-                        <select value={filterGb} onChange={e => setFilterGb(e.target.value)} className={selCls}>
-                            <option value="">📶 Todos los GB</option>
-                            {opcionesGb.map(g => <option key={g} value={g}>{g} GB</option>)}
-                        </select>
-                        <select value={filterMin} onChange={e => setFilterMin(e.target.value)} className={selCls}>
-                            <option value="">📞 Todos los min</option>
-                            {opcionesMin.map(m => <option key={m} value={m}>{m} min</option>)}
-                        </select>
-                        {hayFiltros && (
-                            <button onClick={() => { setFilterAccion(""); setFilterEstado(""); setFilterTipo(""); setFilterDispositivo(""); setFilterGb(""); setFilterMin(""); setSearch(""); }}
-                                className="text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 underline whitespace-nowrap">
-                                Limpiar filtros
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 space-y-3">
+                        {/* Fila 1: búsqueda + filtros principales */}
+                        <div className="flex flex-wrap gap-2">
+                            <input value={search} onChange={e => setSearch(e.target.value)}
+                                placeholder="🔍 Buscar nombre, titular, teléfono, notas..."
+                                className={`flex-1 min-w-48 ${selCls}`} />
+                            <select value={filterAccion} onChange={e => setFilterAccion(e.target.value)} className={selCls}>
+                                <option value="">Todas las acciones</option>
+                                {ACCIONES.filter(Boolean).map(a => <option key={a} value={a}>{a}</option>)}
+                            </select>
+                            <select value={filterEstado} onChange={e => setFilterEstado(e.target.value)} className={selCls}>
+                                <option value="">Todos los estados</option>
+                                {ESTADOS.filter(Boolean).map(a => <option key={a} value={a}>{a}</option>)}
+                            </select>
+                            <select value={filterProximaAccion} onChange={e => setFilterProximaAccion(e.target.value)} className={selCls}>
+                                <option value="">▶ Próxima acción</option>
+                                {["LLAMAR", "CARTA", "COTIZAR", "CANCELAR"].map(a => <option key={a} value={a}>{a}</option>)}
+                            </select>
+                        </div>
+
+                        {/* Fila 2: filtros secundarios */}
+                        <div className="flex flex-wrap gap-2">
+                            <select value={filterTipo} onChange={e => setFilterTipo(e.target.value)} className={selCls}>
+                                <option value="">Todos los tipos</option>
+                                {TIPOS.filter(Boolean).map(a => <option key={a} value={a}>{a}</option>)}
+                            </select>
+                            <select value={filterTitular} onChange={e => setFilterTitular(e.target.value)} className={selCls}>
+                                <option value="">👤 Todos los titulares</option>
+                                {opcionesTitular.map(t => <option key={t} value={t}>{t}</option>)}
+                            </select>
+                            <select value={filterDispositivo} onChange={e => setFilterDispositivo(e.target.value)} className={selCls}>
+                                <option value="">📱 Todos los equipos</option>
+                                {opcionesDispositivo.map(d => <option key={d} value={d}>{d}</option>)}
+                            </select>
+                            <select value={filterGb} onChange={e => setFilterGb(e.target.value)} className={selCls}>
+                                <option value="">📶 Todos los GB</option>
+                                {opcionesGb.map(g => <option key={g} value={g}>{g} GB</option>)}
+                            </select>
+                            <select value={filterMin} onChange={e => setFilterMin(e.target.value)} className={selCls}>
+                                <option value="">📞 Todos los min</option>
+                                {opcionesMin.map(m => <option key={m} value={m}>{m} min</option>)}
+                            </select>
+                        </div>
+
+                        {/* Fila 3: chips de filtro rápido */}
+                        <div className="flex flex-wrap gap-2 items-center">
+                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Rápido:</span>
+                            <button className={chipCls(chipSinTitular)} onClick={() => setChipSinTitular(v => !v)}>
+                                ⚠️ Sin titular
                             </button>
-                        )}
+                            <button className={chipCls(chipSinDispositivo)} onClick={() => setChipSinDispositivo(v => !v)}>
+                                📵 Sin dispositivo
+                            </button>
+                            <button className={chipCls(chipSinMonto)} onClick={() => setChipSinMonto(v => !v)}>
+                                💸 Sin monto
+                            </button>
+                            <button className={chipCls(chipConSeguimiento)} onClick={() => setChipConSeguimiento(v => !v)}>
+                                📝 Con notas
+                            </button>
+                            {/* Atajos de próxima acción como chips */}
+                            {["LLAMAR", "CARTA", "COTIZAR", "CANCELAR"].map(a => (
+                                <button key={a}
+                                    className={chipCls(filterProximaAccion === a)}
+                                    onClick={() => setFilterProximaAccion(v => v === a ? "" : a)}>
+                                    {a === "LLAMAR" ? "📲" : a === "CARTA" ? "✉️" : a === "COTIZAR" ? "💲" : "🚫"} {a}
+                                </button>
+                            ))}
+                            {hayFiltros && (
+                                <button onClick={limpiarTodo}
+                                    className="text-xs text-slate-400 hover:text-rose-500 underline ml-auto whitespace-nowrap">
+                                    ✕ Limpiar todo
+                                </button>
+                            )}
+                        </div>
                     </div>
                 );
             })()}

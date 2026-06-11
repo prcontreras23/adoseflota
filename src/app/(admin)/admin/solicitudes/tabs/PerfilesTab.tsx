@@ -5,6 +5,16 @@ import * as XLSX from "xlsx";
 import toast from "react-hot-toast";
 import NuevaLineaModal from "./NuevaLineaModal";
 
+const PLANES_DATA = [
+  "",
+  "Data 5GB + Bono 2GB (RD$711.00)",
+  "Data 10GB + Bono 5GB (RD$1,161.00)",
+  "Data 15GB + Bono 5GB (RD$1,251.00)",
+  "Data 25GB + Bono 5GB (RD$1,791.00)",
+  "Data 50GB + Bono 50GB (RD$3,681.00)",
+  "No deseo internet",
+];
+
 interface TitularGroup {
   nombre: string;
   lineas: LineaAltice[];
@@ -135,9 +145,16 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
                 <label className={labelCls}>Data actual (GB)</label>
                 <input value={form.gb_antes} onChange={e => set("gb_antes", e.target.value)} className={inputCls} placeholder="Ej: 5" />
               </div>
-              <div>
-                <label className={labelCls}>Data solicitada (GB)</label>
-                <input value={form.gb_solicitado} onChange={e => set("gb_solicitado", e.target.value)} className={inputCls} placeholder="Ej: 10" />
+              <div className="col-span-2">
+                <label className={labelCls}>Plan de datos solicitado</label>
+                <select value={form.gb_solicitado} onChange={e => set("gb_solicitado", e.target.value)} className={inputCls}>
+                  {PLANES_DATA.map(p => <option key={p} value={p}>{p || "(sin plan de datos)"}</option>)}
+                </select>
+                {form.gb_solicitado && !PLANES_DATA.includes(form.gb_solicitado) && (
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Valor actual: <span className="font-medium">{form.gb_solicitado}</span> — no está en la lista de planes
+                  </p>
+                )}
               </div>
               <div>
                 <label className={labelCls}>Minutos actuales</label>
@@ -353,6 +370,14 @@ export default function PerfilesTab() {
   const [filterDispositivo, setFilterDispositivo] = useState("");
   const [filterGb, setFilterGb] = useState("");
   const [filterMin, setFilterMin] = useState("");
+  const [filterProximaAccion, setFilterProximaAccion] = useState("");
+  const [filterAccion, setFilterAccion] = useState("");
+  const [filterEstado, setFilterEstado] = useState("");
+  const [filterTipo, setFilterTipo] = useState("");
+  // Quick chips
+  const [chipSinDispositivo, setChipSinDispositivo] = useState(false);
+  const [chipSinMonto, setChipSinMonto] = useState(false);
+  const [chipConSeguimiento, setChipConSeguimiento] = useState(false);
   const [expandedTitular, setExpandedTitular] = useState<string | null>(null);
   const [editingLinea, setEditingLinea] = useState<LineaAltice | null>(null);
   const [vinculandoTitular, setVinculandoTitular] = useState<string | null>(null);
@@ -444,24 +469,35 @@ export default function PerfilesTab() {
   const opcionesGb = [...new Set(all.map(r => r.gb_solicitado?.trim() || r.gb_antes?.trim()).filter(Boolean))].sort((a, b) => parseFloat(a!) - parseFloat(b!)) as string[];
   const opcionesMin = [...new Set(all.map(r => r.min_solicitados?.trim() || r.min_antes?.trim()).filter(Boolean))].sort((a, b) => parseFloat(a!) - parseFloat(b!)) as string[];
 
-  const hayFiltros = !!(search || filterDispositivo || filterGb || filterMin);
+  const hayFiltros = !!(search || filterDispositivo || filterGb || filterMin || filterProximaAccion || filterAccion || filterEstado || filterTipo || chipSinDispositivo || chipSinMonto || chipConSeguimiento);
 
   const gruposFiltrados = grupos.filter(g => {
     const q = search.toLowerCase();
     const coincideTexto = !search || g.nombre.toLowerCase().includes(q) ||
-      g.lineas.some(l => l.usuario_linea.toLowerCase().includes(q) || l.telefono.includes(q));
+      g.lineas.some(l =>
+        l.usuario_linea.toLowerCase().includes(q) ||
+        l.telefono.includes(q) ||
+        l.seguimiento.toLowerCase().includes(q)
+      );
     if (!coincideTexto) return false;
 
     // Al menos una línea del grupo debe cumplir todos los filtros activos
-    if (filterDispositivo || filterGb || filterMin) {
-      return g.lineas.some(l => {
-        const okDispositivo = !filterDispositivo || l.dispositivo_2026?.trim() === filterDispositivo;
-        const gbLinea = l.gb_solicitado?.trim() || l.gb_antes?.trim();
-        const okGb = !filterGb || gbLinea === filterGb;
-        const minLinea = l.min_solicitados?.trim() || l.min_antes?.trim();
-        const okMin = !filterMin || minLinea === filterMin;
-        return okDispositivo && okGb && okMin;
-      });
+    const tieneAlgunaLinea = g.lineas.some(l => {
+      if (filterAccion && l.accion_2026 !== filterAccion) return false;
+      if (filterEstado && l.estado !== filterEstado) return false;
+      if (filterTipo && l.tipo !== filterTipo) return false;
+      if (filterDispositivo && l.dispositivo_2026?.trim() !== filterDispositivo) return false;
+      if (filterGb) { const gb = l.gb_solicitado?.trim() || l.gb_antes?.trim(); if (gb !== filterGb) return false; }
+      if (filterMin) { const mn = l.min_solicitados?.trim() || l.min_antes?.trim(); if (mn !== filterMin) return false; }
+      if (filterProximaAccion && l.proxima_accion !== filterProximaAccion) return false;
+      if (chipSinDispositivo && l.dispositivo_2026?.trim() && l.dispositivo_2026.trim() !== "SIN CAMBIO" && l.dispositivo_2026.trim() !== "—") return false;
+      if (chipSinMonto && l.monto_mensual?.trim() && parseFloat(l.monto_mensual.replace(/[^0-9.]/g, "")) > 0) return false;
+      if (chipConSeguimiento && !l.seguimiento?.trim()) return false;
+      return true;
+    });
+
+    if (filterAccion || filterEstado || filterTipo || filterDispositivo || filterGb || filterMin || filterProximaAccion || chipSinDispositivo || chipSinMonto || chipConSeguimiento) {
+      return tieneAlgunaLinea;
     }
     return true;
   });
@@ -524,32 +560,80 @@ export default function PerfilesTab() {
       </div>
 
       {/* Barra de filtros */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-3 flex flex-wrap gap-2 items-center">
-        <input value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="🔍 Buscar titular, usuario o teléfono..."
-          className="flex-1 min-w-48 border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-        <select value={filterDispositivo} onChange={e => setFilterDispositivo(e.target.value)}
-          className="border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-          <option value="">📱 Todos los equipos</option>
-          {opcionesDispositivo.map(d => <option key={d} value={d}>{d}</option>)}
-        </select>
-        <select value={filterGb} onChange={e => setFilterGb(e.target.value)}
-          className="border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-          <option value="">📶 Todos los GB</option>
-          {opcionesGb.map(g => <option key={g} value={g}>{g} GB</option>)}
-        </select>
-        <select value={filterMin} onChange={e => setFilterMin(e.target.value)}
-          className="border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-          <option value="">📞 Todos los min</option>
-          {opcionesMin.map(m => <option key={m} value={m}>{m} min</option>)}
-        </select>
-        {hayFiltros && (
-          <button onClick={() => { setSearch(""); setFilterDispositivo(""); setFilterGb(""); setFilterMin(""); }}
-            className="text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 underline whitespace-nowrap">
-            Limpiar filtros
-          </button>
-        )}
-      </div>
+      {(() => {
+        const ACCIONES_LIST = ["BAJA", "ALTA", "CAMBIO SOLICITADO", "SE MANTIENE", "REVISAR"];
+        const ESTADOS_LIST = ["CONFIRMADA", "POR CONFIRMAR", "PENDIENTE", "OK", "RESPONDIÓ", "SIN RESPUESTA"];
+        const TIPOS_LIST = ["EMPLEADO", "EMPLEADO 2", "FAMILIAR", "PASTORES", "DEPARTAMENTAL", "INSTITUCION", "JUBILADO", "EXTERNO", "UD", "DESVINCULAR", "N/D", "CONFLICTO"];
+        const selCls = "border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
+        const chipCls = (active: boolean) => `text-xs font-semibold px-3 py-1.5 rounded-full border cursor-pointer transition-all select-none ${active ? "bg-blue-600 text-white border-blue-600" : "bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:border-blue-400 hover:text-blue-600"}`;
+        const limpiarTodo = () => {
+          setSearch(""); setFilterDispositivo(""); setFilterGb(""); setFilterMin("");
+          setFilterProximaAccion(""); setFilterAccion(""); setFilterEstado(""); setFilterTipo("");
+          setChipSinDispositivo(false); setChipSinMonto(false); setChipConSeguimiento(false);
+        };
+
+        return (
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 space-y-3">
+            {/* Fila 1 */}
+            <div className="flex flex-wrap gap-2">
+              <input value={search} onChange={e => setSearch(e.target.value)}
+                placeholder="🔍 Buscar titular, usuario, teléfono o notas..."
+                className={`flex-1 min-w-48 ${selCls}`} />
+              <select value={filterAccion} onChange={e => setFilterAccion(e.target.value)} className={selCls}>
+                <option value="">Todas las acciones</option>
+                {ACCIONES_LIST.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+              <select value={filterEstado} onChange={e => setFilterEstado(e.target.value)} className={selCls}>
+                <option value="">Todos los estados</option>
+                {ESTADOS_LIST.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+              <select value={filterProximaAccion} onChange={e => setFilterProximaAccion(e.target.value)} className={selCls}>
+                <option value="">▶ Próxima acción</option>
+                {["LLAMAR", "CARTA", "COTIZAR", "CANCELAR"].map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+            </div>
+
+            {/* Fila 2 */}
+            <div className="flex flex-wrap gap-2">
+              <select value={filterTipo} onChange={e => setFilterTipo(e.target.value)} className={selCls}>
+                <option value="">Todos los tipos</option>
+                {TIPOS_LIST.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+              <select value={filterDispositivo} onChange={e => setFilterDispositivo(e.target.value)} className={selCls}>
+                <option value="">📱 Todos los equipos</option>
+                {opcionesDispositivo.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+              <select value={filterGb} onChange={e => setFilterGb(e.target.value)} className={selCls}>
+                <option value="">📶 Todos los GB</option>
+                {opcionesGb.map(g => <option key={g} value={g}>{g} GB</option>)}
+              </select>
+              <select value={filterMin} onChange={e => setFilterMin(e.target.value)} className={selCls}>
+                <option value="">📞 Todos los min</option>
+                {opcionesMin.map(m => <option key={m} value={m}>{m} min</option>)}
+              </select>
+            </div>
+
+            {/* Chips rápidos */}
+            <div className="flex flex-wrap gap-2 items-center">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Rápido:</span>
+              <button className={chipCls(chipSinDispositivo)} onClick={() => setChipSinDispositivo(v => !v)}>📵 Sin dispositivo</button>
+              <button className={chipCls(chipSinMonto)} onClick={() => setChipSinMonto(v => !v)}>💸 Sin monto</button>
+              <button className={chipCls(chipConSeguimiento)} onClick={() => setChipConSeguimiento(v => !v)}>📝 Con notas</button>
+              {["LLAMAR", "CARTA", "COTIZAR", "CANCELAR"].map(a => (
+                <button key={a} className={chipCls(filterProximaAccion === a)}
+                  onClick={() => setFilterProximaAccion(v => v === a ? "" : a)}>
+                  {a === "LLAMAR" ? "📲" : a === "CARTA" ? "✉️" : a === "COTIZAR" ? "💲" : "🚫"} {a}
+                </button>
+              ))}
+              {hayFiltros && (
+                <button onClick={limpiarTodo} className="text-xs text-slate-400 hover:text-rose-500 underline ml-auto whitespace-nowrap">
+                  ✕ Limpiar todo
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       <div className="space-y-3">
         {gruposFiltrados.map(g => {

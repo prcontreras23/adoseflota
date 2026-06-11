@@ -7,6 +7,15 @@ const ACCIONES = ["", "BAJA", "ALTA", "CAMBIO SOLICITADO", "SE MANTIENE", "REVIS
 const ESTADOS = ["", "CONFIRMADA", "POR CONFIRMAR", "PENDIENTE", "OK", "RESPONDIÓ", "SIN RESPUESTA"];
 const TIPOS = ["", "EMPLEADO", "EMPLEADO 2", "FAMILIAR", "PASTORES", "DEPARTAMENTAL", "INSTITUCION", "JUBILADO", "EXTERNO", "UD", "DESVINCULAR", "N/D", "CONFLICTO"];
 const PROXIMAS = ["", "LLAMAR", "CARTA", "COTIZAR", "CANCELAR"];
+const PLANES_DATA = [
+  "",
+  "Data 5GB + Bono 2GB (RD$711.00)",
+  "Data 10GB + Bono 5GB (RD$1,161.00)",
+  "Data 15GB + Bono 5GB (RD$1,251.00)",
+  "Data 25GB + Bono 5GB (RD$1,791.00)",
+  "Data 50GB + Bono 50GB (RD$3,681.00)",
+  "No deseo internet",
+];
 
 const VACIO = {
   telefono: "",
@@ -124,9 +133,10 @@ export default function NuevaLineaModal({ titularInicial, onClose, onCreate }: P
                   placeholder="Ej: 5" className={inputCls} />
               </div>
               <div>
-                <label className={labelCls}>Data solicitada (GB)</label>
-                <input value={form.gb_solicitado} onChange={e => set("gb_solicitado", e.target.value)}
-                  placeholder="Ej: 10" className={inputCls} />
+                <label className={labelCls}>Plan de datos solicitado</label>
+                <select value={form.gb_solicitado} onChange={e => set("gb_solicitado", e.target.value)} className={inputCls}>
+                  {PLANES_DATA.map(p => <option key={p} value={p}>{p || "(sin plan de datos)"}</option>)}
+                </select>
               </div>
               <div>
                 <label className={labelCls}>Minutos actuales</label>
