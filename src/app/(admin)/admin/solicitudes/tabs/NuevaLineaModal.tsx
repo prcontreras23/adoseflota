@@ -1,12 +1,8 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { supabase, type LineaAltice } from "@/lib/supabase";
 import toast from "react-hot-toast";
 
-const ACCIONES = ["", "BAJA", "ALTA", "CAMBIO SOLICITADO", "SE MANTIENE", "REVISAR", "NO REQUIERE FLOTA"];
-const ESTADOS = ["", "CONFIRMADA", "POR CONFIRMAR", "PENDIENTE", "OK", "RESPONDIÓ", "SIN RESPUESTA"];
-const TIPOS = ["", "EMPLEADO", "EMPLEADO 2", "FAMILIAR", "PASTORES", "DEPARTAMENTAL", "INSTITUCION", "JUBILADO", "EXTERNO", "UD", "DESVINCULAR", "N/D", "CONFLICTO"];
-const PROXIMAS = ["", "LLAMAR", "CARTA", "COTIZAR", "CANCELAR"];
 const PLANES_DATA = [
   "",
   "Data 5GB + Bono 2GB (RD$711.00)",
@@ -17,13 +13,7 @@ const PLANES_DATA = [
   "No deseo internet",
 ];
 
-interface Dispositivo {
-  dispositivo: string;
-  disponibles: number;
-}
-
-const VACIO: LineaAltice = {
-  id: "",
+const VACIO = {
   telefono: "",
   usuario_linea: "",
   titular_responsable: "",
@@ -53,16 +43,29 @@ interface Props {
 }
 
 export default function NuevaLineaModal({ titularInicial, onClose, onCreate }: Props) {
-  const [form, setForm] = useState<LineaAltice>({ ...VACIO, titular_responsable: titularInicial ?? "" });
+  const [form, setForm] = useState({ ...VACIO, titular_responsable: titularInicial ?? "" });
   const [saving, setSaving] = useState(false);
-  const [dispositivos, setDispositivos] = useState<Dispositivo[]>([]);
+  const [dispositivosStock, setDispositivosStock] = useState<{ dispositivo: string; disponibles: number }[]>([]);
 
   useEffect(() => {
-    async function loadDispositivos() {
-      const { data } = await supabase.from("almacen_dispositivos").select("dispositivo, disponibles");
-      setDispositivos(data || []);
+    async function cargarStock() {
+      const [{ data: stockData }, { data: lineasData }] = await Promise.all([
+        supabase.from("almacen_dispositivos").select("dispositivo, cantidad_stock").order("dispositivo"),
+        supabase.from("lineas_altice").select("dispositivo_2026"),
+      ]);
+      if (!stockData) return;
+      const conteo: Record<string, number> = {};
+      (lineasData ?? []).forEach((l: { dispositivo_2026?: string }) => {
+        const d = l.dispositivo_2026?.trim().toLowerCase();
+        if (d) conteo[d] = (conteo[d] ?? 0) + 1;
+      });
+      const items = stockData.map((s: { dispositivo: string; cantidad_stock: number }) => ({
+        dispositivo: s.dispositivo,
+        disponibles: s.cantidad_stock - (conteo[s.dispositivo.toLowerCase()] ?? 0),
+      }));
+      setDispositivosStock(items);
     }
-    loadDispositivos();
+    cargarStock();
   }, []);
 
   async function handleSave() {
@@ -83,7 +86,7 @@ export default function NuevaLineaModal({ titularInicial, onClose, onCreate }: P
     onClose();
   }
 
-  function set(field: keyof LineaAltice, value: string) {
+  function set(field: keyof typeof VACIO, value: string) {
     setForm(prev => ({ ...prev, [field]: value }));
   }
 
@@ -92,6 +95,8 @@ export default function NuevaLineaModal({ titularInicial, onClose, onCreate }: P
     "text-slate-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
   const labelCls = "text-xs text-slate-500 mb-1 block font-medium";
   const sectionTitleCls = "text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3";
+
+  const stockSeleccionado = dispositivosStock.find(d => d.dispositivo === form.dispositivo_2026);
 
   return (
     <div className="fixed inset-0 z-50 flex">
@@ -124,7 +129,9 @@ export default function NuevaLineaModal({ titularInicial, onClose, onCreate }: P
               <div>
                 <label className={labelCls}>Tipo</label>
                 <select value={form.tipo} onChange={e => set("tipo", e.target.value)} className={inputCls}>
-                  {TIPOS.map(v => <option key={v} value={v}>{v || "(sin tipo)"}</option>)}
+                  {["", "EMPLEADO", "EMPLEADO 2", "FAMILIAR", "PASTORES", "DEPARTAMENTAL", "INSTITUCION", "JUBILADO", "EXTERNO", "UD", "DESVINCULAR", "N/D", "CONFLICTO"].map(v => (
+                    <option key={v} value={v}>{v || "(sin tipo)"}</option>
+                  ))}
                 </select>
               </div>
               <div className="col-span-2">
@@ -136,11 +143,6 @@ export default function NuevaLineaModal({ titularInicial, onClose, onCreate }: P
                 <label className={labelCls}>Titular responsable</label>
                 <input value={form.titular_responsable} onChange={e => set("titular_responsable", e.target.value)}
                   placeholder="Nombre del titular" className={inputCls} />
-              </div>
-              <div className="col-span-2">
-                <label className={labelCls}>Detalle origen</label>
-                <input value={form.detalle_origen} onChange={e => set("detalle_origen", e.target.value)}
-                  placeholder="Ej: Portabilidad desde Claro, Nueva solicitud..." className={inputCls} />
               </div>
             </div>
           </section>
@@ -154,7 +156,7 @@ export default function NuevaLineaModal({ titularInicial, onClose, onCreate }: P
                 <input value={form.gb_antes} onChange={e => set("gb_antes", e.target.value)}
                   placeholder="Ej: 5" className={inputCls} />
               </div>
-              <div>
+              <div className="col-span-2">
                 <label className={labelCls}>Plan de datos solicitado</label>
                 <select value={form.gb_solicitado} onChange={e => set("gb_solicitado", e.target.value)} className={inputCls}>
                   {PLANES_DATA.map(p => <option key={p} value={p}>{p || "(sin plan de datos)"}</option>)}
@@ -173,7 +175,7 @@ export default function NuevaLineaModal({ titularInicial, onClose, onCreate }: P
             </div>
           </section>
 
-          {/* Dispositivo */}
+          {/* Dispositivo y Costo */}
           <section>
             <p className={sectionTitleCls}>📱 Dispositivo y Costo</p>
             <div className="space-y-3">
@@ -181,8 +183,12 @@ export default function NuevaLineaModal({ titularInicial, onClose, onCreate }: P
                 <label className={labelCls}>Dispositivo 2026</label>
                 <select value={form.dispositivo_2026} onChange={e => set("dispositivo_2026", e.target.value)} className={inputCls}>
                   <option value="">(sin dispositivo)</option>
-                  {dispositivos.map(d => {
-                    const etiqueta = d.disponibles > 0 ? `✓ ${d.disponibles}` : `⚠ ${d.disponibles}`;
+                  {dispositivosStock.map(d => {
+                    const etiqueta = d.disponibles > 0
+                      ? `${d.disponibles} disponible${d.disponibles !== 1 ? "s" : ""}`
+                      : d.disponibles === 0
+                        ? "⚠ Agotado"
+                        : `⚠ Déficit (${Math.abs(d.disponibles)} de más)`;
                     return (
                       <option key={d.dispositivo} value={d.dispositivo}>
                         {d.dispositivo} — {etiqueta}
@@ -190,6 +196,19 @@ export default function NuevaLineaModal({ titularInicial, onClose, onCreate }: P
                     );
                   })}
                 </select>
+
+                {/* Aviso cuando no hay stock */}
+                {stockSeleccionado && stockSeleccionado.disponibles <= 0 && (
+                  <div className="mt-2 flex items-start gap-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg px-3 py-2">
+                    <span className="text-amber-500 text-base leading-tight mt-0.5">⚠️</span>
+                    <p className="text-xs text-amber-700 dark:text-amber-300 leading-snug">
+                      {stockSeleccionado.disponibles === 0
+                        ? <><strong>Sin stock disponible</strong> para <em>{stockSeleccionado.dispositivo}</em>. Puedes asignarlo de todas formas, pero actualiza el almacén cuando recibas más unidades.</>
+                        : <><strong>Déficit de {Math.abs(stockSeleccionado.disponibles)} unidad{Math.abs(stockSeleccionado.disponibles) !== 1 ? "es" : ""}</strong> para <em>{stockSeleccionado.dispositivo}</em>. Ya hay más solicitudes que stock. Puedes continuar, pero verifica con el proveedor.</>
+                      }
+                    </p>
+                  </div>
+                )}
               </div>
               <div>
                 <label className={labelCls}>Cotización</label>
@@ -211,19 +230,25 @@ export default function NuevaLineaModal({ titularInicial, onClose, onCreate }: P
               <div>
                 <label className={labelCls}>Acción 2026</label>
                 <select value={form.accion_2026} onChange={e => set("accion_2026", e.target.value)} className={inputCls}>
-                  {ACCIONES.map(v => <option key={v} value={v}>{v || "(sin acción)"}</option>)}
+                  {["", "BAJA", "ALTA", "CAMBIO SOLICITADO", "SE MANTIENE", "REVISAR", "NO REQUIERE FLOTA"].map(v => (
+                    <option key={v} value={v}>{v || "(sin acción)"}</option>
+                  ))}
                 </select>
               </div>
               <div>
                 <label className={labelCls}>Estado</label>
                 <select value={form.estado} onChange={e => set("estado", e.target.value)} className={inputCls}>
-                  {ESTADOS.map(v => <option key={v} value={v}>{v || "(sin estado)"}</option>)}
+                  {["", "CONFIRMADA", "POR CONFIRMAR", "PENDIENTE", "OK", "RESPONDIÓ", "SIN RESPUESTA"].map(v => (
+                    <option key={v} value={v}>{v || "(sin estado)"}</option>
+                  ))}
                 </select>
               </div>
               <div className="col-span-2">
                 <label className={labelCls}>Próxima acción</label>
                 <select value={form.proxima_accion} onChange={e => set("proxima_accion", e.target.value)} className={inputCls}>
-                  {PROXIMAS.map(v => <option key={v} value={v}>{v || "(sin próxima acción)"}</option>)}
+                  {["", "LLAMAR", "CARTA", "COTIZAR", "CANCELAR"].map(v => (
+                    <option key={v} value={v}>{v || "(sin próxima acción)"}</option>
+                  ))}
                 </select>
               </div>
               <div className="col-span-2">
@@ -233,6 +258,20 @@ export default function NuevaLineaModal({ titularInicial, onClose, onCreate }: P
                   rows={3} className={`${inputCls} resize-none`} />
                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Esta nota te ayuda a documentar el seguimiento sin perder la alerta original.</p>
               </div>
+            </div>
+          </section>
+
+          {/* Revisión */}
+          <section>
+            <p className={sectionTitleCls}>✅ Revisión</p>
+            <div>
+              <label className={labelCls}>Revisado por</label>
+              <select value={form.revisado_por} onChange={e => set("revisado_por", e.target.value)} className={inputCls}>
+                <option value="">(sin revisar)</option>
+                <option value="Francis">Francis</option>
+                <option value="Carlos">Carlos</option>
+                <option value="Soto">Soto</option>
+              </select>
             </div>
           </section>
 
@@ -250,20 +289,6 @@ export default function NuevaLineaModal({ titularInicial, onClose, onCreate }: P
                 <textarea value={form.seguimiento} onChange={e => set("seguimiento", e.target.value)}
                   rows={3} className={inputCls + " resize-none"} />
               </div>
-            </div>
-          </section>
-
-          {/* Revisión */}
-          <section>
-            <p className={sectionTitleCls}>✅ Revisión</p>
-            <div>
-              <label className={labelCls}>Revisado por</label>
-              <select value={form.revisado_por} onChange={e => set("revisado_por", e.target.value)} className={inputCls}>
-                <option value="">(sin revisar)</option>
-                <option value="Francis">Francis</option>
-                <option value="Carlos">Carlos</option>
-                <option value="Soto">Soto</option>
-              </select>
             </div>
           </section>
         </div>
