@@ -69,6 +69,41 @@ export default function AlmacenTab() {
 
     useEffect(() => { loadStock(); }, [loadStock]);
 
+    // Suscripción Realtime al inventario: altas/ediciones/bajas de stock se
+    // reflejan al instante en cualquier ventana o dispositivo (sin recargar).
+    useEffect(() => {
+        const channel = supabase
+            .channel("almacen_dispositivos_sync")
+            .on(
+                "postgres_changes",
+                { event: "*", schema: "public", table: "almacen_dispositivos" },
+                (payload) => {
+                    setRawStock((prev) => {
+                        if (payload.eventType === "INSERT") {
+                            const n = payload.new as DispositivoStock;
+                            if (prev.some((r) => r.id === n.id)) {
+                                return prev.map((r) => (r.id === n.id ? n : r));
+                            }
+                            return [...prev, n].sort((a, b) => a.dispositivo.localeCompare(b.dispositivo));
+                        }
+                        if (payload.eventType === "UPDATE") {
+                            const n = payload.new as DispositivoStock;
+                            return prev.map((r) => (r.id === n.id ? { ...r, ...n } : r));
+                        }
+                        if (payload.eventType === "DELETE") {
+                            const o = payload.old as { id?: string };
+                            return o?.id ? prev.filter((r) => r.id !== o.id) : prev;
+                        }
+                        return prev;
+                    });
+                }
+            )
+            .subscribe();
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, []);
+
     // Cobertura calculada en vivo: cualquier cambio de dispositivo en otra pestaña
     // se refleja aquí al instante (solicitados / disponibles / déficit / sin catalogar).
     const { stock, sinCatalogar } = useMemo(() => {
