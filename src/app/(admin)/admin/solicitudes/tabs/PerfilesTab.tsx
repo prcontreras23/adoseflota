@@ -240,7 +240,7 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
               <div>
                 <label className={labelCls}>Acción 2026</label>
                 <select value={form.accion_2026} onChange={e => set("accion_2026", e.target.value)} className={inputCls}>
-                  {["", "BAJA", "ALTA", "CAMBIO SOLICITADO", "SE MANTIENE", "REVISAR"].map(v => (
+                  {["", "BAJA", "ALTA", "CAMBIO SOLICITADO", "SE MANTIENE", "REVISAR", "NO REQUIERE FLOTA"].map(v => (
                     <option key={v} value={v}>{v || "(sin acción)"}</option>
                   ))}
                 </select>
@@ -527,7 +527,7 @@ export default function PerfilesTab() {
     return true;
   });
 
-  const ACCIONES_ORDEN = ["BAJA", "ALTA", "CAMBIO SOLICITADO", "REVISAR", "SE MANTIENE", ""];
+  const ACCIONES_ORDEN = ["BAJA", "ALTA", "CAMBIO SOLICITADO", "REVISAR", "SE MANTIENE", "NO REQUIERE FLOTA", ""];
 
   function sumaMontoGrupo(lineas: LineaAltice[]): number {
     return lineas.reduce((acc, r) => {
@@ -586,7 +586,7 @@ export default function PerfilesTab() {
 
       {/* Barra de filtros */}
       {(() => {
-        const ACCIONES_LIST = ["BAJA", "ALTA", "CAMBIO SOLICITADO", "SE MANTIENE", "REVISAR"];
+        const ACCIONES_LIST = ["BAJA", "ALTA", "CAMBIO SOLICITADO", "SE MANTIENE", "REVISAR", "NO REQUIERE FLOTA"];
         const ESTADOS_LIST = ["CONFIRMADA", "POR CONFIRMAR", "PENDIENTE", "OK", "RESPONDIÓ", "SIN RESPUESTA"];
         const TIPOS_LIST = ["EMPLEADO", "EMPLEADO 2", "FAMILIAR", "PASTORES", "DEPARTAMENTAL", "INSTITUCION", "JUBILADO", "EXTERNO", "UD", "DESVINCULAR", "N/D", "CONFLICTO"];
         const selCls = "border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";

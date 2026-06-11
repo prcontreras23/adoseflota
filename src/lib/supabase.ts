@@ -164,7 +164,7 @@ export async function getCurrentUser() {
 
 // ─── Altice Renovation 2026 ───────────────────────────────────────────────────
 
-export type Accion2026 = "BAJA" | "ALTA" | "CAMBIO SOLICITADO" | "SE MANTIENE" | "REVISAR" | "";
+export type Accion2026 = "BAJA" | "ALTA" | "CAMBIO SOLICITADO" | "SE MANTIENE" | "REVISAR" | "NO REQUIERE FLOTA" | "";
 export type EstadoLinea = "CONFIRMADA" | "POR CONFIRMAR" | "PENDIENTE" | "OK" | "RESPONDIÓ" | "SIN RESPUESTA" | "";
 
 export interface LineaAltice {
@@ -197,6 +197,7 @@ export const ACCION_COLORS: Record<string, string> = {
     "CAMBIO SOLICITADO": "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
     "REVISAR": "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
     "SE MANTIENE": "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300",
+    "NO REQUIERE FLOTA": "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400",
 };
 
 export const ESTADO_LINEA_COLORS: Record<string, string> = {
