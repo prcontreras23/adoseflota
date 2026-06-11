@@ -49,6 +49,9 @@ export default function LineasTab() {
     const [filterAccion, setFilterAccion] = useState("");
     const [filterEstado, setFilterEstado] = useState("");
     const [filterTipo, setFilterTipo] = useState("");
+    const [filterDispositivo, setFilterDispositivo] = useState("");
+    const [filterGb, setFilterGb] = useState("");
+    const [filterMin, setFilterMin] = useState("");
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [showNueva, setShowNueva] = useState(false);
     const [importing, setImporting] = useState(false);
@@ -68,6 +71,9 @@ export default function LineasTab() {
         if (filterAccion) f = f.filter(r => r.accion_2026 === filterAccion);
         if (filterEstado) f = f.filter(r => r.estado === filterEstado);
         if (filterTipo) f = f.filter(r => r.tipo === filterTipo);
+        if (filterDispositivo) f = f.filter(r => r.dispositivo_2026?.trim() === filterDispositivo);
+        if (filterGb) f = f.filter(r => (r.gb_solicitado?.trim() || r.gb_antes?.trim()) === filterGb);
+        if (filterMin) f = f.filter(r => (r.min_solicitados?.trim() || r.min_antes?.trim()) === filterMin);
         if (search) {
             const q = search.toLowerCase();
             f = f.filter(r =>
@@ -78,7 +84,7 @@ export default function LineasTab() {
             );
         }
         setFiltered(f);
-    }, [all, filterAccion, filterEstado, filterTipo, search]);
+    }, [all, filterAccion, filterEstado, filterTipo, filterDispositivo, filterGb, filterMin, search]);
 
     async function updateField(id: string, field: keyof LineaAltice, value: string) {
         const { error } = await supabase.from("lineas_altice").update({ [field]: value }).eq("id", id);
@@ -112,6 +118,34 @@ export default function LineasTab() {
         "Seguimiento": "seguimiento",
         "Titular Vinculado": "titular_vinculado",
     };
+
+    function exportarFiltradas() {
+        // Exporta solo las líneas visibles (con filtros aplicados)
+        const rows = filtered.map(r => ({
+            "Teléfono": r.telefono,
+            "Usuario": r.usuario_linea,
+            "Titular Responsable": r.titular_responsable,
+            "Tipo": r.tipo,
+            "Acción 2026": r.accion_2026,
+            "GB Antes": r.gb_antes,
+            "GB Solicitado": r.gb_solicitado,
+            "Min Antes": r.min_antes,
+            "Min Solicitados": r.min_solicitados,
+            "Dispositivo 2026": r.dispositivo_2026,
+            "Estado": r.estado,
+            "Próxima Acción": r.proxima_accion,
+            "Cotización": r.cotizacion,
+            "Monto Mensual": r.monto_mensual,
+            "Observaciones": r.observaciones,
+            "Seguimiento": r.seguimiento,
+        }));
+        const ws = XLSX.utils.json_to_sheet(rows);
+        ws["!cols"] = Object.keys(rows[0] || {}).map(k => ({ wch: Math.max(k.length, 14) }));
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Líneas Altice 2026");
+        XLSX.writeFile(wb, `Exportar-Lineas-${new Date().toISOString().split("T")[0]}.xlsx`);
+        toast.success(`${filtered.length} líneas exportadas`);
+    }
 
     function exportPlantilla() {
         // Exporta TODAS las líneas (no solo filtradas) con TODOS los campos
@@ -235,9 +269,13 @@ export default function LineasTab() {
                         className="text-sm bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl font-semibold transition-colors">
                         ➕ Nueva Línea
                     </button>
+                    <button onClick={exportarFiltradas}
+                        className="text-sm bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-xl font-semibold transition-colors">
+                        📊 Exportar Excel
+                    </button>
                     <button onClick={exportPlantilla}
-                        className="text-sm bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl font-semibold transition-colors">
-                        📥 Descargar Plantilla
+                        className="text-sm bg-emerald-700 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl font-semibold transition-colors">
+                        📥 Plantilla completa
                     </button>
                     <button
                         onClick={() => importRef.current?.click()}
@@ -256,32 +294,50 @@ export default function LineasTab() {
             </div>
 
             {/* Filtros */}
-            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 flex flex-wrap gap-3">
-                <input value={search} onChange={e => setSearch(e.target.value)}
-                    placeholder="🔍 Buscar nombre, titular, teléfono, seguimiento..."
-                    className="flex-1 min-w-52 border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                <select value={filterAccion} onChange={e => setFilterAccion(e.target.value)}
-                    className="border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">Todas las acciones</option>
-                    {ACCIONES.filter(Boolean).map(a => <option key={a} value={a}>{a}</option>)}
-                </select>
-                <select value={filterEstado} onChange={e => setFilterEstado(e.target.value)}
-                    className="border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">Todos los estados</option>
-                    {ESTADOS.filter(Boolean).map(a => <option key={a} value={a}>{a}</option>)}
-                </select>
-                <select value={filterTipo} onChange={e => setFilterTipo(e.target.value)}
-                    className="border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">Todos los tipos</option>
-                    {TIPOS.filter(Boolean).map(a => <option key={a} value={a}>{a}</option>)}
-                </select>
-                {(filterAccion || filterEstado || filterTipo || search) && (
-                    <button onClick={() => { setFilterAccion(""); setFilterEstado(""); setFilterTipo(""); setSearch(""); }}
-                        className="text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 underline">
-                        Limpiar filtros
-                    </button>
-                )}
-            </div>
+            {(() => {
+                const opcionesDispositivo = [...new Set(all.map(r => r.dispositivo_2026?.trim()).filter(Boolean))].sort() as string[];
+                const opcionesGb = [...new Set(all.map(r => r.gb_solicitado?.trim() || r.gb_antes?.trim()).filter(Boolean))].sort((a, b) => parseFloat(a!) - parseFloat(b!)) as string[];
+                const opcionesMin = [...new Set(all.map(r => r.min_solicitados?.trim() || r.min_antes?.trim()).filter(Boolean))].sort((a, b) => parseFloat(a!) - parseFloat(b!)) as string[];
+                const hayFiltros = !!(filterAccion || filterEstado || filterTipo || filterDispositivo || filterGb || filterMin || search);
+                const selCls = "border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
+                return (
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 flex flex-wrap gap-3">
+                        <input value={search} onChange={e => setSearch(e.target.value)}
+                            placeholder="🔍 Buscar nombre, titular, teléfono, seguimiento..."
+                            className={`flex-1 min-w-52 ${selCls}`} />
+                        <select value={filterAccion} onChange={e => setFilterAccion(e.target.value)} className={selCls}>
+                            <option value="">Todas las acciones</option>
+                            {ACCIONES.filter(Boolean).map(a => <option key={a} value={a}>{a}</option>)}
+                        </select>
+                        <select value={filterEstado} onChange={e => setFilterEstado(e.target.value)} className={selCls}>
+                            <option value="">Todos los estados</option>
+                            {ESTADOS.filter(Boolean).map(a => <option key={a} value={a}>{a}</option>)}
+                        </select>
+                        <select value={filterTipo} onChange={e => setFilterTipo(e.target.value)} className={selCls}>
+                            <option value="">Todos los tipos</option>
+                            {TIPOS.filter(Boolean).map(a => <option key={a} value={a}>{a}</option>)}
+                        </select>
+                        <select value={filterDispositivo} onChange={e => setFilterDispositivo(e.target.value)} className={selCls}>
+                            <option value="">📱 Todos los equipos</option>
+                            {opcionesDispositivo.map(d => <option key={d} value={d}>{d}</option>)}
+                        </select>
+                        <select value={filterGb} onChange={e => setFilterGb(e.target.value)} className={selCls}>
+                            <option value="">📶 Todos los GB</option>
+                            {opcionesGb.map(g => <option key={g} value={g}>{g} GB</option>)}
+                        </select>
+                        <select value={filterMin} onChange={e => setFilterMin(e.target.value)} className={selCls}>
+                            <option value="">📞 Todos los min</option>
+                            {opcionesMin.map(m => <option key={m} value={m}>{m} min</option>)}
+                        </select>
+                        {hayFiltros && (
+                            <button onClick={() => { setFilterAccion(""); setFilterEstado(""); setFilterTipo(""); setFilterDispositivo(""); setFilterGb(""); setFilterMin(""); setSearch(""); }}
+                                className="text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 underline whitespace-nowrap">
+                                Limpiar filtros
+                            </button>
+                        )}
+                    </div>
+                );
+            })()}
 
             {/* Tabla */}
             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">

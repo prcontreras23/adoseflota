@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { supabase, type LineaAltice, ACCION_COLORS, ESTADO_LINEA_COLORS } from "@/lib/supabase";
+import * as XLSX from "xlsx";
 import toast from "react-hot-toast";
 import NuevaLineaModal from "./NuevaLineaModal";
 
@@ -33,10 +34,11 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
         const d = l.dispositivo_2026?.trim().toLowerCase();
         if (d) conteo[d] = (conteo[d] ?? 0) + 1;
       });
+      // Incluir TODOS los dispositivos, sin filtrar por disponibles
       const items = stockData.map((s: { dispositivo: string; cantidad_stock: number }) => ({
         dispositivo: s.dispositivo,
         disponibles: s.cantidad_stock - (conteo[s.dispositivo.toLowerCase()] ?? 0),
-      })).filter(s => s.disponibles > 0);
+      }));
       setDispositivosStock(items);
     }
     cargarStock();
@@ -153,17 +155,45 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
             <div className="space-y-3">
               <div>
                 <label className={labelCls}>Dispositivo 2026</label>
-                <select value={form.dispositivo_2026} onChange={e => set("dispositivo_2026", e.target.value)} className={inputCls}>
+                <select
+                  value={form.dispositivo_2026}
+                  onChange={e => set("dispositivo_2026", e.target.value)}
+                  className={inputCls}>
                   <option value="">(sin dispositivo)</option>
+                  {/* Opción actual si no está en el catálogo de almacén */}
                   {form.dispositivo_2026 && !dispositivosStock.find(d => d.dispositivo === form.dispositivo_2026) && (
-                    <option value={form.dispositivo_2026}>{form.dispositivo_2026} (actual)</option>
+                    <option value={form.dispositivo_2026}>{form.dispositivo_2026} (actual — sin stock registrado)</option>
                   )}
-                  {dispositivosStock.map(d => (
-                    <option key={d.dispositivo} value={d.dispositivo}>
-                      {d.dispositivo} — {d.disponibles} disponible{d.disponibles !== 1 ? "s" : ""}
-                    </option>
-                  ))}
+                  {dispositivosStock.map(d => {
+                    const etiqueta = d.disponibles > 0
+                      ? `${d.disponibles} disponible${d.disponibles !== 1 ? "s" : ""}`
+                      : d.disponibles === 0
+                        ? "⚠ Agotado"
+                        : `⚠ Déficit (${Math.abs(d.disponibles)} de más)`;
+                    return (
+                      <option key={d.dispositivo} value={d.dispositivo}>
+                        {d.dispositivo} — {etiqueta}
+                      </option>
+                    );
+                  })}
                 </select>
+
+                {/* Aviso inline cuando el dispositivo seleccionado no tiene stock */}
+                {(() => {
+                  const sel = dispositivosStock.find(d => d.dispositivo === form.dispositivo_2026);
+                  if (!sel || sel.disponibles > 0) return null;
+                  return (
+                    <div className="mt-2 flex items-start gap-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg px-3 py-2">
+                      <span className="text-amber-500 text-base leading-tight mt-0.5">⚠️</span>
+                      <p className="text-xs text-amber-700 dark:text-amber-300 leading-snug">
+                        {sel.disponibles === 0
+                          ? <><strong>Sin stock disponible</strong> para <em>{sel.dispositivo}</em>. Puedes asignarlo de todas formas, pero actualiza el almacén cuando recibas más unidades.</>
+                          : <><strong>Déficit de {Math.abs(sel.disponibles)} unidad{Math.abs(sel.disponibles) !== 1 ? "es" : ""}</strong> para <em>{sel.dispositivo}</em>. Ya hay más solicitudes que stock. Puedes continuar, pero verifica con el proveedor.</>
+                        }
+                      </p>
+                    </div>
+                  );
+                })()}
               </div>
               <div>
                 <label className={labelCls}>Cotización</label>
@@ -320,6 +350,9 @@ export default function PerfilesTab() {
   const [all, setAll] = useState<LineaAltice[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [filterDispositivo, setFilterDispositivo] = useState("");
+  const [filterGb, setFilterGb] = useState("");
+  const [filterMin, setFilterMin] = useState("");
   const [expandedTitular, setExpandedTitular] = useState<string | null>(null);
   const [editingLinea, setEditingLinea] = useState<LineaAltice | null>(null);
   const [vinculandoTitular, setVinculandoTitular] = useState<string | null>(null);
@@ -364,6 +397,33 @@ export default function PerfilesTab() {
     toast.success("Vínculo eliminado");
   }
 
+  function exportarPerfiles() {
+    const rows = all.map(r => ({
+      "Titular Responsable": r.titular_responsable,
+      "Teléfono": r.telefono,
+      "Usuario": r.usuario_linea,
+      "Tipo": r.tipo,
+      "Acción 2026": r.accion_2026,
+      "GB Antes": r.gb_antes,
+      "GB Solicitado": r.gb_solicitado,
+      "Min Antes": r.min_antes,
+      "Min Solicitados": r.min_solicitados,
+      "Dispositivo 2026": r.dispositivo_2026,
+      "Cotización": r.cotizacion,
+      "Monto Mensual": r.monto_mensual,
+      "Estado": r.estado,
+      "Próxima Acción": r.proxima_accion,
+      "Seguimiento": r.seguimiento,
+      "Observaciones": r.observaciones,
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws["!cols"] = Object.keys(rows[0] || {}).map(k => ({ wch: Math.max(k.length, 14) }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Perfiles Flota 2026");
+    XLSX.writeFile(wb, `Perfiles-Flota-${new Date().toISOString().split("T")[0]}.xlsx`);
+    toast.success(`${all.length} perfiles exportados`);
+  }
+
   function handleCreada(linea: LineaAltice) {
     setAll(prev => [...prev, linea]);
     // Expandir el grupo del titular recién creado
@@ -379,11 +439,31 @@ export default function PerfilesTab() {
     }, {} as Record<string, TitularGroup>)
   ).sort((a, b) => a.nombre.localeCompare(b.nombre));
 
+  // Opciones únicas para los filtros
+  const opcionesDispositivo = [...new Set(all.map(r => r.dispositivo_2026?.trim()).filter(Boolean))].sort() as string[];
+  const opcionesGb = [...new Set(all.map(r => r.gb_solicitado?.trim() || r.gb_antes?.trim()).filter(Boolean))].sort((a, b) => parseFloat(a!) - parseFloat(b!)) as string[];
+  const opcionesMin = [...new Set(all.map(r => r.min_solicitados?.trim() || r.min_antes?.trim()).filter(Boolean))].sort((a, b) => parseFloat(a!) - parseFloat(b!)) as string[];
+
+  const hayFiltros = !!(search || filterDispositivo || filterGb || filterMin);
+
   const gruposFiltrados = grupos.filter(g => {
-    if (!search) return true;
     const q = search.toLowerCase();
-    return g.nombre.toLowerCase().includes(q) ||
+    const coincideTexto = !search || g.nombre.toLowerCase().includes(q) ||
       g.lineas.some(l => l.usuario_linea.toLowerCase().includes(q) || l.telefono.includes(q));
+    if (!coincideTexto) return false;
+
+    // Al menos una línea del grupo debe cumplir todos los filtros activos
+    if (filterDispositivo || filterGb || filterMin) {
+      return g.lineas.some(l => {
+        const okDispositivo = !filterDispositivo || l.dispositivo_2026?.trim() === filterDispositivo;
+        const gbLinea = l.gb_solicitado?.trim() || l.gb_antes?.trim();
+        const okGb = !filterGb || gbLinea === filterGb;
+        const minLinea = l.min_solicitados?.trim() || l.min_antes?.trim();
+        const okMin = !filterMin || minLinea === filterMin;
+        return okDispositivo && okGb && okMin;
+      });
+    }
+    return true;
   });
 
   const ACCIONES_ORDEN = ["BAJA", "ALTA", "CAMBIO SOLICITADO", "REVISAR", "SE MANTIENE", ""];
@@ -431,15 +511,45 @@ export default function PerfilesTab() {
           <h2 className="text-lg font-bold text-slate-800 dark:text-white">Perfiles por Titular</h2>
           <p className="text-sm text-slate-500 dark:text-slate-400">{gruposFiltrados.length} titulares · {all.length} líneas totales</p>
         </div>
-        <button onClick={() => setNuevaLineaTitular("")}
-          className="text-sm bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl font-semibold transition-colors">
-          ➕ Nuevo Perfil
-        </button>
+        <div className="flex gap-2">
+          <button onClick={exportarPerfiles}
+            className="text-sm bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-xl font-semibold transition-colors">
+            📊 Exportar Excel
+          </button>
+          <button onClick={() => setNuevaLineaTitular("")}
+            className="text-sm bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl font-semibold transition-colors">
+            ➕ Nuevo Perfil
+          </button>
+        </div>
       </div>
 
-      <input value={search} onChange={e => setSearch(e.target.value)}
-        placeholder="🔍 Buscar titular, usuario o teléfono..."
-        className="w-full border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      {/* Barra de filtros */}
+      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-3 flex flex-wrap gap-2 items-center">
+        <input value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="🔍 Buscar titular, usuario o teléfono..."
+          className="flex-1 min-w-48 border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <select value={filterDispositivo} onChange={e => setFilterDispositivo(e.target.value)}
+          className="border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="">📱 Todos los equipos</option>
+          {opcionesDispositivo.map(d => <option key={d} value={d}>{d}</option>)}
+        </select>
+        <select value={filterGb} onChange={e => setFilterGb(e.target.value)}
+          className="border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="">📶 Todos los GB</option>
+          {opcionesGb.map(g => <option key={g} value={g}>{g} GB</option>)}
+        </select>
+        <select value={filterMin} onChange={e => setFilterMin(e.target.value)}
+          className="border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="">📞 Todos los min</option>
+          {opcionesMin.map(m => <option key={m} value={m}>{m} min</option>)}
+        </select>
+        {hayFiltros && (
+          <button onClick={() => { setSearch(""); setFilterDispositivo(""); setFilterGb(""); setFilterMin(""); }}
+            className="text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 underline whitespace-nowrap">
+            Limpiar filtros
+          </button>
+        )}
+      </div>
 
       <div className="space-y-3">
         {gruposFiltrados.map(g => {

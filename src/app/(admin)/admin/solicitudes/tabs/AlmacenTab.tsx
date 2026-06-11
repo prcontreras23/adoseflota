@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { supabase, type LineaAltice } from "@/lib/supabase";
+import * as XLSX from "xlsx";
 import toast from "react-hot-toast";
 
 interface DispositivoStock {
@@ -164,6 +165,23 @@ export default function AlmacenTab() {
     const totalDisponibles = stock.reduce((s, i) => s + Math.max(i.disponibles, 0), 0);
     const conDeficit = stock.filter(i => i.disponibles < 0).length;
 
+    function exportarAlmacen() {
+        const rows = stock.map(s => ({
+            "Dispositivo": s.dispositivo,
+            "Stock": s.cantidad_stock,
+            "Solicitados": s.solicitados,
+            "Disponibles": s.disponibles,
+            "Estado": s.disponibles > 0 ? "Disponible" : s.disponibles === 0 ? "Agotado" : `Déficit (${Math.abs(s.disponibles)})`,
+            "Notas": s.notas,
+        }));
+        const ws = XLSX.utils.json_to_sheet(rows);
+        ws["!cols"] = [{ wch: 30 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 20 }, { wch: 30 }];
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Almacén Dispositivos");
+        XLSX.writeFile(wb, `Almacen-Dispositivos-${new Date().toISOString().split("T")[0]}.xlsx`);
+        toast.success("Almacén exportado");
+    }
+
     const inputCls = "w-full border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
     const labelCls = "text-xs text-slate-500 mb-1 block font-medium";
 
@@ -239,10 +257,16 @@ export default function AlmacenTab() {
                         Stock real vs. solicitados en las líneas
                     </p>
                 </div>
-                <button onClick={() => abrirNuevo()}
-                    className="text-sm bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl font-semibold transition-colors">
-                    ➕ Agregar dispositivo
-                </button>
+                <div className="flex gap-2">
+                    <button onClick={exportarAlmacen} disabled={stock.length === 0}
+                        className="text-sm bg-green-600 hover:bg-green-500 disabled:opacity-40 text-white px-4 py-2 rounded-xl font-semibold transition-colors">
+                        📊 Exportar Excel
+                    </button>
+                    <button onClick={() => abrirNuevo()}
+                        className="text-sm bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl font-semibold transition-colors">
+                        ➕ Agregar dispositivo
+                    </button>
+                </div>
             </div>
 
             {/* ── KPI CARDS ──────────────────────────────────────────── */}
