@@ -1,9 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase, type LineaAltice } from "@/lib/supabase";
 import toast from "react-hot-toast";
 
-const ACCIONES = ["", "BAJA", "ALTA", "CAMBIO SOLICITADO", "SE MANTIENE", "REVISAR"];
+const ACCIONES = ["", "BAJA", "ALTA", "CAMBIO SOLICITADO", "SE MANTIENE", "REVISAR", "NO REQUIERE FLOTA"];
 const ESTADOS = ["", "CONFIRMADA", "POR CONFIRMAR", "PENDIENTE", "OK", "RESPONDIÓ", "SIN RESPUESTA"];
 const TIPOS = ["", "EMPLEADO", "EMPLEADO 2", "FAMILIAR", "PASTORES", "DEPARTAMENTAL", "INSTITUCION", "JUBILADO", "EXTERNO", "UD", "DESVINCULAR", "N/D", "CONFLICTO"];
 const PROXIMAS = ["", "LLAMAR", "CARTA", "COTIZAR", "CANCELAR"];
@@ -17,7 +17,13 @@ const PLANES_DATA = [
   "No deseo internet",
 ];
 
-const VACIO = {
+interface Dispositivo {
+  dispositivo: string;
+  disponibles: number;
+}
+
+const VACIO: LineaAltice = {
+  id: "",
   telefono: "",
   usuario_linea: "",
   titular_responsable: "",
@@ -33,9 +39,11 @@ const VACIO = {
   proxima_accion: "",
   observaciones: "",
   seguimiento: "",
+  nota_resolucion: "",
   monto_mensual: "",
   cotizacion: "",
   titular_vinculado: "",
+  revisado_por: "",
 };
 
 interface Props {
@@ -45,8 +53,17 @@ interface Props {
 }
 
 export default function NuevaLineaModal({ titularInicial, onClose, onCreate }: Props) {
-  const [form, setForm] = useState({ ...VACIO, titular_responsable: titularInicial ?? "" });
+  const [form, setForm] = useState<LineaAltice>({ ...VACIO, titular_responsable: titularInicial ?? "" });
   const [saving, setSaving] = useState(false);
+  const [dispositivos, setDispositivos] = useState<Dispositivo[]>([]);
+
+  useEffect(() => {
+    async function loadDispositivos() {
+      const { data } = await supabase.from("almacen_dispositivos").select("dispositivo, disponibles");
+      setDispositivos(data || []);
+    }
+    loadDispositivos();
+  }, []);
 
   async function handleSave() {
     if (!form.telefono.trim()) {
@@ -66,7 +83,7 @@ export default function NuevaLineaModal({ titularInicial, onClose, onCreate }: P
     onClose();
   }
 
-  function set(field: keyof typeof VACIO, value: string) {
+  function set(field: keyof LineaAltice, value: string) {
     setForm(prev => ({ ...prev, [field]: value }));
   }
 
@@ -120,6 +137,11 @@ export default function NuevaLineaModal({ titularInicial, onClose, onCreate }: P
                 <input value={form.titular_responsable} onChange={e => set("titular_responsable", e.target.value)}
                   placeholder="Nombre del titular" className={inputCls} />
               </div>
+              <div className="col-span-2">
+                <label className={labelCls}>Detalle origen</label>
+                <input value={form.detalle_origen} onChange={e => set("detalle_origen", e.target.value)}
+                  placeholder="Ej: Portabilidad desde Claro, Nueva solicitud..." className={inputCls} />
+              </div>
             </div>
           </section>
 
@@ -157,8 +179,17 @@ export default function NuevaLineaModal({ titularInicial, onClose, onCreate }: P
             <div className="space-y-3">
               <div>
                 <label className={labelCls}>Dispositivo 2026</label>
-                <input value={form.dispositivo_2026} onChange={e => set("dispositivo_2026", e.target.value)}
-                  placeholder="Ej: Samsung A56, iPhone 17 Pro Max..." className={inputCls} />
+                <select value={form.dispositivo_2026} onChange={e => set("dispositivo_2026", e.target.value)} className={inputCls}>
+                  <option value="">(sin dispositivo)</option>
+                  {dispositivos.map(d => {
+                    const etiqueta = d.disponibles > 0 ? `✓ ${d.disponibles}` : `⚠ ${d.disponibles}`;
+                    return (
+                      <option key={d.dispositivo} value={d.dispositivo}>
+                        {d.dispositivo} — {etiqueta}
+                      </option>
+                    );
+                  })}
+                </select>
               </div>
               <div>
                 <label className={labelCls}>Cotización</label>
@@ -195,6 +226,13 @@ export default function NuevaLineaModal({ titularInicial, onClose, onCreate }: P
                   {PROXIMAS.map(v => <option key={v} value={v}>{v || "(sin próxima acción)"}</option>)}
                 </select>
               </div>
+              <div className="col-span-2">
+                <label className={labelCls}>💬 Nota de resolución</label>
+                <textarea value={form.nota_resolucion} onChange={e => set("nota_resolucion", e.target.value)}
+                  placeholder="Registra aquí qué acción tomaste, resultado de llamadas, confirmaciones, etc."
+                  rows={3} className={`${inputCls} resize-none`} />
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Esta nota te ayuda a documentar el seguimiento sin perder la alerta original.</p>
+              </div>
             </div>
           </section>
 
@@ -212,6 +250,20 @@ export default function NuevaLineaModal({ titularInicial, onClose, onCreate }: P
                 <textarea value={form.seguimiento} onChange={e => set("seguimiento", e.target.value)}
                   rows={3} className={inputCls + " resize-none"} />
               </div>
+            </div>
+          </section>
+
+          {/* Revisión */}
+          <section>
+            <p className={sectionTitleCls}>✅ Revisión</p>
+            <div>
+              <label className={labelCls}>Revisado por</label>
+              <select value={form.revisado_por} onChange={e => set("revisado_por", e.target.value)} className={inputCls}>
+                <option value="">(sin revisar)</option>
+                <option value="Francis">Francis</option>
+                <option value="Carlos">Carlos</option>
+                <option value="Soto">Soto</option>
+              </select>
             </div>
           </section>
         </div>

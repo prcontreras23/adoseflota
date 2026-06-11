@@ -85,6 +85,7 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
       proxima_accion: form.proxima_accion,
       observaciones: form.observaciones,
       seguimiento: form.seguimiento,
+      nota_resolucion: form.nota_resolucion,
       revisado_por: form.revisado_por,
     }).eq("id", linea.id);
     setSaving(false);
@@ -260,6 +261,13 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
                     <option key={v} value={v}>{v || "(sin próxima acción)"}</option>
                   ))}
                 </select>
+              </div>
+              <div className="col-span-2">
+                <label className={labelCls}>💬 Nota de resolución</label>
+                <textarea value={form.nota_resolucion} onChange={e => set("nota_resolucion", e.target.value)}
+                  placeholder="Registra aquí qué acción tomaste, resultado de llamadas, confirmaciones, etc. (Ej: Llamada 11-06 — confirmó su plan. iPhone 17 Pro aprobado por director)"
+                  rows={3} className={`${inputCls} resize-none`} />
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Esta nota te ayuda a documentar el seguimiento sin perder la alerta original.</p>
               </div>
             </div>
           </section>

@@ -184,6 +184,7 @@ export interface LineaAltice {
     proxima_accion: string;
     observaciones: string;
     seguimiento: string;
+    nota_resolucion: string;
     updated_at?: string;
     monto_mensual: string;
     cotizacion: string;
