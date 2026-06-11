@@ -418,7 +418,7 @@ export default function LineasTab() {
                                         className="hover:bg-slate-50 dark:hover:bg-slate-700/30 cursor-pointer"
                                         onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}>
                                         <td className="p-2.5 font-mono font-medium text-slate-700 dark:text-slate-200 whitespace-nowrap">
-                                            {r.telefono?.startsWith("NUEVA") ? <span className="text-green-600 font-bold">{r.telefono}</span> : <span className="flex items-center gap-1">{r.telefono}<a href={`tel:+1${r.telefono.replace(/-/g, "")}`} onClick={e => e.stopPropagation()} title="Llamar" className="text-blue-500 hover:text-blue-700 ml-1">📞</a></span>}
+                                            {r.telefono?.startsWith("NUEVA") ? <span className="text-green-600 font-bold">{r.telefono}</span> : <span className="flex items-center gap-1">{r.telefono}<a href={`tel:+1${r.telefono?.replace(/-/g, "")}`} onClick={e => e.stopPropagation()} title="Llamar" className="text-blue-500 hover:text-blue-700 ml-1">📞</a></span>}
                                         </td>
                                         <td className="p-2.5">
                                             <p className="font-medium text-slate-800 dark:text-white">{r.usuario_linea || "—"}</p>
