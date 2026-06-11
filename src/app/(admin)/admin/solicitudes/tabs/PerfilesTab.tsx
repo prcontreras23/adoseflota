@@ -5,6 +5,7 @@ import { useLineas } from "@/lib/LineasContext";
 import * as XLSX from "xlsx";
 import toast from "react-hot-toast";
 import NuevaLineaModal from "./NuevaLineaModal";
+import FormularioPanel from "./FormularioPanel";
 
 const PLANES_DATA = [
   "",
@@ -114,6 +115,12 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
         </div>
 
         <div className="p-4 space-y-6 flex-1">
+          {/* Panel de respuesta del formulario */}
+          <FormularioPanel
+            titular={linea.titular_responsable ?? ""}
+            usuario={linea.usuario_linea ?? ""}
+          />
+
           <section>
             <p className={sectionTitleCls}>👤 Identificación</p>
             <div className="grid grid-cols-2 gap-3">
@@ -401,6 +408,8 @@ export default function PerfilesTab() {
   const [chipSinDispositivo, setChipSinDispositivo] = useState(false);
   const [chipSinMonto, setChipSinMonto] = useState(false);
   const [chipConSeguimiento, setChipConSeguimiento] = useState(false);
+  const [chipSinRevisar, setChipSinRevisar] = useState(false);
+  const [filterRevisadoPor, setFilterRevisadoPor] = useState("");
   const [expandedTitular, setExpandedTitular] = useState<string | null>(null);
   const [editingLinea, setEditingLinea] = useState<LineaAltice | null>(null);
   const [vinculandoTitular, setVinculandoTitular] = useState<string | null>(null);
@@ -483,7 +492,7 @@ export default function PerfilesTab() {
   const opcionesGb = [...new Set(all.map(r => r.gb_solicitado?.trim() || r.gb_antes?.trim()).filter(Boolean))].sort((a, b) => parseFloat(a!) - parseFloat(b!)) as string[];
   const opcionesMin = [...new Set(all.map(r => r.min_solicitados?.trim() || r.min_antes?.trim()).filter(Boolean))].sort((a, b) => parseFloat(a!) - parseFloat(b!)) as string[];
 
-  const hayFiltros = !!(search || filterDispositivo || filterGb || filterMin || filterProximaAccion || filterAccion || filterEstado || filterTipo || chipSinDispositivo || chipSinMonto || chipConSeguimiento);
+  const hayFiltros = !!(search || filterDispositivo || filterGb || filterMin || filterProximaAccion || filterAccion || filterEstado || filterTipo || chipSinDispositivo || chipSinMonto || chipConSeguimiento || chipSinRevisar || filterRevisadoPor);
 
   const gruposFiltrados = grupos.filter(g => {
     const q = search.toLowerCase();
@@ -507,10 +516,12 @@ export default function PerfilesTab() {
       if (chipSinDispositivo && l.dispositivo_2026?.trim() && l.dispositivo_2026.trim() !== "SIN CAMBIO" && l.dispositivo_2026.trim() !== "—") return false;
       if (chipSinMonto && l.monto_mensual?.trim() && parseFloat(l.monto_mensual.replace(/[^0-9.]/g, "")) > 0) return false;
       if (chipConSeguimiento && !l.seguimiento?.trim()) return false;
+      if (chipSinRevisar && l.revisado_por?.trim()) return false;
+      if (filterRevisadoPor && l.revisado_por?.trim() !== filterRevisadoPor) return false;
       return true;
     });
 
-    if (filterAccion || filterEstado || filterTipo || filterDispositivo || filterGb || filterMin || filterProximaAccion || chipSinDispositivo || chipSinMonto || chipConSeguimiento) {
+    if (filterAccion || filterEstado || filterTipo || filterDispositivo || filterGb || filterMin || filterProximaAccion || chipSinDispositivo || chipSinMonto || chipConSeguimiento || chipSinRevisar || filterRevisadoPor) {
       return tieneAlgunaLinea;
     }
     return true;
@@ -583,7 +594,7 @@ export default function PerfilesTab() {
         const limpiarTodo = () => {
           setSearch(""); setFilterDispositivo(""); setFilterGb(""); setFilterMin("");
           setFilterProximaAccion(""); setFilterAccion(""); setFilterEstado(""); setFilterTipo("");
-          setChipSinDispositivo(false); setChipSinMonto(false); setChipConSeguimiento(false);
+          setChipSinDispositivo(false); setChipSinMonto(false); setChipConSeguimiento(false); setChipSinRevisar(false); setFilterRevisadoPor("");
         };
 
         return (
@@ -625,11 +636,18 @@ export default function PerfilesTab() {
                 <option value="">📞 Todos los min</option>
                 {opcionesMin.map(m => <option key={m} value={m}>{m} min</option>)}
               </select>
+              <select value={filterRevisadoPor} onChange={e => setFilterRevisadoPor(e.target.value)} className={selCls}>
+                <option value="">✅ Revisor — todos</option>
+                <option value="Francis">✅ Francis</option>
+                <option value="Carlos">✅ Carlos</option>
+                <option value="Soto">✅ Soto</option>
+              </select>
             </div>
 
             {/* Chips rápidos */}
             <div className="flex flex-wrap gap-2 items-center">
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Rápido:</span>
+              <button className={chipCls(chipSinRevisar)} onClick={() => setChipSinRevisar(v => !v)}>⬜ Sin revisar</button>
               <button className={chipCls(chipSinDispositivo)} onClick={() => setChipSinDispositivo(v => !v)}>📵 Sin dispositivo</button>
               <button className={chipCls(chipSinMonto)} onClick={() => setChipSinMonto(v => !v)}>💸 Sin monto</button>
               <button className={chipCls(chipConSeguimiento)} onClick={() => setChipConSeguimiento(v => !v)}>📝 Con notas</button>
