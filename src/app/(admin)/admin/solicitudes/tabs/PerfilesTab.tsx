@@ -84,6 +84,7 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
       proxima_accion: form.proxima_accion,
       observaciones: form.observaciones,
       seguimiento: form.seguimiento,
+      revisado_por: form.revisado_por,
     }).eq("id", linea.id);
     setSaving(false);
     if (error) { toast.error("Error al guardar"); return; }
@@ -257,6 +258,19 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
           </section>
 
           <section>
+            <p className={sectionTitleCls}>✅ Revisión</p>
+            <div>
+              <label className={labelCls}>Revisado por</label>
+              <select value={form.revisado_por} onChange={e => set("revisado_por", e.target.value)} className={inputCls}>
+                <option value="">(sin revisar)</option>
+                <option value="Francis">Francis</option>
+                <option value="Carlos">Carlos</option>
+                <option value="Soto">Soto</option>
+              </select>
+            </div>
+          </section>
+
+          <section>
             <p className={sectionTitleCls}>📝 Notas</p>
             <div className="space-y-3">
               <div>
@@ -352,6 +366,15 @@ function LineaRow({ linea, onEdit, dimmed }: { linea: LineaAltice; onEdit: () =>
           {linea.estado && (
             <span className={`text-xs font-semibold px-2 py-1 rounded-lg ${ESTADO_LINEA_COLORS[linea.estado] ?? "bg-slate-100 text-slate-500"}`}>
               {linea.estado}
+            </span>
+          )}
+          {linea.revisado_por ? (
+            <span className="text-xs font-semibold px-2 py-1 rounded-lg bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400">
+              ✅ {linea.revisado_por}
+            </span>
+          ) : (
+            <span className="text-xs font-semibold px-2 py-1 rounded-lg bg-slate-100 text-slate-400 dark:bg-slate-700 dark:text-slate-500">
+              ⬜ Sin revisar
             </span>
           )}
           <button onClick={onEdit}

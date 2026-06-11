@@ -188,6 +188,7 @@ export interface LineaAltice {
     monto_mensual: string;
     cotizacion: string;
     titular_vinculado: string;
+    revisado_por: string;
 }
 
 export const ACCION_COLORS: Record<string, string> = {
