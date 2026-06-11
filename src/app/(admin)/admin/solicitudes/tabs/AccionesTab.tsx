@@ -25,15 +25,20 @@ const TIPO_STYLES: Record<string, string> = {
 };
 
 const TIPO_ICONS: Record<string, string> = {
-    "LLAMAR": "📞", "CARTA": "📄", "CANCELAR": "❌", "COTIZAR": "💰", "OTRO": "📌",
+    "LLAMAR": "📲", "CARTA": "✉️", "CANCELAR": "🚫", "COTIZAR": "💲", "OTRO": "📌",
 };
+
+// IDs completados en esta sesión (para mostrar la sección "Completadas" sin recargar)
+type CompletadaItem = { id: string; usuario: string; telefono: string; accionAnterior: string };
 
 export default function AccionesTab() {
     const [all, setAll] = useState<LineaAltice[]>([]);
     const [loading, setLoading] = useState(true);
     const [filtro, setFiltro] = useState<FiltroAccion>("TODOS");
     const [search, setSearch] = useState("");
-    const [completadas, setCompletadas] = useState<Set<string>>(new Set());
+    // Registro en sesión de ítems completados (solo visual, la fuente de verdad es Supabase)
+    const [completadasSesion, setCompletadasSesion] = useState<CompletadaItem[]>([]);
+    const [completando, setCompletando] = useState<string | null>(null);
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -44,22 +49,36 @@ export default function AccionesTab() {
 
     useEffect(() => { loadData(); }, [loadData]);
 
-    // Cargar completadas desde localStorage
-    useEffect(() => {
-        try {
-            const saved = localStorage.getItem("acciones_completadas");
-            if (saved) setCompletadas(new Set(JSON.parse(saved)));
-        } catch { /* ok */ }
-    }, []);
+    // Marcar como completada: limpia proxima_accion en Supabase
+    async function completar(r: LineaAltice) {
+        setCompletando(r.id);
+        const { error } = await supabase
+            .from("lineas_altice")
+            .update({ proxima_accion: "" })
+            .eq("id", r.id);
+        setCompletando(null);
 
-    function toggleCompletada(id: string) {
-        setCompletadas(prev => {
-            const next = new Set(prev);
-            if (next.has(id)) next.delete(id);
-            else next.add(id);
-            localStorage.setItem("acciones_completadas", JSON.stringify([...next]));
-            return next;
-        });
+        if (error) { toast.error("Error al guardar"); return; }
+
+        // Actualizar estado local
+        setAll(prev => prev.map(x => x.id === r.id ? { ...x, proxima_accion: "" } : x));
+        setCompletadasSesion(prev => [
+            { id: r.id, usuario: r.usuario_linea || r.telefono, telefono: r.telefono, accionAnterior: r.proxima_accion },
+            ...prev,
+        ]);
+        toast.success(`✓ Acción completada — ${r.usuario_linea || r.telefono}`, { duration: 2000 });
+    }
+
+    // Deshacer: restaura la proxima_accion anterior
+    async function deshacer(item: CompletadaItem) {
+        const { error } = await supabase
+            .from("lineas_altice")
+            .update({ proxima_accion: item.accionAnterior })
+            .eq("id", item.id);
+        if (error) { toast.error("Error al restaurar"); return; }
+        setAll(prev => prev.map(r => r.id === item.id ? { ...r, proxima_accion: item.accionAnterior } : r));
+        setCompletadasSesion(prev => prev.filter(c => c.id !== item.id));
+        toast.success("Acción restaurada");
     }
 
     async function marcarEstado(id: string, estado: string) {
@@ -76,38 +95,37 @@ export default function AccionesTab() {
         toast.success("Nota guardada ✓", { duration: 1200 });
     }
 
+    // Líneas con proxima_accion pendiente (fuente de verdad: Supabase)
     const pendientes = all.filter(r => r.proxima_accion && r.proxima_accion.trim() !== "");
+    const totalPendientes = pendientes.length;
 
     const filtrados = pendientes.filter(r => {
         const esCritico = CRITICOS.includes(r.telefono);
-        if (filtro === "CRITICOS") return esCritico;
-        if (filtro !== "TODOS") return detectarTipo(r.proxima_accion) === filtro;
+        if (filtro === "CRITICOS" && !esCritico) return false;
+        if (filtro !== "TODOS" && filtro !== "CRITICOS" && detectarTipo(r.proxima_accion) !== filtro) return false;
         if (search) {
             const q = search.toLowerCase();
-            return r.usuario_linea.toLowerCase().includes(q) ||
+            return (
+                r.usuario_linea.toLowerCase().includes(q) ||
                 r.titular_responsable.toLowerCase().includes(q) ||
                 r.telefono.includes(q) ||
-                r.proxima_accion.toLowerCase().includes(q);
+                r.proxima_accion.toLowerCase().includes(q) ||
+                r.seguimiento.toLowerCase().includes(q)
+            );
         }
         return true;
-    }).filter(r => {
-        if (!search || filtro !== "TODOS") return true;
-        const q = search.toLowerCase();
-        return r.usuario_linea.toLowerCase().includes(q) ||
-            r.titular_responsable.toLowerCase().includes(q) ||
-            r.telefono.includes(q) ||
-            r.proxima_accion.toLowerCase().includes(q);
     });
 
-    // Agrupar críticos primero
+    // Críticos primero
     const criticos = filtrados.filter(r => CRITICOS.includes(r.telefono));
     const normales = filtrados.filter(r => !CRITICOS.includes(r.telefono));
     const ordenado = [...criticos, ...normales];
 
-    const pendientesSinCompletar = ordenado.filter(r => !completadas.has(r.id));
-    const completadasList = ordenado.filter(r => completadas.has(r.id));
-
-    if (loading) return <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>;
+    if (loading) return (
+        <div className="flex justify-center py-20">
+            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+    );
 
     return (
         <div className="space-y-4">
@@ -116,15 +134,16 @@ export default function AccionesTab() {
                 <div>
                     <h2 className="text-lg font-bold text-slate-800 dark:text-white">Acciones Pendientes</h2>
                     <p className="text-sm text-slate-500 dark:text-slate-400">
-                        {pendientesSinCompletar.length} pendientes · {completadasList.length} completadas
+                        <span className="font-semibold text-amber-600">{totalPendientes}</span> pendientes
+                        {completadasSesion.length > 0 && (
+                            <> · <span className="font-semibold text-emerald-600">{completadasSesion.length}</span> completadas esta sesión</>
+                        )}
                     </p>
                 </div>
-                {completadas.size > 0 && (
-                    <button onClick={() => { setCompletadas(new Set()); localStorage.removeItem("acciones_completadas"); }}
-                        className="text-sm text-slate-500 hover:text-red-500 underline transition-colors">
-                        Limpiar marcas ✓
-                    </button>
-                )}
+                <button onClick={loadData}
+                    className="text-sm bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 px-3 py-2 rounded-xl font-semibold transition-colors">
+                    🔄 Actualizar
+                </button>
             </div>
 
             {/* Filtros */}
@@ -136,7 +155,7 @@ export default function AccionesTab() {
                                 ? f === "CRITICOS" ? "bg-rose-600 text-white" : "bg-blue-600 text-white"
                                 : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600"
                                 }`}>
-                            {f === "CRITICOS" ? "🔴 Críticos" : f === "TODOS" ? "Todos" : `${TIPO_ICONS[f]} ${f}`}
+                            {f === "CRITICOS" ? "🔴 Críticos" : f === "TODOS" ? "Todos" : `${TIPO_ICONS[f] ?? "📌"} ${f}`}
                         </button>
                     ))}
                 </div>
@@ -145,22 +164,27 @@ export default function AccionesTab() {
                     className="w-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
 
-            {/* Lista de acciones */}
+            {/* Lista de acciones pendientes */}
             <div className="space-y-2">
-                {pendientesSinCompletar.map(r => {
+                {ordenado.map(r => {
                     const esCritico = CRITICOS.includes(r.telefono);
                     const tipo = detectarTipo(r.proxima_accion);
+                    const estaCargando = completando === r.id;
                     return (
                         <div key={r.id}
                             className={`bg-white dark:bg-slate-800 rounded-2xl border transition-all ${esCritico
                                 ? "border-rose-300 dark:border-rose-700 shadow-sm shadow-rose-100 dark:shadow-rose-900/20"
                                 : "border-slate-200 dark:border-slate-700"
-                                }`}>
+                                } ${estaCargando ? "opacity-50" : ""}`}>
                             <div className="p-4">
                                 <div className="flex flex-wrap items-start gap-3">
-                                    {/* Checkbox completado */}
-                                    <button onClick={() => toggleCompletada(r.id)}
-                                        className="w-6 h-6 rounded-full border-2 border-slate-300 dark:border-slate-600 hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors shrink-0 mt-0.5 flex items-center justify-center">
+                                    {/* Botón completar */}
+                                    <button
+                                        onClick={() => completar(r)}
+                                        disabled={estaCargando}
+                                        title="Marcar como completada"
+                                        className="w-6 h-6 rounded-full border-2 border-slate-300 dark:border-slate-600 hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all shrink-0 mt-0.5 flex items-center justify-center disabled:opacity-40 group">
+                                        <span className="text-emerald-500 text-xs opacity-0 group-hover:opacity-100 transition-opacity">✓</span>
                                     </button>
 
                                     {/* Info */}
@@ -176,7 +200,10 @@ export default function AccionesTab() {
                                         </div>
                                         <p className="font-bold text-sm text-slate-800 dark:text-white">{r.usuario_linea || "Sin nombre"}</p>
                                         <p className="text-xs text-slate-400 mb-2">
-                                            {r.titular_responsable && r.titular_responsable !== r.usuario_linea && `Titular: ${r.titular_responsable} · `}
+                                            {r.titular_responsable && r.titular_responsable !== r.usuario_linea
+                                                ? `Titular: ${r.titular_responsable} · ` : ""}
+                                            {r.titular_responsable === "" || !r.titular_responsable
+                                                ? <span className="text-amber-500">(SIN TITULAR — identificar) · </span> : ""}
                                             {r.telefono}
                                         </p>
                                         <div className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 text-sm text-slate-700 dark:text-slate-200 border-l-4 border-blue-400">
@@ -204,33 +231,44 @@ export default function AccionesTab() {
                 })}
             </div>
 
-            {/* Completadas */}
-            {completadasList.length > 0 && (
-                <div>
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">✅ Completadas</h3>
-                    <div className="space-y-2">
-                        {completadasList.map(r => (
-                            <div key={r.id} className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-700 p-3 opacity-60">
-                                <div className="flex items-center gap-3">
-                                    <button onClick={() => toggleCompletada(r.id)}
-                                        className="w-6 h-6 rounded-full bg-green-500 text-white text-xs flex items-center justify-center shrink-0">
-                                        ✓
-                                    </button>
-                                    <div className="flex-1 min-w-0">
-                                        <span className="font-medium text-sm text-slate-600 dark:text-slate-300 line-through">{r.usuario_linea}</span>
-                                        <span className="font-mono text-xs text-slate-400 ml-2">{r.telefono}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+            {ordenado.length === 0 && totalPendientes === 0 && (
+                <div className="py-16 text-center text-slate-400">
+                    <p className="text-4xl mb-2">🎉</p>
+                    <p className="font-medium">¡No hay acciones pendientes!</p>
                 </div>
             )}
 
-            {ordenado.length === 0 && (
-                <div className="py-16 text-center text-slate-400">
-                    <p className="text-4xl mb-2">🎉</p>
-                    <p>No hay acciones pendientes con esos filtros</p>
+            {ordenado.length === 0 && totalPendientes > 0 && (
+                <div className="py-10 text-center text-slate-400">
+                    <p className="text-3xl mb-2">🔍</p>
+                    <p>No hay acciones con esos filtros</p>
+                </div>
+            )}
+
+            {/* Completadas esta sesión */}
+            {completadasSesion.length > 0 && (
+                <div>
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+                        ✅ Completadas esta sesión ({completadasSesion.length})
+                    </h3>
+                    <div className="space-y-1.5">
+                        {completadasSesion.map(item => (
+                            <div key={item.id}
+                                className="bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800 rounded-2xl px-4 py-2.5 flex items-center gap-3">
+                                <span className="w-6 h-6 rounded-full bg-emerald-500 text-white text-xs flex items-center justify-center shrink-0">✓</span>
+                                <div className="flex-1 min-w-0">
+                                    <span className="font-medium text-sm text-slate-700 dark:text-slate-200">{item.usuario}</span>
+                                    <span className="font-mono text-xs text-slate-400 ml-2">{item.telefono}</span>
+                                    <p className="text-xs text-slate-400 truncate">{item.accionAnterior}</p>
+                                </div>
+                                <button onClick={() => deshacer(item)}
+                                    title="Deshacer"
+                                    className="text-xs text-slate-400 hover:text-amber-600 underline shrink-0 transition-colors">
+                                    Deshacer
+                                </button>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             )}
         </div>
@@ -240,6 +278,8 @@ export default function AccionesTab() {
 function SeguimientoInline({ id, value, onSave }: { id: string; value: string; onSave: (v: string) => void }) {
     const [editing, setEditing] = useState(false);
     const [draft, setDraft] = useState(value);
+
+    useEffect(() => { setDraft(value); }, [value]);
 
     function commit() {
         setEditing(false);
