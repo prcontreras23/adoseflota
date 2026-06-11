@@ -9,6 +9,7 @@ import PerfilesTab from "./tabs/PerfilesTab";
 import AccionesTab from "./tabs/AccionesTab";
 import MaestroTab from "./tabs/MaestroTab";
 import UsuariosTab from "./tabs/UsuariosTab";
+import AlmacenTab from "./tabs/AlmacenTab";
 import toast from "react-hot-toast";
 
 const TABS = [
@@ -16,6 +17,7 @@ const TABS = [
     { id: "lineas", label: "📱 Líneas", component: LineasTab },
     { id: "perfiles", label: "👤 Perfiles", component: PerfilesTab },
     { id: "acciones", label: "✅ Acciones", component: AccionesTab },
+    { id: "almacen", label: "📦 Almacén", component: AlmacenTab },
     { id: "maestro", label: "📋 Flota Maestra", component: MaestroTab },
     { id: "usuarios", label: "👥 Usuarios", component: UsuariosTab },
 ];

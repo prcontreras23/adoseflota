@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase, type LineaAltice, ACCION_COLORS, ESTADO_LINEA_COLORS } from "@/lib/supabase";
 import * as XLSX from "xlsx";
 import toast from "react-hot-toast";
+import NuevaLineaModal from "./NuevaLineaModal";
 
 const ACCIONES = ["", "BAJA", "ALTA", "CAMBIO SOLICITADO", "SE MANTIENE", "REVISAR"];
 const ESTADOS = ["", "CONFIRMADA", "POR CONFIRMAR", "PENDIENTE", "OK", "RESPONDIÓ", "SIN RESPUESTA"];
@@ -49,6 +50,9 @@ export default function LineasTab() {
     const [filterEstado, setFilterEstado] = useState("");
     const [filterTipo, setFilterTipo] = useState("");
     const [expandedId, setExpandedId] = useState<string | null>(null);
+    const [showNueva, setShowNueva] = useState(false);
+    const [importing, setImporting] = useState(false);
+    const importRef = useRef<HTMLInputElement>(null);
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -83,44 +87,172 @@ export default function LineasTab() {
         toast.success("Guardado ✓", { duration: 1200 });
     }
 
-    function exportExcel() {
-        const rows = filtered.map(r => ({
+    function handleCreada(linea: LineaAltice) {
+        setAll(prev => [...prev, linea].sort((a, b) => a.titular_responsable.localeCompare(b.titular_responsable)));
+    }
+
+    // Mapeo columna Excel → campo BD
+    const COLUMNAS: Record<string, keyof LineaAltice> = {
+        "Teléfono": "telefono",
+        "Usuario": "usuario_linea",
+        "Titular Responsable": "titular_responsable",
+        "Tipo": "tipo",
+        "Acción 2026": "accion_2026",
+        "Detalle Origen": "detalle_origen",
+        "GB Antes": "gb_antes",
+        "GB Solicitado": "gb_solicitado",
+        "Min Antes": "min_antes",
+        "Min Solicitados": "min_solicitados",
+        "Dispositivo 2026": "dispositivo_2026",
+        "Cotización": "cotizacion",
+        "Monto Mensual": "monto_mensual",
+        "Estado": "estado",
+        "Próxima Acción": "proxima_accion",
+        "Observaciones": "observaciones",
+        "Seguimiento": "seguimiento",
+        "Titular Vinculado": "titular_vinculado",
+    };
+
+    function exportPlantilla() {
+        // Exporta TODAS las líneas (no solo filtradas) con TODOS los campos
+        const rows = all.map(r => ({
             "Teléfono": r.telefono,
             "Usuario": r.usuario_linea,
             "Titular Responsable": r.titular_responsable,
             "Tipo": r.tipo,
             "Acción 2026": r.accion_2026,
+            "Detalle Origen": r.detalle_origen,
             "GB Antes": r.gb_antes,
             "GB Solicitado": r.gb_solicitado,
             "Min Antes": r.min_antes,
             "Min Solicitados": r.min_solicitados,
             "Dispositivo 2026": r.dispositivo_2026,
+            "Cotización": r.cotizacion,
+            "Monto Mensual": r.monto_mensual,
             "Estado": r.estado,
             "Próxima Acción": r.proxima_accion,
             "Observaciones": r.observaciones,
             "Seguimiento": r.seguimiento,
+            "Titular Vinculado": r.titular_vinculado,
         }));
         const ws = XLSX.utils.json_to_sheet(rows);
+        // Ancho mínimo por columna
+        ws["!cols"] = Object.keys(rows[0] || {}).map(k =>
+            ({ wch: Math.max(k.length, 15) })
+        );
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Líneas Altice 2026");
-        XLSX.writeFile(wb, `Lineas-Altice-2026-${new Date().toISOString().split("T")[0]}.xlsx`);
-        toast.success("Excel exportado");
+        XLSX.writeFile(wb, `Plantilla-Flota-${new Date().toISOString().split("T")[0]}.xlsx`);
+        toast.success("Plantilla descargada — edita y sube con «Importar»");
+    }
+
+    async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        // Limpiar el input para que el mismo archivo pueda volver a subirse
+        e.target.value = "";
+        setImporting(true);
+        const toastId = toast.loading("Leyendo archivo...");
+
+        try {
+            const buf = await file.arrayBuffer();
+            const wb = XLSX.read(buf, { type: "array" });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const jsonRaw: Record<string, string>[] = XLSX.utils.sheet_to_json(ws, { defval: "" });
+
+            if (jsonRaw.length === 0) {
+                toast.dismiss(toastId);
+                toast.error("El archivo no tiene filas");
+                setImporting(false);
+                return;
+            }
+
+            // Mapear encabezados → campos BD
+            const rows = jsonRaw.map(raw => {
+                const r: Partial<LineaAltice> = {};
+                for (const [col, field] of Object.entries(COLUMNAS)) {
+                    if (col in raw) (r as any)[field] = String(raw[col] ?? "");
+                }
+                return r;
+            }).filter(r => r.telefono?.trim()); // Teléfono es obligatorio
+
+            if (rows.length === 0) {
+                toast.dismiss(toastId);
+                toast.error("No se encontró la columna «Teléfono» o no hay filas válidas");
+                setImporting(false);
+                return;
+            }
+
+            toast.loading(`Actualizando ${rows.length} líneas en Supabase...`, { id: toastId });
+
+            // Upsert por lotes de 50
+            const BATCH = 50;
+            let errCount = 0;
+            for (let i = 0; i < rows.length; i += BATCH) {
+                const lote = rows.slice(i, i + BATCH);
+                const { error } = await supabase
+                    .from("lineas_altice")
+                    .upsert(lote as any[], { onConflict: "telefono" });
+                if (error) errCount++;
+            }
+
+            toast.dismiss(toastId);
+            if (errCount > 0) {
+                toast.error(`Importado con ${errCount} lotes con error`);
+            } else {
+                toast.success(`✅ ${rows.length} líneas actualizadas en Supabase`);
+            }
+
+            // Recargar datos
+            await loadData();
+        } catch (err) {
+            toast.dismiss(toastId);
+            toast.error("Error al leer el archivo: " + (err as Error).message);
+        } finally {
+            setImporting(false);
+        }
     }
 
     if (loading) return <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>;
 
     return (
         <div className="space-y-4">
+            {showNueva && (
+                <NuevaLineaModal
+                    onClose={() => setShowNueva(false)}
+                    onCreate={handleCreada}
+                />
+            )}
+
             {/* Header */}
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h2 className="text-lg font-bold text-slate-800 dark:text-white">Líneas del Contrato</h2>
                     <p className="text-sm text-slate-500 dark:text-slate-400">{filtered.length} de {all.length} líneas</p>
                 </div>
-                <button onClick={exportExcel}
-                    className="text-sm bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-xl font-semibold transition-colors">
-                    📊 Exportar Excel
-                </button>
+                <div className="flex flex-wrap gap-2">
+                    <button onClick={() => setShowNueva(true)}
+                        className="text-sm bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl font-semibold transition-colors">
+                        ➕ Nueva Línea
+                    </button>
+                    <button onClick={exportPlantilla}
+                        className="text-sm bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl font-semibold transition-colors">
+                        📥 Descargar Plantilla
+                    </button>
+                    <button
+                        onClick={() => importRef.current?.click()}
+                        disabled={importing}
+                        className="text-sm bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white px-4 py-2 rounded-xl font-semibold transition-colors">
+                        {importing ? "⏳ Importando..." : "📤 Importar Excel"}
+                    </button>
+                    <input
+                        ref={importRef}
+                        type="file"
+                        accept=".xlsx,.xls"
+                        className="hidden"
+                        onChange={handleImport}
+                    />
+                </div>
             </div>
 
             {/* Filtros */}
@@ -175,7 +307,14 @@ export default function LineasTab() {
                                             <p className="font-medium text-slate-800 dark:text-white">{r.usuario_linea || "—"}</p>
                                             <p className="text-slate-400 text-[11px]">{r.titular_responsable || <span className="text-red-400">Sin titular</span>}</p>
                                         </td>
-                                        <td className="p-2.5 text-slate-500 dark:text-slate-400 whitespace-nowrap">{r.tipo || "—"}</td>
+                                        {/* Tipo — editable inline */}
+                                        <td className="p-2.5 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                                            <select value={r.tipo}
+                                                onChange={e => updateField(r.id, "tipo", e.target.value)}
+                                                className="text-xs px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
+                                                {TIPOS.map(t => <option key={t} value={t}>{t || "(tipo)"}</option>)}
+                                            </select>
+                                        </td>
                                         <td className="p-2.5 whitespace-nowrap">
                                             <select value={r.accion_2026}
                                                 onClick={e => e.stopPropagation()}

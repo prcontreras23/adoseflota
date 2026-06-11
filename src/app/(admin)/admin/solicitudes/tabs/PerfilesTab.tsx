@@ -2,19 +2,33 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase, type LineaAltice, ACCION_COLORS, ESTADO_LINEA_COLORS } from "@/lib/supabase";
 import toast from "react-hot-toast";
+import NuevaLineaModal from "./NuevaLineaModal";
 
 interface TitularGroup {
   nombre: string;
   lineas: LineaAltice[];
 }
 
-function EditModal({ linea, onClose, onSave }: {
+function EditModal({ linea, onClose, onSave, onDelete }: {
   linea: LineaAltice;
   onClose: () => void;
   onSave: (updated: LineaAltice) => void;
+  onDelete: (id: string) => void;
 }) {
   const [form, setForm] = useState<LineaAltice>({ ...linea });
   const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDelete() {
+    setDeleting(true);
+    const { error } = await supabase.from("lineas_altice").delete().eq("id", linea.id);
+    setDeleting(false);
+    if (error) { toast.error("Error al eliminar"); return; }
+    toast.success("Línea eliminada");
+    onDelete(linea.id);
+    onClose();
+  }
 
   async function handleSave() {
     setSaving(true);
@@ -74,7 +88,7 @@ function EditModal({ linea, onClose, onSave }: {
               <div>
                 <label className={labelCls}>Tipo</label>
                 <select value={form.tipo} onChange={e => set("tipo", e.target.value)} className={inputCls}>
-                  {["", "TITULAR", "DEPENDIENTE", "LABORAL", "FAMILIAR"].map(v => (
+                  {["", "EMPLEADO", "EMPLEADO 2", "FAMILIAR", "PASTORES", "DEPARTAMENTAL", "INSTITUCION", "JUBILADO", "EXTERNO", "UD", "DESVINCULAR", "N/D", "CONFLICTO"].map(v => (
                     <option key={v} value={v}>{v || "(sin tipo)"}</option>
                   ))}
                 </select>
@@ -180,15 +194,46 @@ function EditModal({ linea, onClose, onSave }: {
           </section>
         </div>
 
-        <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex gap-3 sticky bottom-0 bg-white dark:bg-slate-900">
-          <button onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm font-semibold hover:bg-slate-200 dark:hover:bg-slate-600">
-            Cancelar
-          </button>
-          <button onClick={handleSave} disabled={saving}
-            className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-500 disabled:opacity-50 transition-colors">
-            {saving ? "Guardando..." : "Guardar cambios"}
-          </button>
+        <div className="border-t border-slate-200 dark:border-slate-700 sticky bottom-0 bg-white dark:bg-slate-900">
+          {/* Confirmación de eliminación */}
+          {confirmDelete && (
+            <div className="px-4 pt-4 pb-2">
+              <div className="bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 rounded-xl p-3">
+                <p className="text-sm font-semibold text-rose-700 dark:text-rose-400 mb-0.5">
+                  ¿Eliminar esta línea permanentemente?
+                </p>
+                <p className="text-xs text-rose-600 dark:text-rose-500 mb-3">
+                  Se borrará <strong>{linea.telefono}</strong> ({linea.usuario_linea || "sin nombre"}) de la base de datos. Esta acción no se puede deshacer.
+                </p>
+                <div className="flex gap-2">
+                  <button onClick={() => setConfirmDelete(false)}
+                    className="flex-1 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold hover:bg-slate-200 transition-colors">
+                    Cancelar
+                  </button>
+                  <button onClick={handleDelete} disabled={deleting}
+                    className="flex-1 py-2 rounded-lg bg-rose-600 text-white text-xs font-semibold hover:bg-rose-500 disabled:opacity-50 transition-colors">
+                    {deleting ? "Eliminando..." : "Sí, eliminar"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="p-4 flex gap-3">
+            <button onClick={() => setConfirmDelete(true)}
+              disabled={confirmDelete}
+              className="py-2.5 px-4 rounded-xl bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 text-sm font-semibold hover:bg-rose-100 dark:hover:bg-rose-950/40 disabled:opacity-40 transition-colors border border-rose-200 dark:border-rose-800">
+              🗑 Eliminar
+            </button>
+            <button onClick={onClose}
+              className="flex-1 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm font-semibold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
+              Cancelar
+            </button>
+            <button onClick={handleSave} disabled={saving}
+              className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-500 disabled:opacity-50 transition-colors">
+              {saving ? "Guardando..." : "Guardar"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -247,6 +292,8 @@ export default function PerfilesTab() {
   const [expandedTitular, setExpandedTitular] = useState<string | null>(null);
   const [editingLinea, setEditingLinea] = useState<LineaAltice | null>(null);
   const [vinculandoTitular, setVinculandoTitular] = useState<string | null>(null);
+  // Modal nueva línea: null = cerrado, string = titular pre-llenado (puede ser "")
+  const [nuevaLineaTitular, setNuevaLineaTitular] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -286,6 +333,12 @@ export default function PerfilesTab() {
     toast.success("Vínculo eliminado");
   }
 
+  function handleCreada(linea: LineaAltice) {
+    setAll(prev => [...prev, linea]);
+    // Expandir el grupo del titular recién creado
+    if (linea.titular_responsable) setExpandedTitular(linea.titular_responsable);
+  }
+
   const grupos: TitularGroup[] = Object.values(
     all.reduce((acc, r) => {
       const key = r.titular_responsable || "Sin titular identificado";
@@ -304,6 +357,18 @@ export default function PerfilesTab() {
 
   const ACCIONES_ORDEN = ["BAJA", "ALTA", "CAMBIO SOLICITADO", "REVISAR", "SE MANTIENE", ""];
 
+  function sumaMontoGrupo(lineas: LineaAltice[]): number {
+    return lineas.reduce((acc, r) => {
+      if (!r.monto_mensual) return acc;
+      const n = parseFloat(r.monto_mensual.replace(/[^0-9.]/g, ""));
+      return acc + (isNaN(n) ? 0 : n);
+    }, 0);
+  }
+
+  function fmtRD(n: number) {
+    return new Intl.NumberFormat("es-DO", { style: "currency", currency: "DOP", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
+  }
+
   if (loading) return (
     <div className="flex justify-center py-20">
       <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
@@ -317,12 +382,28 @@ export default function PerfilesTab() {
           linea={editingLinea}
           onClose={() => setEditingLinea(null)}
           onSave={(updated) => setAll(prev => prev.map(r => r.id === updated.id ? updated : r))}
+          onDelete={(id) => setAll(prev => prev.filter(r => r.id !== id))}
         />
       )}
 
-      <div>
-        <h2 className="text-lg font-bold text-slate-800 dark:text-white">Perfiles por Titular</h2>
-        <p className="text-sm text-slate-500 dark:text-slate-400">{gruposFiltrados.length} titulares · {all.length} líneas totales</p>
+      {nuevaLineaTitular !== null && (
+        <NuevaLineaModal
+          titularInicial={nuevaLineaTitular}
+          onClose={() => setNuevaLineaTitular(null)}
+          onCreate={handleCreada}
+        />
+      )}
+
+      {/* Encabezado */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-slate-800 dark:text-white">Perfiles por Titular</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{gruposFiltrados.length} titulares · {all.length} líneas totales</p>
+        </div>
+        <button onClick={() => setNuevaLineaTitular("")}
+          className="text-sm bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl font-semibold transition-colors">
+          ➕ Nuevo Perfil
+        </button>
       </div>
 
       <input value={search} onChange={e => setSearch(e.target.value)}
@@ -338,6 +419,8 @@ export default function PerfilesTab() {
           const lineasVinculadas = vinculadoNombre
             ? all.filter(r => r.titular_responsable === vinculadoNombre)
             : [];
+          const montoGrupo = sumaMontoGrupo(g.lineas);
+          const tieneMontos = g.lineas.some(l => l.monto_mensual && parseFloat(l.monto_mensual.replace(/[^0-9.]/g, "")) > 0);
 
           return (
             <div key={g.nombre}
@@ -353,9 +436,14 @@ export default function PerfilesTab() {
                     <p className={`font-bold text-sm truncate ${tieneProblema ? "text-amber-700 dark:text-amber-400" : "text-slate-800 dark:text-white"}`}>
                       {g.nombre}
                     </p>
-                    <p className="text-xs text-slate-400">
-                      {g.lineas.length} línea{g.lineas.length !== 1 ? "s" : ""}
-                      {vinculadoNombre && <span className="ml-2 text-purple-500 font-semibold">🔗 {vinculadoNombre}</span>}
+                    <p className="text-xs text-slate-400 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                      <span>{g.lineas.length} línea{g.lineas.length !== 1 ? "s" : ""}</span>
+                      {tieneMontos && (
+                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                          💰 {fmtRD(montoGrupo)}/mes
+                        </span>
+                      )}
+                      {vinculadoNombre && <span className="text-purple-500 font-semibold">🔗 {vinculadoNombre}</span>}
                     </p>
                   </div>
                   <div className="flex gap-1 flex-wrap shrink-0">
@@ -366,6 +454,16 @@ export default function PerfilesTab() {
                   </div>
                   <span className="text-slate-400 text-sm ml-1 shrink-0">{isOpen ? "▲" : "▼"}</span>
                 </button>
+
+                {/* Botón agregar línea al titular */}
+                {!tieneProblema && (
+                  <button
+                    onClick={() => { setNuevaLineaTitular(g.nombre); }}
+                    title="Agregar línea a este titular"
+                    className="text-xs px-2 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 font-semibold shrink-0 transition-colors">
+                    ➕
+                  </button>
+                )}
 
                 {!tieneProblema && (
                   <div className="relative shrink-0">
@@ -410,6 +508,17 @@ export default function PerfilesTab() {
                         <LineaRow key={linea.id} linea={linea} onEdit={() => setEditingLinea(linea)} />
                       ))}
                   </div>
+
+                  {/* Botón agregar línea dentro del grupo expandido */}
+                  {!tieneProblema && (
+                    <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-700">
+                      <button onClick={() => setNuevaLineaTitular(g.nombre)}
+                        className="w-full py-2 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-600 text-slate-400 hover:border-blue-400 hover:text-blue-500 text-sm font-semibold transition-colors">
+                        ➕ Agregar línea a {g.nombre.split(" ")[0]}
+                      </button>
+                    </div>
+                  )}
+
                   {lineasVinculadas.length > 0 && (
                     <div className="border-t-2 border-purple-200 dark:border-purple-800">
                       <div className="px-4 py-2.5 bg-purple-50 dark:bg-purple-900/20 flex items-center gap-2">
