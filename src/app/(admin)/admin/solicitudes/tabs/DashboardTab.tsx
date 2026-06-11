@@ -1,7 +1,7 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
-import { supabase, type LineaAltice, ACCION_COLORS } from "@/lib/supabase";
-import toast from "react-hot-toast";
+import { useMemo } from "react";
+import { type LineaAltice, ACCION_COLORS } from "@/lib/supabase";
+import { useLineas } from "@/lib/LineasContext";
 
 interface Stats {
     total: number;
@@ -76,21 +76,8 @@ function formatRD(amount: number): string {
 }
 
 export default function DashboardTab() {
-    const [lineas, setLineas] = useState<LineaAltice[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [stats, setStats] = useState<Stats | null>(null);
-
-    const loadData = useCallback(async () => {
-        setLoading(true);
-        const { data, error } = await supabase.from("lineas_altice").select("*");
-        if (error) { toast.error("Error cargando datos"); setLoading(false); return; }
-        const rows = (data ?? []) as LineaAltice[];
-        setLineas(rows);
-        setStats(calcStats(rows));
-        setLoading(false);
-    }, []);
-
-    useEffect(() => { loadData(); }, [loadData]);
+    const { lineas, loading, reload } = useLineas();
+    const stats = useMemo(() => calcStats(lineas), [lineas]);
 
     const StatCard = ({ label, value, color, icon }: { label: string; value: number; color: string; icon: string }) => (
         <div className={`rounded-2xl p-4 flex items-center gap-4 ${color}`}>
@@ -126,7 +113,7 @@ export default function DashboardTab() {
                         Contrato Altice · {stats.total} registros · {new Date().toLocaleDateString("es-DO", { day: "2-digit", month: "short", year: "numeric" })}
                     </p>
                 </div>
-                <button onClick={loadData}
+                <button onClick={reload}
                     className="text-sm bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 px-4 py-2 rounded-xl font-medium transition-colors">
                     🔄 Actualizar
                 </button>

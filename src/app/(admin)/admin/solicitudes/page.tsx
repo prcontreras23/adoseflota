@@ -10,6 +10,7 @@ import AccionesTab from "./tabs/AccionesTab";
 import MaestroTab from "./tabs/MaestroTab";
 import UsuariosTab from "./tabs/UsuariosTab";
 import AlmacenTab from "./tabs/AlmacenTab";
+import { LineasProvider } from "@/lib/LineasContext";
 import toast from "react-hot-toast";
 
 const TABS = [
@@ -71,6 +72,7 @@ export default function AdminDashboard() {
     const ActiveComponent = TABS.find(t => t.id === activeTab)?.component || TABS[0].component;
 
     return (
+        <LineasProvider>
         <div className="min-h-screen bg-[#F8FAFC] dark:bg-slate-900 flex flex-col transition-colors duration-300">
             {/* Header */}
             <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-50">
@@ -122,5 +124,6 @@ export default function AdminDashboard() {
                 <ActiveComponent />
             </main>
         </div>
+        </LineasProvider>
     );
 }

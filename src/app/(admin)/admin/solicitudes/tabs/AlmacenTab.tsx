@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
-import { supabase, type LineaAltice } from "@/lib/supabase";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { supabase } from "@/lib/supabase";
+import { useLineas } from "@/lib/LineasContext";
 import * as XLSX from "xlsx";
 import toast from "react-hot-toast";
 
@@ -44,8 +45,8 @@ interface FormState {
 const FORM_VACIO: FormState = { dispositivo: "", cantidad_stock: "", notas: "" };
 
 export default function AlmacenTab() {
-    const [stock, setStock] = useState<DispositivoConStats[]>([]);
-    const [lineas, setLineas] = useState<LineaAltice[]>([]);
+    const { lineas: ctxLineas } = useLineas();
+    const [rawStock, setRawStock] = useState<DispositivoStock[]>([]);
     const [loading, setLoading] = useState(true);
 
     // Modal agregar / editar
@@ -58,22 +59,22 @@ export default function AlmacenTab() {
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
     const [deleting, setDeleting] = useState(false);
 
-    // Dispositivos no catalogados (en líneas pero sin entrada en almacén)
-    const [sinCatalogar, setSinCatalogar] = useState<{ nombre: string; cantidad: number }[]>([]);
-
-    const loadAll = useCallback(async () => {
+    // Solo carga el inventario; las líneas vienen del contexto compartido (Realtime)
+    const loadStock = useCallback(async () => {
         setLoading(true);
-        const [{ data: stockData }, { data: lineasData }] = await Promise.all([
-            supabase.from("almacen_dispositivos").select("*").order("dispositivo"),
-            supabase.from("lineas_altice").select("dispositivo_2026"),
-        ]);
+        const { data } = await supabase.from("almacen_dispositivos").select("*").order("dispositivo");
+        setRawStock((data ?? []) as DispositivoStock[]);
+        setLoading(false);
+    }, []);
 
-        const stockItems = (stockData ?? []) as DispositivoStock[];
-        const todasLineas = (lineasData ?? []) as Pick<LineaAltice, "dispositivo_2026">[];
+    useEffect(() => { loadStock(); }, [loadStock]);
 
+    // Cobertura calculada en vivo: cualquier cambio de dispositivo en otra pestaña
+    // se refleja aquí al instante (solicitados / disponibles / déficit / sin catalogar).
+    const { stock, sinCatalogar } = useMemo(() => {
         // Contar solicitudes por dispositivo (case-insensitive)
         const conteo: Record<string, number> = {};
-        for (const l of todasLineas) {
+        for (const l of ctxLineas) {
             const d = l.dispositivo_2026?.trim();
             if (!d || d === "" || d.toUpperCase() === "SIN CAMBIO" || d.toUpperCase() === "—") continue;
             const key = d.toLowerCase();
@@ -81,32 +82,24 @@ export default function AlmacenTab() {
         }
 
         // Enriquecer stock con estadísticas
-        const enriched: DispositivoConStats[] = stockItems.map(s => {
+        const enriched: DispositivoConStats[] = rawStock.map(s => {
             const key = s.dispositivo.toLowerCase();
             const solicitados = conteo[key] ?? 0;
             return { ...s, solicitados, disponibles: s.cantidad_stock - solicitados };
         });
 
         // Detectar dispositivos en líneas que no están en almacén
-        const catalogados = new Set(stockItems.map(s => s.dispositivo.toLowerCase()));
+        const catalogados = new Set(rawStock.map(s => s.dispositivo.toLowerCase()));
         const noEnAlmacen: Record<string, number> = {};
         for (const [key, cnt] of Object.entries(conteo)) {
-            if (!catalogados.has(key)) {
-                noEnAlmacen[key] = cnt;
-            }
+            if (!catalogados.has(key)) noEnAlmacen[key] = cnt;
         }
-        setSinCatalogar(
-            Object.entries(noEnAlmacen)
-                .sort((a, b) => b[1] - a[1])
-                .map(([nombre, cantidad]) => ({ nombre, cantidad }))
-        );
+        const sc = Object.entries(noEnAlmacen)
+            .sort((a, b) => b[1] - a[1])
+            .map(([nombre, cantidad]) => ({ nombre, cantidad }));
 
-        setStock(enriched);
-        setLineas(todasLineas as any);
-        setLoading(false);
-    }, []);
-
-    useEffect(() => { loadAll(); }, [loadAll]);
+        return { stock: enriched, sinCatalogar: sc };
+    }, [rawStock, ctxLineas]);
 
     function abrirNuevo(nombreSugerido?: string) {
         setForm({ ...FORM_VACIO, dispositivo: nombreSugerido ?? "" });
@@ -145,7 +138,7 @@ export default function AlmacenTab() {
         }
         setSaving(false);
         setModal("closed");
-        await loadAll();
+        await loadStock();
     }
 
     async function eliminar(id: string) {
@@ -155,7 +148,7 @@ export default function AlmacenTab() {
         if (error) { toast.error("Error al eliminar"); return; }
         toast.success("Eliminado del almacén");
         setConfirmDeleteId(null);
-        await loadAll();
+        await loadStock();
     }
 
     // KPIs generales

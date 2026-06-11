@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { supabase, type LineaAltice, ACCION_COLORS, ESTADO_LINEA_COLORS } from "@/lib/supabase";
+import { useLineas } from "@/lib/LineasContext";
 import * as XLSX from "xlsx";
 import toast from "react-hot-toast";
 import NuevaLineaModal from "./NuevaLineaModal";
@@ -364,8 +365,7 @@ function LineaRow({ linea, onEdit, dimmed }: { linea: LineaAltice; onEdit: () =>
 }
 
 export default function PerfilesTab() {
-  const [all, setAll] = useState<LineaAltice[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { lineas: all, loading, upsertLocal, removeLocal, patchLocal } = useLineas();
   const [search, setSearch] = useState("");
   const [filterDispositivo, setFilterDispositivo] = useState("");
   const [filterGb, setFilterGb] = useState("");
@@ -384,15 +384,6 @@ export default function PerfilesTab() {
   // Modal nueva línea: null = cerrado, string = titular pre-llenado (puede ser "")
   const [nuevaLineaTitular, setNuevaLineaTitular] = useState<string | null>(null);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    const { data } = await supabase.from("lineas_altice").select("*").order("usuario_linea");
-    setAll((data ?? []) as LineaAltice[]);
-    setLoading(false);
-  }, []);
-
-  useEffect(() => { loadData(); }, [loadData]);
-
   const todosLosTitulares = [...new Set(all.map(r => r.titular_responsable).filter(Boolean))].sort();
 
   async function guardarVinculo(titularOrigen: string, titularDestino: string) {
@@ -401,7 +392,7 @@ export default function PerfilesTab() {
       supabase.from("lineas_altice").update({ titular_vinculado: titularOrigen }).eq("titular_responsable", titularDestino),
     ]);
     if (r1.error || r2.error) { toast.error("Error al vincular"); return; }
-    setAll(prev => prev.map(r => {
+    patchLocal(prev => prev.map(r => {
       if (r.titular_responsable === titularOrigen) return { ...r, titular_vinculado: titularDestino };
       if (r.titular_responsable === titularDestino) return { ...r, titular_vinculado: titularOrigen };
       return r;
@@ -415,7 +406,7 @@ export default function PerfilesTab() {
       supabase.from("lineas_altice").update({ titular_vinculado: "" }).eq("titular_responsable", titular),
       supabase.from("lineas_altice").update({ titular_vinculado: "" }).eq("titular_responsable", vinculado),
     ]);
-    setAll(prev => prev.map(r =>
+    patchLocal(prev => prev.map(r =>
       r.titular_responsable === titular || r.titular_responsable === vinculado
         ? { ...r, titular_vinculado: "" } : r
     ));
@@ -450,7 +441,7 @@ export default function PerfilesTab() {
   }
 
   function handleCreada(linea: LineaAltice) {
-    setAll(prev => [...prev, linea]);
+    upsertLocal(linea);
     // Expandir el grupo del titular recién creado
     if (linea.titular_responsable) setExpandedTitular(linea.titular_responsable);
   }
@@ -528,8 +519,8 @@ export default function PerfilesTab() {
         <EditModal
           linea={editingLinea}
           onClose={() => setEditingLinea(null)}
-          onSave={(updated) => setAll(prev => prev.map(r => r.id === updated.id ? updated : r))}
-          onDelete={(id) => setAll(prev => prev.filter(r => r.id !== id))}
+          onSave={(updated) => upsertLocal(updated)}
+          onDelete={(id) => removeLocal(id)}
         />
       )}
 

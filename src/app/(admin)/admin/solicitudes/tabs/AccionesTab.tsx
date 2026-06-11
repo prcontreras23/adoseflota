@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
-import { supabase, type LineaAltice, ACCION_COLORS } from "@/lib/supabase";
+import { useEffect, useState } from "react";
+import { type LineaAltice, ACCION_COLORS } from "@/lib/supabase";
+import { useLineas } from "@/lib/LineasContext";
 import toast from "react-hot-toast";
 
 const CRITICOS = ["829-521-5406", "829-679-7928", "829-755-8327", "829-420-7725"];
@@ -32,36 +33,21 @@ const TIPO_ICONS: Record<string, string> = {
 type CompletadaItem = { id: string; usuario: string; telefono: string; accionAnterior: string };
 
 export default function AccionesTab() {
-    const [all, setAll] = useState<LineaAltice[]>([]);
-    const [loading, setLoading] = useState(true);
+    const { lineas: all, loading, reload, mutate } = useLineas();
     const [filtro, setFiltro] = useState<FiltroAccion>("TODOS");
     const [search, setSearch] = useState("");
     // Registro en sesión de ítems completados (solo visual, la fuente de verdad es Supabase)
     const [completadasSesion, setCompletadasSesion] = useState<CompletadaItem[]>([]);
     const [completando, setCompletando] = useState<string | null>(null);
 
-    const loadData = useCallback(async () => {
-        setLoading(true);
-        const { data } = await supabase.from("lineas_altice").select("*");
-        setAll((data ?? []) as LineaAltice[]);
-        setLoading(false);
-    }, []);
-
-    useEffect(() => { loadData(); }, [loadData]);
-
     // Marcar como completada: limpia proxima_accion en Supabase
     async function completar(r: LineaAltice) {
         setCompletando(r.id);
-        const { error } = await supabase
-            .from("lineas_altice")
-            .update({ proxima_accion: "" })
-            .eq("id", r.id);
+        const ok = await mutate(r.id, { proxima_accion: "" });
         setCompletando(null);
 
-        if (error) { toast.error("Error al guardar"); return; }
+        if (!ok) { toast.error("Error al guardar"); return; }
 
-        // Actualizar estado local
-        setAll(prev => prev.map(x => x.id === r.id ? { ...x, proxima_accion: "" } : x));
         setCompletadasSesion(prev => [
             { id: r.id, usuario: r.usuario_linea || r.telefono, telefono: r.telefono, accionAnterior: r.proxima_accion },
             ...prev,
@@ -71,27 +57,21 @@ export default function AccionesTab() {
 
     // Deshacer: restaura la proxima_accion anterior
     async function deshacer(item: CompletadaItem) {
-        const { error } = await supabase
-            .from("lineas_altice")
-            .update({ proxima_accion: item.accionAnterior })
-            .eq("id", item.id);
-        if (error) { toast.error("Error al restaurar"); return; }
-        setAll(prev => prev.map(r => r.id === item.id ? { ...r, proxima_accion: item.accionAnterior } : r));
+        const ok = await mutate(item.id, { proxima_accion: item.accionAnterior });
+        if (!ok) { toast.error("Error al restaurar"); return; }
         setCompletadasSesion(prev => prev.filter(c => c.id !== item.id));
         toast.success("Acción restaurada");
     }
 
     async function marcarEstado(id: string, estado: string) {
-        const { error } = await supabase.from("lineas_altice").update({ estado }).eq("id", id);
-        if (error) { toast.error("Error guardando"); return; }
-        setAll(prev => prev.map(r => r.id === id ? { ...r, estado } : r));
+        const ok = await mutate(id, { estado });
+        if (!ok) { toast.error("Error guardando"); return; }
         toast.success("Estado actualizado ✓", { duration: 1200 });
     }
 
     async function guardarSeguimiento(id: string, valor: string) {
-        const { error } = await supabase.from("lineas_altice").update({ seguimiento: valor }).eq("id", id);
-        if (error) { toast.error("Error guardando"); return; }
-        setAll(prev => prev.map(r => r.id === id ? { ...r, seguimiento: valor } : r));
+        const ok = await mutate(id, { seguimiento: valor });
+        if (!ok) { toast.error("Error guardando"); return; }
         toast.success("Nota guardada ✓", { duration: 1200 });
     }
 
@@ -140,7 +120,7 @@ export default function AccionesTab() {
                         )}
                     </p>
                 </div>
-                <button onClick={loadData}
+                <button onClick={reload}
                     className="text-sm bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 px-3 py-2 rounded-xl font-semibold transition-colors">
                     🔄 Actualizar
                 </button>

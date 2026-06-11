@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase, type LineaAltice, ACCION_COLORS, ESTADO_LINEA_COLORS } from "@/lib/supabase";
+import { useLineas } from "@/lib/LineasContext";
 import * as XLSX from "xlsx";
 import toast from "react-hot-toast";
 import NuevaLineaModal from "./NuevaLineaModal";
@@ -42,9 +43,8 @@ function FieldEditable({ value, onSave, multiline = false }: { value: string; on
 }
 
 export default function LineasTab() {
-    const [all, setAll] = useState<LineaAltice[]>([]);
+    const { lineas: all, loading, reload, mutate, upsertLocal } = useLineas();
     const [filtered, setFiltered] = useState<LineaAltice[]>([]);
-    const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
     const [filterAccion, setFilterAccion] = useState("");
     const [filterEstado, setFilterEstado] = useState("");
@@ -63,15 +63,6 @@ export default function LineasTab() {
     const [showNueva, setShowNueva] = useState(false);
     const [importing, setImporting] = useState(false);
     const importRef = useRef<HTMLInputElement>(null);
-
-    const loadData = useCallback(async () => {
-        setLoading(true);
-        const { data } = await supabase.from("lineas_altice").select("*").order("titular_responsable");
-        setAll((data ?? []) as LineaAltice[]);
-        setLoading(false);
-    }, []);
-
-    useEffect(() => { loadData(); }, [loadData]);
 
     useEffect(() => {
         let f = all;
@@ -102,14 +93,13 @@ export default function LineasTab() {
         filterProximaAccion, filterTitular, chipSinTitular, chipSinDispositivo, chipSinMonto, chipConSeguimiento, search]);
 
     async function updateField(id: string, field: keyof LineaAltice, value: string) {
-        const { error } = await supabase.from("lineas_altice").update({ [field]: value }).eq("id", id);
-        if (error) { toast.error("Error guardando"); return; }
-        setAll(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r));
+        const ok = await mutate(id, { [field]: value });
+        if (!ok) { toast.error("Error guardando"); return; }
         toast.success("Guardado ✓", { duration: 1200 });
     }
 
     function handleCreada(linea: LineaAltice) {
-        setAll(prev => [...prev, linea].sort((a, b) => a.titular_responsable.localeCompare(b.titular_responsable)));
+        upsertLocal(linea);
     }
 
     // Mapeo columna Excel → campo BD
@@ -253,7 +243,7 @@ export default function LineasTab() {
             }
 
             // Recargar datos
-            await loadData();
+            await reload();
         } catch (err) {
             toast.dismiss(toastId);
             toast.error("Error al leer el archivo: " + (err as Error).message);
