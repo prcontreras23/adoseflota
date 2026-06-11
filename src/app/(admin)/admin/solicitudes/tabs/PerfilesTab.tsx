@@ -19,6 +19,28 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [dispositivosStock, setDispositivosStock] = useState<{ dispositivo: string; disponibles: number }[]>([]);
+
+  useEffect(() => {
+    async function cargarStock() {
+      const [{ data: stockData }, { data: lineasData }] = await Promise.all([
+        supabase.from("almacen_dispositivos").select("dispositivo, cantidad_stock").order("dispositivo"),
+        supabase.from("lineas_altice").select("dispositivo_2026"),
+      ]);
+      if (!stockData) return;
+      const conteo: Record<string, number> = {};
+      (lineasData ?? []).forEach((l: { dispositivo_2026?: string }) => {
+        const d = l.dispositivo_2026?.trim().toLowerCase();
+        if (d) conteo[d] = (conteo[d] ?? 0) + 1;
+      });
+      const items = stockData.map((s: { dispositivo: string; cantidad_stock: number }) => ({
+        dispositivo: s.dispositivo,
+        disponibles: s.cantidad_stock - (conteo[s.dispositivo.toLowerCase()] ?? 0),
+      })).filter(s => s.disponibles > 0);
+      setDispositivosStock(items);
+    }
+    cargarStock();
+  }, []);
 
   async function handleDelete() {
     setDeleting(true);
@@ -131,8 +153,17 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
             <div className="space-y-3">
               <div>
                 <label className={labelCls}>Dispositivo 2026</label>
-                <input value={form.dispositivo_2026} onChange={e => set("dispositivo_2026", e.target.value)}
-                  placeholder="Ej: Samsung A56, iPhone 17 Pro Max..." className={inputCls} />
+                <select value={form.dispositivo_2026} onChange={e => set("dispositivo_2026", e.target.value)} className={inputCls}>
+                  <option value="">(sin dispositivo)</option>
+                  {form.dispositivo_2026 && !dispositivosStock.find(d => d.dispositivo === form.dispositivo_2026) && (
+                    <option value={form.dispositivo_2026}>{form.dispositivo_2026} (actual)</option>
+                  )}
+                  {dispositivosStock.map(d => (
+                    <option key={d.dispositivo} value={d.dispositivo}>
+                      {d.dispositivo} — {d.disponibles} disponible{d.disponibles !== 1 ? "s" : ""}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className={labelCls}>Cotización</label>
