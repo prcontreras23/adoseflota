@@ -196,6 +196,15 @@ export interface LineaAltice {
     entregado: boolean;
 }
 
+export interface InventarioAltice {
+    id: string;
+    marca: string;
+    imei: string;
+    sim: string;
+    asignado: boolean;
+    linea_id: string | null;
+}
+
 export const ACCION_COLORS: Record<string, string> = {
     "BAJA": "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400",
     "ALTA": "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",

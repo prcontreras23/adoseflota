@@ -392,6 +392,15 @@ function LineaRow({ linea, onEdit, dimmed }: { linea: LineaAltice; onEdit: () =>
               ⬜ Sin revisar
             </span>
           )}
+          {linea.entregado ? (
+            <span className="text-xs font-semibold px-2 py-1 rounded-lg bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+              ✅ Entregado
+            </span>
+          ) : linea.imei?.trim() ? (
+            <span className="text-xs font-semibold px-2 py-1 rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+              📱 IMEI asig.
+            </span>
+          ) : null}
           <button onClick={onEdit}
             className="mt-1 text-xs px-3 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 font-semibold transition-colors">
             ✏️ Editar

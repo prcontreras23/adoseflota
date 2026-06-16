@@ -1,19 +1,40 @@
 "use client";
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase, formatDate, type LineaAltice } from "@/lib/supabase";
+import { useLineas } from "@/lib/LineasContext";
 import toast from "react-hot-toast";
 import * as XLSX from "xlsx";
 
+interface InventarioItem {
+    id: string;
+    marca: string;
+    imei: string;
+    sim: string;
+    asignado: boolean;
+    linea_id: string | null;
+}
+
 type Vista = "pendientes" | "entregadas" | "sin_imei";
 
+function modelKey(s: string): string {
+    const l = s.toLowerCase();
+    if (l.includes("a56")) return "a56";
+    if (l.includes("a17")) return "a17";
+    if (l.includes("g56")) return "g56";
+    return "";
+}
+
 export default function EntregasLineasTab() {
-    const [lineas, setLineas] = useState<LineaAltice[]>([]);
-    const [loading, setLoading] = useState(true);
+    const { lineas: all, loading, mutate } = useLineas();
+    const [inventario, setInventario] = useState<InventarioItem[]>([]);
     const [vista, setVista] = useState<Vista>("pendientes");
     const [search, setSearch] = useState("");
     const [modalLinea, setModalLinea] = useState<LineaAltice | null>(null);
     const [modalMode, setModalMode] = useState<"imei" | "entrega">("imei");
-    const [formImei, setFormImei] = useState({ imei: "", sim: "" });
+    const [selectedInvId, setSelectedInvId] = useState("");
+    const [useManual, setUseManual] = useState(false);
+    const [manualImei, setManualImei] = useState("");
+    const [manualSim, setManualSim] = useState("");
     const [fechaEntrega, setFechaEntrega] = useState(new Date().toISOString().split("T")[0]);
     const [saving, setSaving] = useState(false);
     const [importing, setImporting] = useState(false);
@@ -22,27 +43,34 @@ export default function EntregasLineasTab() {
     const [signed, setSigned] = useState(false);
     const [drawing, setDrawing] = useState(false);
 
-    const loadData = useCallback(async () => {
-        setLoading(true);
-        const { data } = await supabase
-            .from("lineas_altice")
-            .select("*")
-            .in("accion_2026", ["CAMBIO SOLICITADO", "ALTA", "SE MANTIENE"])
-            .order("usuario_linea");
-        setLineas((data ?? []) as LineaAltice[]);
-        setLoading(false);
-    }, []);
+    // Lines that need delivery (synced via LineasContext — same source as Perfiles)
+    const lineas = all.filter(l =>
+        ["CAMBIO SOLICITADO", "ALTA", "SE MANTIENE"].includes(l.accion_2026)
+    );
 
-    useEffect(() => { loadData(); }, [loadData]);
+    async function loadInventario() {
+        const { data } = await supabase.from("inventario_altice").select("*").order("marca");
+        setInventario((data ?? []) as InventarioItem[]);
+    }
+    useEffect(() => { loadInventario(); }, []);
+
+    function matchingInventario(linea: LineaAltice): InventarioItem[] {
+        const key = modelKey(linea.dispositivo_2026 || "");
+        return inventario.filter(i => {
+            if (i.asignado && i.linea_id !== linea.id) return false;
+            if (!key) return true;
+            return modelKey(i.marca) === key;
+        });
+    }
 
     const filtered = lineas.filter(l => {
         const q = search.toLowerCase();
-        const matchSearch = !q || l.usuario_linea?.toLowerCase().includes(q)
+        const ok = !q || l.usuario_linea?.toLowerCase().includes(q)
+            || l.titular_responsable?.toLowerCase().includes(q)
             || l.telefono?.includes(q)
             || l.imei?.includes(q)
-            || l.sim?.includes(q)
             || l.dispositivo_2026?.toLowerCase().includes(q);
-        if (!matchSearch) return false;
+        if (!ok) return false;
         if (vista === "pendientes") return !l.entregado;
         if (vista === "entregadas") return l.entregado;
         if (vista === "sin_imei") return !l.entregado && !l.imei?.trim();
@@ -54,14 +82,15 @@ export default function EntregasLineasTab() {
         conImei: lineas.filter(l => l.imei?.trim()).length,
         entregados: lineas.filter(l => l.entregado).length,
         sinImei: lineas.filter(l => !l.entregado && !l.imei?.trim()).length,
+        inventarioLibre: inventario.filter(i => !i.asignado).length,
     };
 
     // ── Canvas firma ──────────────────────────────────────────────────────────
     function startDraw(e: React.MouseEvent<HTMLCanvasElement>) {
         const c = canvasRef.current; if (!c) return;
         const r = c.getBoundingClientRect();
-        c.getContext("2d")!.beginPath();
-        c.getContext("2d")!.moveTo(e.clientX - r.left, e.clientY - r.top);
+        const ctx = c.getContext("2d")!;
+        ctx.beginPath(); ctx.moveTo(e.clientX - r.left, e.clientY - r.top);
         setDrawing(true);
     }
     function draw(e: React.MouseEvent<HTMLCanvasElement>) {
@@ -71,8 +100,7 @@ export default function EntregasLineasTab() {
         const ctx = c.getContext("2d")!;
         ctx.lineTo(e.clientX - r.left, e.clientY - r.top);
         ctx.strokeStyle = "#1e293b"; ctx.lineWidth = 2; ctx.lineCap = "round";
-        ctx.stroke();
-        setSigned(true);
+        ctx.stroke(); setSigned(true);
     }
     function clearSign() {
         const c = canvasRef.current; if (!c) return;
@@ -83,38 +111,61 @@ export default function EntregasLineasTab() {
     // ── Guardar IMEI/SIM ──────────────────────────────────────────────────────
     async function guardarImei() {
         if (!modalLinea) return;
-        if (!formImei.imei.trim()) { toast.error("El IMEI es obligatorio"); return; }
+        let imei = "", sim = "";
+
+        if (useManual) {
+            imei = manualImei.trim();
+            sim = manualSim.trim();
+            if (!imei) { toast.error("El IMEI es obligatorio"); return; }
+        } else {
+            if (!selectedInvId) { toast.error("Selecciona un dispositivo del inventario"); return; }
+            const item = inventario.find(i => i.id === selectedInvId);
+            if (!item) return;
+            imei = item.imei; sim = item.sim;
+        }
+
         setSaving(true);
-        const { error } = await supabase
-            .from("lineas_altice")
-            .update({ imei: formImei.imei.trim(), sim: formImei.sim.trim() })
-            .eq("id", modalLinea.id);
-        if (error) { toast.error("Error al guardar"); setSaving(false); return; }
-        toast.success("IMEI y SIM guardados ✓");
+
+        // Un-assign previous inventory item if changing
+        const prevItem = inventario.find(i => i.linea_id === modalLinea.id);
+        if (prevItem && prevItem.id !== selectedInvId) {
+            await supabase.from("inventario_altice")
+                .update({ asignado: false, linea_id: null })
+                .eq("id", prevItem.id);
+        }
+
+        // Mark new inventory item as assigned
+        if (!useManual && selectedInvId) {
+            await supabase.from("inventario_altice")
+                .update({ asignado: true, linea_id: modalLinea.id })
+                .eq("id", selectedInvId);
+        }
+
+        // Update line (mutate syncs instantly to Perfiles via Realtime)
+        const ok = await mutate(modalLinea.id, { imei, sim });
+        await loadInventario();
+
+        if (ok) toast.success("IMEI y SIM asignados ✓");
         setSaving(false);
         setModalLinea(null);
-        loadData();
     }
 
-    // ── Registrar entrega ──────────────────────────────────────────────────────
+    // ── Registrar entrega ─────────────────────────────────────────────────────
     async function registrarEntrega() {
         if (!modalLinea) return;
         if (!signed) { toast.error("Se requiere firma digital"); return; }
         setSaving(true);
-        const { error } = await supabase
-            .from("lineas_altice")
-            .update({ entregado: true, fecha_entrega: fechaEntrega })
-            .eq("id", modalLinea.id);
-        if (error) { toast.error("Error al registrar entrega"); setSaving(false); return; }
-        imprimirActa(modalLinea);
-        toast.success("Entrega registrada ✓");
+        const ok = await mutate(modalLinea.id, { entregado: true, fecha_entrega: fechaEntrega });
+        if (ok) {
+            imprimirActa(modalLinea);
+            toast.success("Entrega registrada ✓");
+        }
         setSaving(false);
         setModalLinea(null);
         setSigned(false);
-        loadData();
     }
 
-    // ── Imprimir acta ──────────────────────────────────────────────────────────
+    // ── Imprimir acta ─────────────────────────────────────────────────────────
     function imprimirActa(linea: LineaAltice) {
         const firma = canvasRef.current?.toDataURL("image/png") ?? "";
         const html = `<html><head><title>Acta de Entrega</title>
@@ -143,7 +194,7 @@ export default function EntregasLineasTab() {
             <tr><th>Dispositivo asignado</th><td>${linea.dispositivo_2026 || "—"}</td></tr>
             <tr><th>IMEI</th><td><strong>${linea.imei || "—"}</strong></td></tr>
             <tr><th>SIM / ICC</th><td>${linea.sim || "—"}</td></tr>
-            <tr><th>Plan</th><td>${linea.gb_solicitado || linea.gb_antes || "—"}</td></tr>
+            <tr><th>Plan de datos</th><td>${linea.gb_solicitado || linea.gb_antes || "—"}</td></tr>
             <tr><th>Fecha de entrega</th><td><strong>${new Date(fechaEntrega).toLocaleDateString("es-DO", { year: "numeric", month: "long", day: "numeric" })}</strong></td></tr>
           </table>
           <p style="font-size:12px;color:#475569;line-height:1.6">
@@ -161,7 +212,7 @@ export default function EntregasLineasTab() {
         if (w) { w.document.write(html); w.document.close(); setTimeout(() => w.print(), 600); }
     }
 
-    // ── Importar Excel masivo ──────────────────────────────────────────────────
+    // ── Importar Excel masivo ─────────────────────────────────────────────────
     async function handleImportExcel(e: React.ChangeEvent<HTMLInputElement>) {
         const file = e.target.files?.[0]; if (!file) return;
         setImporting(true);
@@ -169,55 +220,51 @@ export default function EntregasLineasTab() {
         const wb = XLSX.read(buf, { type: "array" });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json<Record<string, string>>(ws, { defval: "" });
-
-        // Detectar columnas flexiblemente
-        const normalize = (s: string) => s?.toString().toLowerCase().replace(/[^a-z0-9]/g, "");
+        const norm = (s: string) => s?.toString().toLowerCase().replace(/[^a-z0-9]/g, "");
         const findCol = (row: Record<string, string>, keys: string[]) => {
             const entries = Object.entries(row);
             for (const k of keys) {
-                const found = entries.find(([h]) => normalize(h).includes(k));
+                const found = entries.find(([h]) => norm(h).includes(k));
                 if (found) return found[1]?.toString().trim() ?? "";
             }
             return "";
         };
-
         let ok = 0, notFound = 0, skipped = 0;
         for (const row of rows) {
             const tel = findCol(row, ["telefono", "numero", "linea", "phone"]).replace(/[^0-9]/g, "");
             const imei = findCol(row, ["imei"]);
             const sim = findCol(row, ["sim", "icc", "tarjeta"]);
             if (!tel || !imei) { skipped++; continue; }
-
-            // Normalizar teléfono para buscar (sin guiones)
             const { data } = await supabase
-                .from("lineas_altice")
-                .select("id, telefono")
-                .or(`telefono.ilike.%${tel}%`);
-
+                .from("lineas_altice").select("id").or(`telefono.ilike.%${tel}%`);
             if (!data || data.length === 0) { notFound++; continue; }
-            await supabase.from("lineas_altice")
-                .update({ imei, sim })
-                .eq("id", data[0].id);
+            await mutate(data[0].id, { imei, sim });
             ok++;
         }
-        toast.success(`Importado: ${ok} líneas actualizadas, ${notFound} no encontradas, ${skipped} filas omitidas`);
+        toast.success(`Importado: ${ok} actualizadas, ${notFound} no encontradas, ${skipped} omitidas`);
         setImporting(false);
         if (importRef.current) importRef.current.value = "";
-        loadData();
     }
 
     // ── Abrir modales ─────────────────────────────────────────────────────────
     function abrirImei(linea: LineaAltice) {
         setModalLinea(linea);
         setModalMode("imei");
-        setFormImei({ imei: linea.imei || "", sim: linea.sim || "" });
+        const currentInv = inventario.find(i => i.linea_id === linea.id);
+        setSelectedInvId(currentInv?.id || "");
+        setManualImei(currentInv ? "" : (linea.imei || ""));
+        setManualSim(currentInv ? "" : (linea.sim || ""));
+        setUseManual(!currentInv && !!linea.imei);
     }
     function abrirEntrega(linea: LineaAltice) {
         setModalLinea(linea);
         setModalMode("entrega");
         setFechaEntrega(new Date().toISOString().split("T")[0]);
         setSigned(false);
-        setTimeout(() => { canvasRef.current && canvasRef.current.getContext("2d")!.clearRect(0, 0, 999, 999); }, 50);
+        setTimeout(() => {
+            const c = canvasRef.current;
+            if (c) c.getContext("2d")!.clearRect(0, 0, c.width, c.height);
+        }, 50);
     }
 
     const inputCls = "w-full border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-800 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
@@ -236,13 +283,12 @@ export default function EntregasLineasTab() {
             {modalLinea && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setModalLinea(null)} />
-                    <div className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-4">
+                    <div className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
 
-                        {/* Header del modal */}
                         <div className="flex items-start justify-between gap-2">
                             <div>
                                 <p className="font-bold text-slate-800 dark:text-white text-base">
-                                    {modalMode === "imei" ? "📱 Asignar IMEI y SIM" : "🤝 Registrar Entrega"}
+                                    {modalMode === "imei" ? "📱 Asignar dispositivo" : "🤝 Registrar Entrega"}
                                 </p>
                                 <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
                                     {modalLinea.usuario_linea || "—"} · {modalLinea.telefono}
@@ -257,22 +303,68 @@ export default function EntregasLineasTab() {
 
                         {modalMode === "imei" ? (
                             <>
-                                <div className="grid grid-cols-1 gap-3">
-                                    <div>
-                                        <label className={labelCls}>IMEI del dispositivo <span className="text-red-500">*</span></label>
-                                        <input value={formImei.imei}
-                                            onChange={e => setFormImei(p => ({ ...p, imei: e.target.value }))}
-                                            placeholder="15 dígitos — ej: 352099001761481"
-                                            className={inputCls} />
-                                    </div>
-                                    <div>
-                                        <label className={labelCls}>Número de SIM / ICC</label>
-                                        <input value={formImei.sim}
-                                            onChange={e => setFormImei(p => ({ ...p, sim: e.target.value }))}
-                                            placeholder="ej: 89302720401234567890"
-                                            className={inputCls} />
-                                    </div>
+                                {/* Toggle: inventario vs manual */}
+                                <div className="flex gap-2">
+                                    <button onClick={() => setUseManual(false)}
+                                        className={`flex-1 py-2 rounded-xl text-sm font-semibold border transition-all ${!useManual ? "bg-blue-600 text-white border-blue-600" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300"}`}>
+                                        📦 Del inventario Altice
+                                    </button>
+                                    <button onClick={() => setUseManual(true)}
+                                        className={`flex-1 py-2 rounded-xl text-sm font-semibold border transition-all ${useManual ? "bg-slate-700 text-white border-slate-700" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300"}`}>
+                                        ✏️ Manual
+                                    </button>
                                 </div>
+
+                                {!useManual ? (
+                                    <div>
+                                        <label className={labelCls}>
+                                            Dispositivo del inventario Altice
+                                            {modalLinea.dispositivo_2026 && <span className="text-slate-400 ml-1">— mostrando {modalLinea.dispositivo_2026}</span>}
+                                        </label>
+                                        <select value={selectedInvId} onChange={e => setSelectedInvId(e.target.value)} className={inputCls}>
+                                            <option value="">— Seleccionar dispositivo —</option>
+                                            {matchingInventario(modalLinea).map(item => (
+                                                <option key={item.id} value={item.id}>
+                                                    {item.imei} · SIM …{item.sim.slice(-6)}
+                                                    {item.linea_id === modalLinea.id ? " (asignado actualmente)" : ""}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {matchingInventario(modalLinea).length === 0 && (
+                                            <p className="text-xs text-amber-600 mt-1">
+                                                No hay dispositivos disponibles para este modelo. Usa entrada manual.
+                                            </p>
+                                        )}
+                                        {selectedInvId && (() => {
+                                            const it = inventario.find(i => i.id === selectedInvId);
+                                            return it ? (
+                                                <div className="mt-2 bg-slate-50 dark:bg-slate-800 rounded-xl p-3 text-xs space-y-1">
+                                                    <p className="font-semibold text-slate-700 dark:text-slate-200">{it.marca}</p>
+                                                    <p><span className="text-slate-400 w-12 inline-block">IMEI:</span><span className="font-mono">{it.imei}</span></p>
+                                                    <p><span className="text-slate-400 w-12 inline-block">SIM:</span><span className="font-mono">{it.sim}</span></p>
+                                                </div>
+                                            ) : null;
+                                        })()}
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className={labelCls}>IMEI del dispositivo <span className="text-red-500">*</span></label>
+                                            <input value={manualImei}
+                                                onChange={e => setManualImei(e.target.value)}
+                                                placeholder="15 dígitos — ej: 352099001761481"
+                                                className={inputCls} />
+                                        </div>
+                                        <div>
+                                            <label className={labelCls}>Número de SIM / ICC</label>
+                                            <input value={manualSim}
+                                                onChange={e => setManualSim(e.target.value)}
+                                                placeholder="ej: 890101250725747238"
+                                                className={inputCls} />
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div className="flex gap-2 pt-1">
                                     <button onClick={() => setModalLinea(null)}
                                         className="flex-1 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm font-semibold">
@@ -286,18 +378,16 @@ export default function EntregasLineasTab() {
                             </>
                         ) : (
                             <>
-                                {/* Info del dispositivo */}
                                 <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 text-sm space-y-1">
                                     <div className="flex gap-2"><span className="text-slate-400 w-20">IMEI:</span><span className="font-mono font-semibold text-slate-700 dark:text-slate-200">{modalLinea.imei || "—"}</span></div>
                                     <div className="flex gap-2"><span className="text-slate-400 w-20">SIM:</span><span className="font-mono text-slate-700 dark:text-slate-200">{modalLinea.sim || "—"}</span></div>
-                                    <div className="flex gap-2"><span className="text-slate-400 w-20">Teléfono:</span><span className="text-slate-700 dark:text-slate-200">{modalLinea.telefono}</span></div>
+                                    <div className="flex gap-2"><span className="text-slate-400 w-20">Teléfono:</span><span>{modalLinea.telefono}</span></div>
+                                    <div className="flex gap-2"><span className="text-slate-400 w-20">Equipo:</span><span>{modalLinea.dispositivo_2026 || "—"}</span></div>
                                 </div>
 
                                 <div>
                                     <label className={labelCls}>Fecha de entrega</label>
-                                    <input type="date" value={fechaEntrega}
-                                        onChange={e => setFechaEntrega(e.target.value)}
-                                        className={inputCls} />
+                                    <input type="date" value={fechaEntrega} onChange={e => setFechaEntrega(e.target.value)} className={inputCls} />
                                 </div>
 
                                 <div>
@@ -334,7 +424,9 @@ export default function EntregasLineasTab() {
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h2 className="text-lg font-bold text-slate-800 dark:text-white">🤝 Módulo de Entregas</h2>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Asigna IMEI/SIM y registra la entrega con firma digital</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                        Asigna dispositivos del inventario Altice y registra la entrega con firma
+                    </p>
                 </div>
                 <div className="flex gap-2 flex-wrap">
                     <input ref={importRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleImportExcel} className="hidden" />
@@ -342,18 +434,19 @@ export default function EntregasLineasTab() {
                         className="text-sm bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white px-4 py-2 rounded-xl font-semibold transition-colors flex items-center gap-2">
                         {importing
                             ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Importando...</>
-                            : "📥 Importar IMEI/SIM (Excel)"}
+                            : "📥 Importar por Excel"}
                     </button>
                 </div>
             </div>
 
             {/* ── KPIs ──────────────────────────────────────────────── */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                 {[
                     { label: "Total a entregar", value: kpis.total, color: "text-slate-700 dark:text-slate-200", bg: "bg-white dark:bg-slate-800" },
                     { label: "Con IMEI asignado", value: kpis.conImei, color: "text-blue-600", bg: "bg-blue-50 dark:bg-blue-900/20" },
                     { label: "Entregados", value: kpis.entregados, color: "text-green-600", bg: "bg-green-50 dark:bg-green-900/20" },
                     { label: "Sin IMEI / Pendiente", value: kpis.sinImei, color: kpis.sinImei > 0 ? "text-amber-600" : "text-slate-400", bg: kpis.sinImei > 0 ? "bg-amber-50 dark:bg-amber-900/20" : "bg-white dark:bg-slate-800" },
+                    { label: "Inventario disponible", value: kpis.inventarioLibre, color: "text-teal-600", bg: "bg-teal-50 dark:bg-teal-900/20" },
                 ].map(k => (
                     <div key={k.label} className={`${k.bg} rounded-2xl border border-slate-200 dark:border-slate-700 p-4`}>
                         <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">{k.label}</p>
@@ -362,30 +455,26 @@ export default function EntregasLineasTab() {
                 ))}
             </div>
 
-            {/* ── FORMATO EXCEL DE IMPORTACIÓN ──────────────────────── */}
-            <div className="bg-purple-50 dark:bg-purple-900/10 border border-purple-200 dark:border-purple-800 rounded-2xl p-4">
-                <p className="text-xs font-bold text-purple-700 dark:text-purple-400 uppercase tracking-widest mb-2">📋 Formato del Excel de importación masiva</p>
-                <p className="text-xs text-purple-600 dark:text-purple-300">
-                    El archivo debe tener al menos las columnas: <strong>Telefono</strong>, <strong>IMEI</strong> y opcionalmente <strong>SIM</strong>.
-                    El sistema buscará cada línea por el número de teléfono y actualizará el IMEI y SIM automáticamente.
+            {/* ── INVENTARIO ALTICE ─────────────────────────────────── */}
+            <div className="bg-teal-50 dark:bg-teal-900/10 border border-teal-200 dark:border-teal-800 rounded-2xl p-4">
+                <p className="text-xs font-bold text-teal-700 dark:text-teal-400 uppercase tracking-widest mb-2">
+                    📦 Inventario Altice cargado — {inventario.length} dispositivos totales
                 </p>
-                <div className="mt-2 overflow-x-auto">
-                    <table className="text-xs border-collapse">
-                        <thead>
-                            <tr className="bg-purple-100 dark:bg-purple-900/30">
-                                <th className="border border-purple-300 dark:border-purple-700 px-3 py-1.5 text-purple-700 dark:text-purple-300">Telefono</th>
-                                <th className="border border-purple-300 dark:border-purple-700 px-3 py-1.5 text-purple-700 dark:text-purple-300">IMEI</th>
-                                <th className="border border-purple-300 dark:border-purple-700 px-3 py-1.5 text-purple-700 dark:text-purple-300">SIM</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr className="bg-white dark:bg-slate-800">
-                                <td className="border border-purple-200 dark:border-purple-800 px-3 py-1.5 font-mono text-slate-600 dark:text-slate-300">829-760-9833</td>
-                                <td className="border border-purple-200 dark:border-purple-800 px-3 py-1.5 font-mono text-slate-600 dark:text-slate-300">352099001761481</td>
-                                <td className="border border-purple-200 dark:border-purple-800 px-3 py-1.5 font-mono text-slate-600 dark:text-slate-300">89302720401234567890</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <div className="flex flex-wrap gap-4 text-sm">
+                    {Object.entries(
+                        inventario.reduce((acc, i) => {
+                            const k = i.marca.split(" ").slice(0, 3).join(" ");
+                            if (!acc[k]) acc[k] = { total: 0, libres: 0 };
+                            acc[k].total++;
+                            if (!i.asignado) acc[k].libres++;
+                            return acc;
+                        }, {} as Record<string, { total: number; libres: number }>)
+                    ).map(([m, c]) => (
+                        <div key={m} className="text-teal-700 dark:text-teal-300">
+                            <span className="font-semibold">{m}</span>
+                            <span className="text-teal-500 ml-2">{c.libres}/{c.total} disponibles</span>
+                        </div>
+                    ))}
                 </div>
             </div>
 
@@ -397,7 +486,9 @@ export default function EntregasLineasTab() {
                 {(["pendientes", "sin_imei", "entregadas"] as Vista[]).map(v => (
                     <button key={v} onClick={() => setVista(v)}
                         className={`px-4 py-2 rounded-full text-sm font-semibold transition-all ${vista === v ? "bg-blue-600 text-white" : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50"}`}>
-                        {v === "pendientes" ? `🕐 Pendientes (${kpis.total - kpis.entregados})` : v === "sin_imei" ? `⚠️ Sin IMEI (${kpis.sinImei})` : `✅ Entregadas (${kpis.entregados})`}
+                        {v === "pendientes" ? `🕐 Pendientes (${kpis.total - kpis.entregados})`
+                            : v === "sin_imei" ? `⚠️ Sin IMEI (${kpis.sinImei})`
+                                : `✅ Entregadas (${kpis.entregados})`}
                     </button>
                 ))}
             </div>
@@ -414,7 +505,7 @@ export default function EntregasLineasTab() {
                         <table className="w-full text-sm">
                             <thead className="bg-slate-50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-700">
                                 <tr>
-                                    {["Beneficiario", "Teléfono", "Dispositivo", "IMEI", "SIM", "Estado", "Acciones"].map(h => (
+                                    {["Beneficiario", "Titular", "Teléfono", "Dispositivo", "IMEI", "SIM", "Estado", "Acciones"].map(h => (
                                         <th key={h} className="p-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">{h}</th>
                                     ))}
                                 </tr>
@@ -426,8 +517,11 @@ export default function EntregasLineasTab() {
                                             <p className="font-semibold text-slate-800 dark:text-white">{linea.usuario_linea || "—"}</p>
                                             <p className="text-xs text-slate-400">{linea.tipo}</p>
                                         </td>
-                                        <td className="p-3 font-mono text-slate-600 dark:text-slate-300">{linea.telefono}</td>
-                                        <td className="p-3 text-xs text-slate-600 dark:text-slate-300 max-w-[140px]">
+                                        <td className="p-3 text-xs text-slate-600 dark:text-slate-300 max-w-[120px]">
+                                            <span className="truncate block">{linea.titular_responsable || "—"}</span>
+                                        </td>
+                                        <td className="p-3 font-mono text-slate-600 dark:text-slate-300 whitespace-nowrap">{linea.telefono}</td>
+                                        <td className="p-3 text-xs text-slate-600 dark:text-slate-300 max-w-[130px]">
                                             {linea.dispositivo_2026 || <span className="text-slate-300 italic">—</span>}
                                         </td>
                                         <td className="p-3">
@@ -437,7 +531,7 @@ export default function EntregasLineasTab() {
                                         </td>
                                         <td className="p-3">
                                             {linea.sim
-                                                ? <span className="font-mono text-xs text-slate-600 dark:text-slate-300">{linea.sim.slice(0, 12)}…</span>
+                                                ? <span className="font-mono text-xs text-slate-600 dark:text-slate-300">…{linea.sim.slice(-8)}</span>
                                                 : <span className="text-slate-300 text-xs">—</span>}
                                         </td>
                                         <td className="p-3">
@@ -460,7 +554,7 @@ export default function EntregasLineasTab() {
                                         </td>
                                         <td className="p-3">
                                             {linea.entregado ? (
-                                                <button onClick={() => imprimirActa(linea)}
+                                                <button onClick={() => { setModalLinea(linea); setModalMode("entrega"); imprimirActa(linea); }}
                                                     className="text-xs px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition-colors font-medium">
                                                     🖨️ Reimprimir
                                                 </button>
@@ -468,7 +562,7 @@ export default function EntregasLineasTab() {
                                                 <div className="flex gap-1">
                                                     <button onClick={() => abrirImei(linea)}
                                                         className="text-xs px-2.5 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 hover:bg-blue-100 transition-colors font-medium whitespace-nowrap">
-                                                        📱 {linea.imei ? "Editar IMEI" : "Asignar IMEI"}
+                                                        📱 {linea.imei ? "Cambiar" : "Asignar"}
                                                     </button>
                                                     {linea.imei && (
                                                         <button onClick={() => abrirEntrega(linea)}
