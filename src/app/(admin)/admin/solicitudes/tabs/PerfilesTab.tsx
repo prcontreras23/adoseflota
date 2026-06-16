@@ -328,25 +328,19 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
                     )}
                   </div>
 
-                  {/* IMEI — se rellena al elegir SIM, editable, rojo si fue modificado */}
-                  {(() => {
-                    const originalImei = selectedInvId ? inventarioItems.find(i => i.id === selectedInvId)?.imei : undefined;
-                    const changed = !!originalImei && (form.imei || "") !== originalImei;
-                    return (
-                      <div>
-                        <label className={labelCls}>
-                          IMEI
-                          {changed && <span className="ml-2 text-red-500 font-semibold text-xs">⚠ modificado — inventario: {originalImei}</span>}
-                        </label>
-                        <input
-                          value={form.imei || ""}
-                          onChange={e => setForm(prev => ({ ...prev, imei: e.target.value }))}
-                          placeholder="Se rellena al seleccionar la SIM"
-                          className={`${inputCls} ${changed ? "border-red-400 dark:border-red-500 bg-red-50 dark:bg-red-900/10 text-red-700 dark:text-red-300" : selectedInvId ? "border-teal-300 dark:border-teal-700 bg-teal-50 dark:bg-teal-900/20" : ""}`}
-                        />
+                  {/* IMEI — solo lectura, se rellena al seleccionar SIM del inventario */}
+                  <div>
+                    <label className={labelCls}>IMEI</label>
+                    {form.imei?.trim() ? (
+                      <div className="flex items-center gap-2 px-3 py-2.5 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-lg">
+                        <span className="font-mono text-sm font-semibold text-slate-800 dark:text-white tracking-wide">{form.imei}</span>
                       </div>
-                    );
-                  })()}
+                    ) : (
+                      <div className="px-3 py-2.5 bg-slate-50 dark:bg-slate-700/50 border border-dashed border-slate-300 dark:border-slate-600 rounded-lg">
+                        <span className="text-sm text-slate-400 italic">Se completa al seleccionar la SIM</span>
+                      </div>
+                    )}
+                  </div>
 
                   {/* Badge entregado */}
                   {form.entregado && (
