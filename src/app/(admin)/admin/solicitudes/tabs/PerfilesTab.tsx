@@ -270,7 +270,6 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
                 return "";
               };
               const modeloKey = getKey(form.dispositivo_2026 || "");
-              const typed = (form.imei || "").replace(/\D/g, "");
               const typedSim = (form.sim || "").replace(/\D/g, "");
               const sugerencias = inventarioItems.filter(i => {
                 if (i.asignado && i.linea_id !== linea.id) return false;
