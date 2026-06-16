@@ -36,6 +36,7 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
   const [inventarioItems, setInventarioItems] = useState<{ id: string; marca: string; imei: string; sim: string; asignado: boolean; linea_id: string | null }[]>([]);
   const [selectedInvId, setSelectedInvId] = useState<string>("");
   const [imeiOpen, setImeiOpen] = useState(false);
+  const [imeiDropOpen, setImeiDropOpen] = useState(false);
 
   useEffect(() => {
     async function cargarDatos() {
@@ -277,10 +278,20 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
               };
               const modeloKey = getKey(form.dispositivo_2026 || "");
               const typedSim = (form.sim || "").replace(/\D/g, "");
-              const sugerencias = inventarioItems.filter(i => {
+              const typedImei = (form.imei || "").replace(/\D/g, "");
+              const baseFilter = (i: typeof inventarioItems[0]) => {
                 if (i.asignado && i.linea_id !== linea.id) return false;
                 if (modeloKey && getKey(i.marca) !== modeloKey) return false;
+                return true;
+              };
+              const sugerencias = inventarioItems.filter(i => {
+                if (!baseFilter(i)) return false;
                 if (typedSim && !i.sim.includes(typedSim)) return false;
+                return true;
+              });
+              const sugerenciasImei = inventarioItems.filter(i => {
+                if (!baseFilter(i)) return false;
+                if (typedImei && !i.imei.includes(typedImei)) return false;
                 return true;
               });
 
@@ -334,16 +345,51 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
                     )}
                   </div>
 
-                  {/* IMEI — solo lectura, se rellena al seleccionar SIM del inventario */}
-                  <div>
-                    <label className={labelCls}>IMEI</label>
-                    {form.imei?.trim() ? (
-                      <div className="flex items-center gap-2 px-3 py-2.5 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-lg">
-                        <span className="font-mono text-sm font-semibold text-slate-800 dark:text-white tracking-wide">{form.imei}</span>
-                      </div>
-                    ) : (
-                      <div className="px-3 py-2.5 bg-slate-50 dark:bg-slate-700/50 border border-dashed border-slate-300 dark:border-slate-600 rounded-lg">
-                        <span className="text-sm text-slate-400 italic">Se completa al seleccionar la SIM</span>
+                  {/* IMEI — combobox editable, también puede seleccionar del inventario */}
+                  <div className="relative">
+                    <label className={labelCls}>
+                      IMEI
+                      {selectedInvId && <span className="ml-2 text-teal-600 font-semibold">✓ del inventario Altice</span>}
+                    </label>
+                    <input
+                      value={form.imei || ""}
+                      onChange={e => {
+                        setForm(prev => ({ ...prev, imei: e.target.value.replace(/\D/g, "") }));
+                        setSelectedInvId("");
+                        setImeiDropOpen(true);
+                      }}
+                      onFocus={() => setImeiDropOpen(true)}
+                      onBlur={() => setTimeout(() => setImeiDropOpen(false), 150)}
+                      placeholder="Escribe o selecciona el IMEI..."
+                      className={`${inputCls} font-mono tracking-wide`}
+                      autoComplete="off"
+                      maxLength={20}
+                    />
+                    {imeiDropOpen && sugerenciasImei.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 z-30 mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl shadow-xl max-h-52 overflow-y-auto">
+                        <p className="px-3 pt-2 pb-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                          Inventario Altice — {sugerenciasImei.length} disponible{sugerenciasImei.length !== 1 ? "s" : ""}
+                        </p>
+                        {sugerenciasImei.map(item => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onMouseDown={() => {
+                              setForm(prev => ({ ...prev, imei: item.imei, sim: item.sim }));
+                              setSelectedInvId(item.id);
+                              setImeiDropOpen(false);
+                            }}
+                            className="w-full text-left px-3 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 flex items-center gap-3 border-t border-slate-100 dark:border-slate-700 first:border-0"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <p className="font-mono text-sm text-slate-800 dark:text-white">{item.imei}</p>
+                              <p className="text-xs text-slate-400 mt-0.5">
+                                SIM: {item.sim} · {item.marca.split(" ").slice(0, 3).join(" ")}
+                                {item.linea_id === linea.id && <span className="text-teal-600 ml-2 font-semibold">✓ asignado</span>}
+                              </p>
+                            </div>
+                          </button>
+                        ))}
                       </div>
                     )}
                   </div>
