@@ -14,24 +14,28 @@ interface DispositivoStock {
 }
 
 interface DispositivoConStats extends DispositivoStock {
-    solicitados: number;     // cuántas líneas piden este equipo
-    disponibles: number;     // stock - solicitados
+    solicitados: number;  // líneas con ese equipo en accion_2026 (CAMBIO/ALTA/SE MANTIENE)
+    entregados: number;   // entregado = true
+    pendientes: number;   // IMEI asignado pero no entregado aún
+    disponibles: number;  // stock - entregados (unidades físicas aún disponibles)
 }
 
-function badge(disponibles: number, stock: number) {
-    if (stock === 0) return { label: "Sin stock", cls: "bg-slate-100 text-slate-500" };
-    if (disponibles > 0) return { label: "Disponible", cls: "bg-emerald-100 text-emerald-700" };
-    if (disponibles === 0) return { label: "Agotado", cls: "bg-amber-100 text-amber-700" };
-    return { label: `Déficit ${disponibles}`, cls: "bg-rose-100 text-rose-700" };
+function badge(entregados: number, stock: number, solicitados: number) {
+    if (stock === 0) return { label: "Sin stock", cls: "bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400" };
+    if (entregados >= stock) return { label: "Todo entregado", cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" };
+    if (solicitados > stock) return { label: `Déficit ${solicitados - stock}`, cls: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400" };
+    if (entregados > 0) return { label: "En progreso", cls: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" };
+    return { label: "Pendiente", cls: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" };
 }
 
-function BarStock({ used, total }: { used: number; total: number }) {
-    if (total === 0) return <div className="h-2 rounded-full bg-slate-100 w-full" />;
-    const pct = Math.min((used / total) * 100, 100);
-    const color = pct >= 100 ? "bg-rose-500" : pct >= 80 ? "bg-amber-500" : "bg-emerald-500";
+function BarEntrega({ entregados, pendientes, total }: { entregados: number; pendientes: number; total: number }) {
+    if (total === 0) return <div className="h-3 rounded-full bg-slate-100 dark:bg-slate-700 w-full" />;
+    const pctEntregado = Math.min((entregados / total) * 100, 100);
+    const pctPendiente = Math.min((pendientes / total) * 100, 100 - pctEntregado);
     return (
-        <div className="h-2 rounded-full bg-slate-100 w-full overflow-hidden">
-            <div className={`h-full rounded-full ${color} transition-all duration-500`} style={{ width: `${pct}%` }} />
+        <div className="h-3 rounded-full bg-slate-100 dark:bg-slate-700 w-full overflow-hidden flex">
+            <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: `${pctEntregado}%` }} />
+            <div className="h-full bg-blue-400 transition-all duration-500" style={{ width: `${pctPendiente}%` }} />
         </div>
     );
 }
@@ -104,29 +108,48 @@ export default function AlmacenTab() {
         };
     }, []);
 
-    // Cobertura calculada en vivo: cualquier cambio de dispositivo en otra pestaña
-    // se refleja aquí al instante (solicitados / disponibles / déficit / sin catalogar).
+    // Estadísticas calculadas en vivo desde LineasContext (Realtime):
+    // cualquier entrega registrada en la pestaña Entregas se refleja aquí al instante.
     const { stock, sinCatalogar } = useMemo(() => {
-        // Contar solicitudes por dispositivo (case-insensitive)
-        const conteo: Record<string, number> = {};
+        const ACCIONES_ENTREGA = ["CAMBIO SOLICITADO", "ALTA", "SE MANTIENE"];
+        const conteoSolicitados: Record<string, number> = {};
+        const conteoEntregados: Record<string, number> = {};
+        const conteoPendientes: Record<string, number> = {};
+
         for (const l of ctxLineas) {
             const d = l.dispositivo_2026?.trim();
-            if (!d || d === "" || d.toUpperCase() === "SIN CAMBIO" || d.toUpperCase() === "—") continue;
+            if (!d || d.toUpperCase() === "SIN CAMBIO" || d === "—") continue;
             const key = d.toLowerCase();
-            conteo[key] = (conteo[key] || 0) + 1;
+            if (ACCIONES_ENTREGA.includes(l.accion_2026)) {
+                conteoSolicitados[key] = (conteoSolicitados[key] || 0) + 1;
+            }
+            if (l.entregado) {
+                conteoEntregados[key] = (conteoEntregados[key] || 0) + 1;
+            }
+            // Pendiente = IMEI asignado pero no entregado
+            if (l.imei?.trim() && !l.entregado && ACCIONES_ENTREGA.includes(l.accion_2026)) {
+                conteoPendientes[key] = (conteoPendientes[key] || 0) + 1;
+            }
         }
 
-        // Enriquecer stock con estadísticas
         const enriched: DispositivoConStats[] = rawStock.map(s => {
             const key = s.dispositivo.toLowerCase();
-            const solicitados = conteo[key] ?? 0;
-            return { ...s, solicitados, disponibles: s.cantidad_stock - solicitados };
+            const solicitados = conteoSolicitados[key] ?? 0;
+            const entregados = conteoEntregados[key] ?? 0;
+            const pendientes = conteoPendientes[key] ?? 0;
+            return {
+                ...s,
+                solicitados,
+                entregados,
+                pendientes,
+                disponibles: s.cantidad_stock - entregados,
+            };
         });
 
-        // Detectar dispositivos en líneas que no están en almacén
+        // Dispositivos en líneas sin entrada en almacén
         const catalogados = new Set(rawStock.map(s => s.dispositivo.toLowerCase()));
         const noEnAlmacen: Record<string, number> = {};
-        for (const [key, cnt] of Object.entries(conteo)) {
+        for (const [key, cnt] of Object.entries(conteoSolicitados)) {
             if (!catalogados.has(key)) noEnAlmacen[key] = cnt;
         }
         const sc = Object.entries(noEnAlmacen)
@@ -189,21 +212,24 @@ export default function AlmacenTab() {
     // KPIs generales
     const totalModelos = stock.length;
     const totalUnidades = stock.reduce((s, i) => s + i.cantidad_stock, 0);
-    const totalSolicitados = stock.reduce((s, i) => s + i.solicitados, 0);
+    const totalEntregados = stock.reduce((s, i) => s + i.entregados, 0);
+    const totalPendientes = stock.reduce((s, i) => s + i.pendientes, 0);
     const totalDisponibles = stock.reduce((s, i) => s + Math.max(i.disponibles, 0), 0);
-    const conDeficit = stock.filter(i => i.disponibles < 0).length;
+    const conDeficit = stock.filter(i => i.solicitados > i.cantidad_stock).length;
 
     function exportarAlmacen() {
         const rows = stock.map(s => ({
             "Dispositivo": s.dispositivo,
             "Stock": s.cantidad_stock,
             "Solicitados": s.solicitados,
+            "Entregados": s.entregados,
+            "Pendientes (IMEI asig.)": s.pendientes,
             "Disponibles": s.disponibles,
-            "Estado": s.disponibles > 0 ? "Disponible" : s.disponibles === 0 ? "Agotado" : `Déficit (${Math.abs(s.disponibles)})`,
+            "Estado": badge(s.entregados, s.cantidad_stock, s.solicitados).label,
             "Notas": s.notas,
         }));
         const ws = XLSX.utils.json_to_sheet(rows);
-        ws["!cols"] = [{ wch: 30 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 20 }, { wch: 30 }];
+        ws["!cols"] = [{ wch: 30 }, { wch: 8 }, { wch: 12 }, { wch: 12 }, { wch: 20 }, { wch: 12 }, { wch: 20 }, { wch: 30 }];
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Almacén Dispositivos");
         XLSX.writeFile(wb, `Almacen-Dispositivos-${new Date().toISOString().split("T")[0]}.xlsx`);
@@ -300,10 +326,10 @@ export default function AlmacenTab() {
             {/* ── KPI CARDS ──────────────────────────────────────────── */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
-                    { label: "Modelos en almacén", value: totalModelos, color: "text-blue-600", bg: "bg-blue-50 dark:bg-blue-900/20" },
-                    { label: "Unidades en stock", value: totalUnidades, color: "text-slate-700 dark:text-slate-200", bg: "bg-white dark:bg-slate-800" },
-                    { label: "Solicitados", value: totalSolicitados, color: "text-amber-600", bg: "bg-amber-50 dark:bg-amber-900/20" },
-                    { label: "Disponibles", value: totalDisponibles, color: conDeficit > 0 ? "text-rose-600" : "text-emerald-600", bg: conDeficit > 0 ? "bg-rose-50 dark:bg-rose-900/20" : "bg-emerald-50 dark:bg-emerald-900/20" },
+                    { label: "Total en almacén", value: totalUnidades, color: "text-slate-700 dark:text-slate-200", bg: "bg-white dark:bg-slate-800" },
+                    { label: "Entregados", value: totalEntregados, color: "text-emerald-600", bg: "bg-emerald-50 dark:bg-emerald-900/20" },
+                    { label: "IMEI asig. / pendientes", value: totalPendientes, color: "text-blue-600", bg: "bg-blue-50 dark:bg-blue-900/20" },
+                    { label: "Disponibles en almacén", value: totalDisponibles, color: conDeficit > 0 ? "text-rose-600" : "text-teal-600", bg: conDeficit > 0 ? "bg-rose-50 dark:bg-rose-900/20" : "bg-teal-50 dark:bg-teal-900/20" },
                 ].map(k => (
                     <div key={k.label} className={`${k.bg} rounded-2xl border border-slate-200 dark:border-slate-700 p-4`}>
                         <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">{k.label}</p>
@@ -340,18 +366,19 @@ export default function AlmacenTab() {
                         <table className="w-full text-sm">
                             <thead className="bg-slate-50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-700">
                                 <tr>
-                                    {["Dispositivo", "Stock", "Solicitados", "Disponibles", "Estado", "Cobertura", "Notas", ""].map(h => (
+                                    {["Dispositivo", "Stock", "Entregados", "Pendientes", "Disponibles", "Progreso de entrega", "Estado", ""].map(h => (
                                         <th key={h} className="p-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">{h}</th>
                                     ))}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                                 {stock.map(item => {
-                                    const b = badge(item.disponibles, item.cantidad_stock);
+                                    const b = badge(item.entregados, item.cantidad_stock, item.solicitados);
                                     return (
                                         <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
                                             <td className="p-3 font-medium text-slate-800 dark:text-white whitespace-nowrap">
                                                 {item.dispositivo}
+                                                {item.notas && <p className="text-xs text-slate-400 font-normal mt-0.5">{item.notas}</p>}
                                             </td>
                                             <td className="p-3 text-center">
                                                 <span className="font-bold text-slate-700 dark:text-slate-200 text-base">
@@ -359,30 +386,36 @@ export default function AlmacenTab() {
                                                 </span>
                                             </td>
                                             <td className="p-3 text-center">
-                                                <span className={`font-semibold text-base ${item.solicitados > item.cantidad_stock ? "text-rose-600" : "text-amber-600"}`}>
-                                                    {item.solicitados}
+                                                <span className="font-bold text-base text-emerald-600 dark:text-emerald-400">
+                                                    {item.entregados}
                                                 </span>
                                             </td>
                                             <td className="p-3 text-center">
-                                                <span className={`font-bold text-base ${item.disponibles < 0 ? "text-rose-600" : item.disponibles === 0 ? "text-amber-600" : "text-emerald-600"}`}>
-                                                    {item.disponibles < 0 ? `−${Math.abs(item.disponibles)}` : item.disponibles}
+                                                <span className={`font-semibold text-base ${item.pendientes > 0 ? "text-blue-600 dark:text-blue-400" : "text-slate-400"}`}>
+                                                    {item.pendientes}
                                                 </span>
+                                            </td>
+                                            <td className="p-3 text-center">
+                                                <span className={`font-bold text-base ${item.disponibles <= 0 ? "text-rose-600" : "text-teal-600 dark:text-teal-400"}`}>
+                                                    {item.disponibles}
+                                                </span>
+                                            </td>
+                                            <td className="p-3 min-w-[140px]">
+                                                <BarEntrega entregados={item.entregados} pendientes={item.pendientes} total={item.cantidad_stock} />
+                                                <p className="text-[10px] text-slate-400 mt-1 flex gap-3">
+                                                    <span className="text-emerald-600">■ {item.entregados} entregados</span>
+                                                    {item.pendientes > 0 && <span className="text-blue-500">■ {item.pendientes} con IMEI</span>}
+                                                </p>
                                             </td>
                                             <td className="p-3">
                                                 <span className={`text-xs font-semibold px-2 py-1 rounded-full ${b.cls}`}>
                                                     {b.label}
                                                 </span>
-                                            </td>
-                                            <td className="p-3 min-w-[120px]">
-                                                <BarStock used={item.solicitados} total={item.cantidad_stock} />
-                                                <p className="text-[10px] text-slate-400 mt-1">
-                                                    {item.cantidad_stock > 0
-                                                        ? `${Math.min(Math.round((item.solicitados / item.cantidad_stock) * 100), 100)}% usado`
-                                                        : "Sin stock"}
-                                                </p>
-                                            </td>
-                                            <td className="p-3 text-xs text-slate-500 dark:text-slate-400 max-w-[180px]">
-                                                <span className="line-clamp-2">{item.notas || "—"}</span>
+                                                {item.solicitados > item.cantidad_stock && (
+                                                    <p className="text-[10px] text-rose-500 mt-1">
+                                                        {item.solicitados} solicitados vs {item.cantidad_stock} stock
+                                                    </p>
+                                                )}
                                             </td>
                                             <td className="p-3 whitespace-nowrap">
                                                 <div className="flex gap-1">
