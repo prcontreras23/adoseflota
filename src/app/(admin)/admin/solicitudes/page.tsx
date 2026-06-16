@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import toast from "react-hot-toast";
 import DashboardTab from "./tabs/DashboardTab";
 import LineasTab from "./tabs/LineasTab";
 import PerfilesTab from "./tabs/PerfilesTab";
@@ -73,6 +74,12 @@ const Icon = {
             <line x1="21" y1="12" x2="9" y2="12"/>
         </svg>
     ),
+    gear: (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+        </svg>
+    ),
 };
 
 const TABS = [
@@ -88,9 +95,16 @@ const TABS = [
 export default function AdminDashboard() {
     const router = useRouter();
     const [activeTab, setActiveTab] = useState("dashboard");
-    const [user, setUser] = useState<{ nombre: string; rol: string } | null>(null);
+    const [user, setUser] = useState<{ nombre: string; es_admin: boolean; permisos: string[] } | null>(null);
     const [loading, setLoading] = useState(true);
     const [darkMode, setDarkMode] = useState(false);
+
+    // Settings modal state
+    const [showSettings, setShowSettings] = useState(false);
+    const [pinActual, setPinActual] = useState("");
+    const [pinNuevo, setPinNuevo] = useState("");
+    const [pinConfirm, setPinConfirm] = useState("");
+    const [savingPin, setSavingPin] = useState(false);
 
     useEffect(() => {
         if (typeof window !== "undefined") {
@@ -98,15 +112,25 @@ export default function AdminDashboard() {
             setDarkMode(isDark);
             if (isDark) document.documentElement.classList.add("dark");
         }
-        async function checkAuth() {
-            setUser({ nombre: "Admin Temporal", rol: "admin" } as any);
-            setLoading(false);
+
+        // Read session from localStorage
+        const raw = typeof window !== "undefined" ? localStorage.getItem("flota_session") : null;
+        if (!raw) { router.push("/login"); return; }
+        try {
+            const session = JSON.parse(raw);
+            setUser({ nombre: session.nombre, es_admin: session.es_admin ?? false, permisos: session.permisos ?? [] });
+            if (!session.es_admin && session.permisos?.length > 0) {
+                setActiveTab(session.permisos[0]);
+            }
+        } catch {
+            router.push("/login");
+            return;
         }
-        checkAuth();
+        setLoading(false);
     }, [router]);
 
     async function handleLogout() {
-        await supabase.auth.signOut();
+        localStorage.removeItem("flota_session");
         router.push("/login");
     }
 
@@ -117,13 +141,73 @@ export default function AdminDashboard() {
         else document.documentElement.classList.remove("dark");
     }
 
+    function openSettings() {
+        setPinActual("");
+        setPinNuevo("");
+        setPinConfirm("");
+        setShowSettings(true);
+    }
+
+    async function handleSavePin() {
+        if (pinNuevo.length !== 6 || !/^\d{6}$/.test(pinNuevo)) {
+            toast.error("El PIN nuevo debe ser exactamente 6 dígitos");
+            return;
+        }
+        if (pinNuevo !== pinConfirm) {
+            toast.error("Los PINs nuevos no coinciden");
+            return;
+        }
+
+        setSavingPin(true);
+
+        // Get session id
+        const raw = localStorage.getItem("flota_session");
+        if (!raw) { router.push("/login"); return; }
+        const session = JSON.parse(raw);
+
+        // Verify current PIN
+        const { data: pinData, error: verifyError } = await supabase
+            .from("access_pins")
+            .select("id")
+            .eq("id", session.id)
+            .eq("pin", pinActual)
+            .eq("activo", true)
+            .single();
+
+        if (verifyError || !pinData) {
+            toast.error("PIN actual incorrecto");
+            setSavingPin(false);
+            return;
+        }
+
+        // Update new PIN
+        const { error: updateError } = await supabase
+            .from("access_pins")
+            .update({ pin: pinNuevo })
+            .eq("id", session.id);
+
+        if (updateError) {
+            toast.error("Error al actualizar el PIN");
+            setSavingPin(false);
+            return;
+        }
+
+        toast.success("PIN actualizado");
+        setSavingPin(false);
+        setShowSettings(false);
+    }
+
     if (loading) return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
             <div className="w-8 h-8 border-[3px] border-blue-600 border-t-transparent rounded-full animate-spin" />
         </div>
     );
 
-    const ActiveComponent = TABS.find(t => t.id === activeTab)?.component || TABS[0].component;
+    const visibleTabs = user?.es_admin
+        ? TABS
+        : TABS.filter(t => (user?.permisos ?? []).includes(t.id));
+
+    const ActiveComponent = visibleTabs.find(t => t.id === activeTab)?.component || visibleTabs[0].component;
 
     return (
         <LineasProvider>
@@ -151,7 +235,7 @@ export default function AdminDashboard() {
 
                     {/* Desktop Nav — underline style */}
                     <nav className="hidden md:flex items-stretch h-[58px] gap-0.5 flex-1 justify-center">
-                        {TABS.map(tab => {
+                        {visibleTabs.map(tab => {
                             const active = activeTab === tab.id;
                             return (
                                 <button
@@ -183,10 +267,19 @@ export default function AdminDashboard() {
                             </div>
                             <div className="flex flex-col leading-none">
                                 <span className="text-[12px] font-semibold text-slate-800 dark:text-white">{user?.nombre}</span>
-                                <span className="text-[10px] font-medium text-blue-500 uppercase tracking-wider">Admin</span>
+                                <span className="text-[10px] font-medium text-blue-500 uppercase tracking-wider">
+                                    {user?.es_admin ? "Admin" : "Usuario"}
+                                </span>
                             </div>
                         </div>
                         <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 hidden lg:block mx-1" />
+                        {/* Settings button */}
+                        <button
+                            onClick={openSettings}
+                            className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all hover:scale-105"
+                            title="Configuración">
+                            {Icon.gear}
+                        </button>
                         <button
                             onClick={toggleDarkMode}
                             className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all hover:scale-105">
@@ -204,7 +297,7 @@ export default function AdminDashboard() {
                 {/* Mobile Nav */}
                 <div className="md:hidden px-3 pb-1.5 overflow-x-auto border-t border-slate-100 dark:border-slate-800/60">
                     <div className="flex gap-0.5 min-w-max pt-1">
-                        {TABS.map(tab => {
+                        {visibleTabs.map(tab => {
                             const active = activeTab === tab.id;
                             return (
                                 <button
@@ -230,6 +323,88 @@ export default function AdminDashboard() {
             <main className="flex-1 max-w-[1440px] mx-auto w-full px-4 py-6">
                 <ActiveComponent />
             </main>
+
+            {/* Settings Modal */}
+            {showSettings && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-sm border border-slate-200 dark:border-slate-700">
+                        {/* Modal Header */}
+                        <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-800">
+                            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Cambiar PIN</h2>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                                {user?.nombre} &middot; <span className="text-blue-500 capitalize">{user?.rol}</span>
+                            </p>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="px-6 py-5 space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                                    PIN actual
+                                </label>
+                                <input
+                                    type="password"
+                                    maxLength={6}
+                                    value={pinActual}
+                                    onChange={e => setPinActual(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                                    placeholder="••••••"
+                                    className="w-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                                    PIN nuevo
+                                </label>
+                                <input
+                                    type="password"
+                                    maxLength={6}
+                                    value={pinNuevo}
+                                    onChange={e => setPinNuevo(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                                    placeholder="••••••"
+                                    className="w-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                                    Confirmar PIN nuevo
+                                </label>
+                                <input
+                                    type="password"
+                                    maxLength={6}
+                                    value={pinConfirm}
+                                    onChange={e => setPinConfirm(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                                    placeholder="••••••"
+                                    className="w-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex gap-3 justify-end">
+                            <button
+                                onClick={() => setShowSettings(false)}
+                                disabled={savingPin}
+                                className="px-4 py-2 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all disabled:opacity-50">
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleSavePin}
+                                disabled={savingPin || !pinActual || !pinNuevo || !pinConfirm}
+                                className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                                {savingPin ? (
+                                    <>
+                                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                        </svg>
+                                        Guardando...
+                                    </>
+                                ) : "Guardar"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
         </LineasProvider>
     );

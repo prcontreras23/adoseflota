@@ -140,7 +140,7 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
         <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between sticky top-0 bg-white dark:bg-slate-900 z-10">
           <div>
             <p className="font-bold text-slate-800 dark:text-white text-base">Editar línea</p>
-            <p className="text-xs text-slate-400 flex items-center gap-1">{linea.telefono}{!linea.telefono?.startsWith("NUEVA") && <a href={`tel:+1${linea.telefono?.replace(/-/g, "")}`} title="Llamar" className="text-blue-500 hover:text-blue-700">📞</a>} · {linea.usuario_linea}</p>
+            <p className="text-xs text-slate-400 flex items-center gap-1">{linea.telefono}{!linea.telefono?.startsWith("NUEVA") && <a href={`tel:+1${linea.telefono?.replace(/-/g, "")}`} title="Llamar" className="text-blue-500 hover:text-blue-700"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg></a>} · {linea.usuario_linea}</p>
           </div>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 hover:text-slate-800 text-lg">✕</button>
         </div>
@@ -153,7 +153,7 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
           />
 
           <section>
-            <p className={sectionTitleCls}>👤 Identificación</p>
+            <p className={`${sectionTitleCls} flex items-center gap-1.5`}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Identificación</p>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={labelCls}>Teléfono</label>
@@ -179,7 +179,7 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
           </section>
 
           <section>
-            <p className={sectionTitleCls}>📶 Plan</p>
+            <p className={`${sectionTitleCls} flex items-center gap-1.5`}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> Plan</p>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={labelCls}>Data actual (GB)</label>
@@ -208,7 +208,7 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
           </section>
 
           <section>
-            <p className={sectionTitleCls}>📱 Dispositivo y Costo</p>
+            <p className={`${sectionTitleCls} flex items-center gap-1.5`}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg> Dispositivo y Costo</p>
             <div className="space-y-3">
               <div>
                 <label className={labelCls}>Dispositivo 2026</label>
@@ -241,7 +241,7 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
                   if (!sel || sel.disponibles > 0) return null;
                   return (
                     <div className="mt-2 flex items-start gap-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg px-3 py-2">
-                      <span className="text-amber-500 text-base leading-tight mt-0.5">⚠️</span>
+                      <span className="text-amber-500 leading-tight mt-0.5 shrink-0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
                       <p className="text-xs text-amber-700 dark:text-amber-300 leading-snug">
                         {sel.disponibles === 0
                           ? <><strong>Sin stock disponible</strong> para <em>{sel.dispositivo}</em>. Puedes asignarlo de todas formas, pero actualiza el almacén cuando recibas más unidades.</>
@@ -266,7 +266,7 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
           </section>
 
           <section>
-            <p className={sectionTitleCls}>🏷️ IMEI y SIM</p>
+            <p className={`${sectionTitleCls} flex items-center gap-1.5`}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg> IMEI y SIM</p>
             {(() => {
               const getKey = (s: string) => {
                 const l = s.toLowerCase();
@@ -351,7 +351,7 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
                   {/* Badge entregado */}
                   {form.entregado && (
                     <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg px-3 py-2">
-                      <span className="text-green-600 text-base">✅</span>
+                      <span className="text-green-600"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.1 9 11.1"/></svg></span>
                       <p className="text-xs text-green-700 dark:text-green-300 font-medium">
                         Entregado el {form.fecha_entrega ? new Date(form.fecha_entrega).toLocaleDateString("es-DO", { year: "numeric", month: "long", day: "numeric" }) : "—"}
                       </p>
@@ -363,7 +363,7 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
           </section>
 
           <section>
-            <p className={sectionTitleCls}>📋 Estatus</p>
+            <p className={`${sectionTitleCls} flex items-center gap-1.5`}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> Estatus</p>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={labelCls}>Acción 2026</label>
@@ -390,7 +390,7 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
                 </select>
               </div>
               <div className="col-span-2">
-                <label className={labelCls}>💬 Nota de resolución</label>
+                <label className={`${labelCls} flex items-center gap-1`}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> Nota de resolución</label>
                 <textarea value={form.nota_resolucion} onChange={e => set("nota_resolucion", e.target.value)}
                   placeholder="Registra aquí qué acción tomaste, resultado de llamadas, confirmaciones, etc. (Ej: Llamada 11-06 — confirmó su plan. iPhone 17 Pro aprobado por director)"
                   rows={3} className={`${inputCls} resize-none`} />
@@ -400,7 +400,7 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
           </section>
 
           <section>
-            <p className={sectionTitleCls}>✅ Revisión</p>
+            <p className={`${sectionTitleCls} flex items-center gap-1.5`}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.1 9 11.1"/></svg> Revisión</p>
             <div>
               <label className={labelCls}>Revisado por</label>
               <select value={form.revisado_por} onChange={e => set("revisado_por", e.target.value)} className={inputCls}>
@@ -413,7 +413,7 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
           </section>
 
           <section>
-            <p className={sectionTitleCls}>📝 Notas</p>
+            <p className={`${sectionTitleCls} flex items-center gap-1.5`}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Notas</p>
             <div className="space-y-3">
               <div>
                 <label className={labelCls}>Observaciones</label>
@@ -457,8 +457,8 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
           <div className="p-4 flex gap-3">
             <button onClick={() => setConfirmDelete(true)}
               disabled={confirmDelete}
-              className="py-2.5 px-4 rounded-xl bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 text-sm font-semibold hover:bg-rose-100 dark:hover:bg-rose-950/40 disabled:opacity-40 transition-colors border border-rose-200 dark:border-rose-800">
-              🗑 Eliminar
+              className="py-2.5 px-4 rounded-xl bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 text-sm font-semibold hover:bg-rose-100 dark:hover:bg-rose-950/40 disabled:opacity-40 transition-colors border border-rose-200 dark:border-rose-800 flex items-center gap-1.5">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg> Eliminar
             </button>
             <button onClick={onClose}
               className="flex-1 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm font-semibold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
@@ -486,14 +486,14 @@ function LineaRow({ linea, onEdit, dimmed }: { linea: LineaAltice; onEdit: () =>
             {linea.tipo && <span className="text-xs text-slate-400">{linea.tipo}</span>}
           </div>
           <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400 mt-1">
-            <span>📶 <strong>{linea.gb_antes || "—"}</strong> → <strong className="text-blue-600 dark:text-blue-400">{linea.gb_solicitado || "—"}</strong> GB</span>
-            <span>📞 <strong>{linea.min_antes || "—"}</strong> → <strong className="text-blue-600 dark:text-blue-400">{linea.min_solicitados || "—"}</strong> min</span>
-            {linea.dispositivo_2026 && <span>📱 {linea.dispositivo_2026}</span>}
-            {linea.monto_mensual && <span className="text-green-600 dark:text-green-400 font-semibold">💰 {linea.monto_mensual}</span>}
-            {linea.cotizacion && <span className="text-amber-600 dark:text-amber-400">📋 {linea.cotizacion}</span>}
+            <span className="flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> <strong>{linea.gb_antes || "—"}</strong> → <strong className="text-blue-600 dark:text-blue-400">{linea.gb_solicitado || "—"}</strong> GB</span>
+            <span className="flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg> <strong>{linea.min_antes || "—"}</strong> → <strong className="text-blue-600 dark:text-blue-400">{linea.min_solicitados || "—"}</strong> min</span>
+            {linea.dispositivo_2026 && <span className="flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg> {linea.dispositivo_2026}</span>}
+            {linea.monto_mensual && <span className="text-green-600 dark:text-green-400 font-semibold flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg> {linea.monto_mensual}</span>}
+            {linea.cotizacion && <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> {linea.cotizacion}</span>}
           </div>
           {linea.seguimiento && (
-            <p className="mt-1.5 text-xs text-slate-400 dark:text-slate-500 italic line-clamp-1">💬 {linea.seguimiento}</p>
+            <p className="mt-1.5 text-xs text-slate-400 dark:text-slate-500 italic line-clamp-1 flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> {linea.seguimiento}</p>
           )}
           {linea.proxima_accion && (
             <span className="mt-1.5 inline-block text-[11px] bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 rounded px-2 py-0.5 font-semibold">
@@ -511,26 +511,26 @@ function LineaRow({ linea, onEdit, dimmed }: { linea: LineaAltice; onEdit: () =>
             </span>
           )}
           {linea.revisado_por ? (
-            <span className="text-xs font-semibold px-2 py-1 rounded-lg bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400">
-              ✅ {linea.revisado_por}
+            <span className="text-xs font-semibold px-2 py-1 rounded-lg bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400 flex items-center gap-1">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.1 9 11.1"/></svg> {linea.revisado_por}
             </span>
           ) : (
-            <span className="text-xs font-semibold px-2 py-1 rounded-lg bg-slate-100 text-slate-400 dark:bg-slate-700 dark:text-slate-500">
-              ⬜ Sin revisar
+            <span className="text-xs font-semibold px-2 py-1 rounded-lg bg-slate-100 text-slate-400 dark:bg-slate-700 dark:text-slate-500 flex items-center gap-1">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg> Sin revisar
             </span>
           )}
           {linea.entregado ? (
-            <span className="text-xs font-semibold px-2 py-1 rounded-lg bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-              ✅ Entregado
+            <span className="text-xs font-semibold px-2 py-1 rounded-lg bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 flex items-center gap-1">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.1 9 11.1"/></svg> Entregado
             </span>
           ) : linea.imei?.trim() ? (
-            <span className="text-xs font-semibold px-2 py-1 rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-              📱 IMEI asig.
+            <span className="text-xs font-semibold px-2 py-1 rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 flex items-center gap-1">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg> IMEI asig.
             </span>
           ) : null}
           <button onClick={onEdit}
-            className="mt-1 text-xs px-3 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 font-semibold transition-colors">
-            ✏️ Editar
+            className="mt-1 text-xs px-3 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 font-semibold transition-colors flex items-center gap-1">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Editar
           </button>
         </div>
       </div>
@@ -718,12 +718,12 @@ export default function PerfilesTab() {
         </div>
         <div className="flex gap-2">
           <button onClick={exportarPerfiles}
-            className="text-sm bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-xl font-semibold transition-colors">
-            📊 Exportar Excel
+            className="text-sm bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-xl font-semibold transition-colors flex items-center gap-1.5">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> Exportar Excel
           </button>
           <button onClick={() => setNuevaLineaTitular("")}
-            className="text-sm bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl font-semibold transition-colors">
-            ➕ Nuevo Perfil
+            className="text-sm bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl font-semibold transition-colors flex items-center gap-1.5">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Nuevo Perfil
           </button>
         </div>
       </div>
@@ -791,14 +791,16 @@ export default function PerfilesTab() {
             {/* Chips rápidos */}
             <div className="flex flex-wrap gap-2 items-center">
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Rápido:</span>
-              <button className={chipCls(chipSinRevisar)} onClick={() => setChipSinRevisar(v => !v)}>⬜ Sin revisar</button>
-              <button className={chipCls(chipSinDispositivo)} onClick={() => setChipSinDispositivo(v => !v)}>📵 Sin dispositivo</button>
-              <button className={chipCls(chipSinMonto)} onClick={() => setChipSinMonto(v => !v)}>💸 Sin monto</button>
-              <button className={chipCls(chipConSeguimiento)} onClick={() => setChipConSeguimiento(v => !v)}>📝 Con notas</button>
+              <button className={chipCls(chipSinRevisar)} onClick={() => setChipSinRevisar(v => !v)}><span className="flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg> Sin revisar</span></button>
+              <button className={chipCls(chipSinDispositivo)} onClick={() => setChipSinDispositivo(v => !v)}><span className="flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg> Sin dispositivo</span></button>
+              <button className={chipCls(chipSinMonto)} onClick={() => setChipSinMonto(v => !v)}><span className="flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg> Sin monto</span></button>
+              <button className={chipCls(chipConSeguimiento)} onClick={() => setChipConSeguimiento(v => !v)}><span className="flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Con notas</span></button>
               {["LLAMAR", "CARTA", "COTIZAR", "CANCELAR"].map(a => (
                 <button key={a} className={chipCls(filterProximaAccion === a)}
                   onClick={() => setFilterProximaAccion(v => v === a ? "" : a)}>
-                  {a === "LLAMAR" ? "📲" : a === "CARTA" ? "✉️" : a === "COTIZAR" ? "💲" : "🚫"} {a}
+                  <span className="flex items-center gap-1">
+                    {a === "LLAMAR" ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg> : a === "CARTA" ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> : a === "COTIZAR" ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg> : <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>} {a}
+                  </span>
                 </button>
               ))}
               {hayFiltros && (
@@ -840,11 +842,11 @@ export default function PerfilesTab() {
                     <p className="text-xs text-slate-400 flex flex-wrap items-center gap-x-2 gap-y-0.5">
                       <span>{g.lineas.length} línea{g.lineas.length !== 1 ? "s" : ""}</span>
                       {tieneMontos && (
-                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                          💰 {fmtRD(montoGrupo)}/mes
+                        <span className="font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg> {fmtRD(montoGrupo)}/mes
                         </span>
                       )}
-                      {vinculadoNombre && <span className="text-purple-500 font-semibold">🔗 {vinculadoNombre}</span>}
+                      {vinculadoNombre && <span className="text-purple-500 font-semibold flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg> {vinculadoNombre}</span>}
                     </p>
                   </div>
                   <div className="flex gap-1 flex-wrap shrink-0">

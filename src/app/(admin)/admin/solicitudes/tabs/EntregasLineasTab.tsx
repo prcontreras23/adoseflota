@@ -293,8 +293,8 @@ export default function EntregasLineasTab() {
 
                         <div className="flex items-start justify-between gap-2">
                             <div>
-                                <p className="font-bold text-slate-800 dark:text-white text-base">
-                                    {modalMode === "imei" ? "📱 Asignar dispositivo" : "🤝 Registrar Entrega"}
+                                <p className="font-bold text-slate-800 dark:text-white text-base flex items-center gap-1.5">
+                                    {modalMode === "imei" ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg> Asignar dispositivo</> : <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg> Registrar Entrega</>}
                                 </p>
                                 <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
                                     {modalLinea.usuario_linea || "—"} · {modalLinea.telefono}
@@ -312,12 +312,12 @@ export default function EntregasLineasTab() {
                                 {/* Toggle: inventario vs manual */}
                                 <div className="flex gap-2">
                                     <button onClick={() => setUseManual(false)}
-                                        className={`flex-1 py-2 rounded-xl text-sm font-semibold border transition-all ${!useManual ? "bg-blue-600 text-white border-blue-600" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300"}`}>
-                                        📦 Del inventario Altice
+                                        className={`flex-1 py-2 rounded-xl text-sm font-semibold border transition-all flex items-center justify-center gap-1.5 ${!useManual ? "bg-blue-600 text-white border-blue-600" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300"}`}>
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg> Del inventario Altice
                                     </button>
                                     <button onClick={() => setUseManual(true)}
-                                        className={`flex-1 py-2 rounded-xl text-sm font-semibold border transition-all ${useManual ? "bg-slate-700 text-white border-slate-700" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300"}`}>
-                                        ✏️ Manual
+                                        className={`flex-1 py-2 rounded-xl text-sm font-semibold border transition-all flex items-center justify-center gap-1.5 ${useManual ? "bg-slate-700 text-white border-slate-700" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300"}`}>
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Manual
                                     </button>
                                 </div>
 
@@ -406,7 +406,7 @@ export default function EntregasLineasTab() {
                                     </button>
                                     <button onClick={guardarImei} disabled={saving}
                                         className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold disabled:opacity-50 transition-colors">
-                                        {saving ? "Guardando..." : "💾 Guardar"}
+                                        {saving ? "Guardando..." : <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Guardar</>}
                                     </button>
                                 </div>
                             </>
@@ -445,7 +445,7 @@ export default function EntregasLineasTab() {
                                         className="flex-1 py-2.5 rounded-xl bg-green-600 hover:bg-green-500 text-white text-sm font-semibold disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
                                         {saving
                                             ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Guardando...</>
-                                            : "🤝 Registrar + Imprimir Acta"}
+                                            : <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg> Registrar + Imprimir Acta</>}
                                     </button>
                                 </div>
                             </>
@@ -457,7 +457,7 @@ export default function EntregasLineasTab() {
             {/* ── HEADER ────────────────────────────────────────────── */}
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                    <h2 className="text-lg font-bold text-slate-800 dark:text-white">🤝 Módulo de Entregas</h2>
+                    <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-1.5"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg> Módulo de Entregas</h2>
                     <p className="text-sm text-slate-500 dark:text-slate-400">
                         Asigna dispositivos del inventario Altice y registra la entrega con firma
                     </p>
@@ -468,7 +468,7 @@ export default function EntregasLineasTab() {
                         className="text-sm bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white px-4 py-2 rounded-xl font-semibold transition-colors flex items-center gap-2">
                         {importing
                             ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Importando...</>
-                            : "📥 Importar por Excel"}
+                            : <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Importar por Excel</>}
                     </button>
                 </div>
             </div>
@@ -491,8 +491,8 @@ export default function EntregasLineasTab() {
 
             {/* ── INVENTARIO ALTICE ─────────────────────────────────── */}
             <div className="bg-teal-50 dark:bg-teal-900/10 border border-teal-200 dark:border-teal-800 rounded-2xl p-4">
-                <p className="text-xs font-bold text-teal-700 dark:text-teal-400 uppercase tracking-widest mb-2">
-                    📦 Inventario Altice cargado — {inventario.length} dispositivos totales
+                <p className="text-xs font-bold text-teal-700 dark:text-teal-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg> Inventario Altice cargado — {inventario.length} dispositivos totales
                 </p>
                 <div className="flex flex-wrap gap-4 text-sm">
                     {Object.entries(
@@ -519,10 +519,10 @@ export default function EntregasLineasTab() {
                     className="flex-1 min-w-[200px] border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-800 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 {(["pendientes", "sin_imei", "entregadas"] as Vista[]).map(v => (
                     <button key={v} onClick={() => setVista(v)}
-                        className={`px-4 py-2 rounded-full text-sm font-semibold transition-all ${vista === v ? "bg-blue-600 text-white" : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50"}`}>
-                        {v === "pendientes" ? `🕐 Pendientes (${kpis.total - kpis.entregados})`
-                            : v === "sin_imei" ? `⚠️ Sin IMEI (${kpis.sinImei})`
-                                : `✅ Entregadas (${kpis.entregados})`}
+                        className={`px-4 py-2 rounded-full text-sm font-semibold transition-all flex items-center gap-1.5 ${vista === v ? "bg-blue-600 text-white" : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50"}`}>
+                        {v === "pendientes" ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Pendientes ({kpis.total - kpis.entregados})</>
+                            : v === "sin_imei" ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Sin IMEI ({kpis.sinImei})</>
+                                : <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.1 9 11.1"/></svg> Entregadas ({kpis.entregados})</>}
                     </button>
                 ))}
             </div>
@@ -531,7 +531,7 @@ export default function EntregasLineasTab() {
             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
                 {filtered.length === 0 ? (
                     <div className="py-16 text-center text-slate-400">
-                        <p className="text-4xl mb-2">🤝</p>
+                        <div className="flex justify-center mb-2"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></div>
                         <p className="font-medium">No hay líneas en esta vista</p>
                     </div>
                 ) : (
@@ -571,37 +571,37 @@ export default function EntregasLineasTab() {
                                         <td className="p-3">
                                             {linea.entregado ? (
                                                 <div>
-                                                    <span className="text-xs font-semibold px-2 py-1 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                                                        ✅ Entregado
+                                                    <span className="text-xs font-semibold px-2 py-1 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 flex items-center gap-1 w-fit">
+                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.1 9 11.1"/></svg> Entregado
                                                     </span>
                                                     {linea.fecha_entrega && <p className="text-xs text-slate-400 mt-1">{formatDate(linea.fecha_entrega)}</p>}
                                                 </div>
                                             ) : linea.imei ? (
-                                                <span className="text-xs font-semibold px-2 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                                                    📱 IMEI asignado
+                                                <span className="text-xs font-semibold px-2 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 flex items-center gap-1 w-fit">
+                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg> IMEI asignado
                                                 </span>
                                             ) : (
-                                                <span className="text-xs font-semibold px-2 py-1 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                                                    ⏳ Pendiente
+                                                <span className="text-xs font-semibold px-2 py-1 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 flex items-center gap-1 w-fit">
+                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Pendiente
                                                 </span>
                                             )}
                                         </td>
                                         <td className="p-3">
                                             {linea.entregado ? (
                                                 <button onClick={() => { setModalLinea(linea); setModalMode("entrega"); imprimirActa(linea); }}
-                                                    className="text-xs px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition-colors font-medium">
-                                                    🖨️ Reimprimir
+                                                    className="text-xs px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition-colors font-medium flex items-center gap-1">
+                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> Reimprimir
                                                 </button>
                                             ) : (
                                                 <div className="flex gap-1">
                                                     <button onClick={() => abrirImei(linea)}
-                                                        className="text-xs px-2.5 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 hover:bg-blue-100 transition-colors font-medium whitespace-nowrap">
-                                                        📱 {linea.imei ? "Cambiar" : "Asignar"}
+                                                        className="text-xs px-2.5 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 hover:bg-blue-100 transition-colors font-medium whitespace-nowrap flex items-center gap-1">
+                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg> {linea.imei ? "Cambiar" : "Asignar"}
                                                     </button>
                                                     {linea.imei && (
                                                         <button onClick={() => abrirEntrega(linea)}
-                                                            className="text-xs px-2.5 py-1.5 rounded-lg bg-green-600 hover:bg-green-500 text-white transition-colors font-medium whitespace-nowrap">
-                                                            🤝 Entregar
+                                                            className="text-xs px-2.5 py-1.5 rounded-lg bg-green-600 hover:bg-green-500 text-white transition-colors font-medium whitespace-nowrap flex items-center gap-1">
+                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg> Entregar
                                                         </button>
                                                     )}
                                                 </div>

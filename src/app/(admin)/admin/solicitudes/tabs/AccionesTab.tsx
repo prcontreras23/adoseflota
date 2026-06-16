@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { type LineaAltice, ACCION_COLORS } from "@/lib/supabase";
 import { useLineas } from "@/lib/LineasContext";
 import toast from "react-hot-toast";
@@ -25,8 +25,12 @@ const TIPO_STYLES: Record<string, string> = {
     "OTRO": "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300",
 };
 
-const TIPO_ICONS: Record<string, string> = {
-    "LLAMAR": "📲", "CARTA": "✉️", "CANCELAR": "🚫", "COTIZAR": "💲", "OTRO": "📌",
+const TIPO_ICONS: Record<string, React.ReactNode> = {
+    "LLAMAR": <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>,
+    "CARTA": <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>,
+    "CANCELAR": <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>,
+    "COTIZAR": <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>,
+    "OTRO": <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>,
 };
 
 // IDs completados en esta sesión (para mostrar la sección "Completadas" sin recargar)
@@ -121,8 +125,8 @@ export default function AccionesTab() {
                     </p>
                 </div>
                 <button onClick={reload}
-                    className="text-sm bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 px-3 py-2 rounded-xl font-semibold transition-colors">
-                    🔄 Actualizar
+                    className="text-sm bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 px-3 py-2 rounded-xl font-semibold transition-colors flex items-center gap-1.5">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg> Actualizar
                 </button>
             </div>
 
@@ -135,7 +139,7 @@ export default function AccionesTab() {
                                 ? f === "CRITICOS" ? "bg-rose-600 text-white" : "bg-blue-600 text-white"
                                 : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600"
                                 }`}>
-                            {f === "CRITICOS" ? "🔴 Críticos" : f === "TODOS" ? "Todos" : `${TIPO_ICONS[f] ?? "📌"} ${f}`}
+                            {f === "CRITICOS" ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{display:"inline",verticalAlign:"middle",marginRight:3}}><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg> Críticos</> : f === "TODOS" ? "Todos" : <span className="flex items-center gap-1">{TIPO_ICONS[f] ?? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>} {f}</span>}
                         </button>
                     ))}
                 </div>
@@ -170,8 +174,8 @@ export default function AccionesTab() {
                                     {/* Info */}
                                     <div className="flex-1 min-w-0">
                                         <div className="flex flex-wrap items-center gap-2 mb-1">
-                                            {esCritico && <span className="text-xs font-bold text-rose-600 dark:text-rose-400">🔴 CRÍTICO</span>}
-                                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${TIPO_STYLES[tipo]}`}>
+                                            {esCritico && <span className="text-xs font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg> CRÍTICO</span>}
+                                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 ${TIPO_STYLES[tipo]}`}>
                                                 {TIPO_ICONS[tipo]} {tipo}
                                             </span>
                                             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${ACCION_COLORS[r.accion_2026] ?? "bg-slate-100 text-slate-500"}`}>
@@ -213,14 +217,14 @@ export default function AccionesTab() {
 
             {ordenado.length === 0 && totalPendientes === 0 && (
                 <div className="py-16 text-center text-slate-400">
-                    <p className="text-4xl mb-2">🎉</p>
+                    <div className="flex justify-center mb-2"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.1 9 11.1"/></svg></div>
                     <p className="font-medium">¡No hay acciones pendientes!</p>
                 </div>
             )}
 
             {ordenado.length === 0 && totalPendientes > 0 && (
                 <div className="py-10 text-center text-slate-400">
-                    <p className="text-3xl mb-2">🔍</p>
+                    <div className="flex justify-center mb-2"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
                     <p>No hay acciones con esos filtros</p>
                 </div>
             )}
@@ -228,8 +232,8 @@ export default function AccionesTab() {
             {/* Completadas esta sesión */}
             {completadasSesion.length > 0 && (
                 <div>
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
-                        ✅ Completadas esta sesión ({completadasSesion.length})
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.1 9 11.1"/></svg> Completadas esta sesión ({completadasSesion.length})
                     </h3>
                     <div className="space-y-1.5">
                         {completadasSesion.map(item => (
@@ -280,7 +284,7 @@ function SeguimientoInline({ id, value, onSave }: { id: string; value: string; o
             ) : (
                 <button onClick={() => { setDraft(value); setEditing(true); }}
                     className="w-full text-left text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 bg-transparent hover:bg-slate-50 dark:hover:bg-slate-700/30 rounded-lg px-2 py-1 transition-colors">
-                    {value ? `📝 ${value}` : <span className="italic text-slate-300 dark:text-slate-600">+ Agregar nota de seguimiento</span>}
+                    {value ? <span className="flex items-center gap-1"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>{value}</span> : <span className="italic text-slate-300 dark:text-slate-600">+ Agregar nota de seguimiento</span>}
                 </button>
             )}
         </div>
