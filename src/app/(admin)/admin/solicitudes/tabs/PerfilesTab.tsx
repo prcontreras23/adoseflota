@@ -329,17 +329,25 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
                     )}
                   </div>
 
-                  {/* IMEI — se rellena automáticamente al elegir SIM */}
-                  <div>
-                    <label className={labelCls}>IMEI</label>
-                    <input
-                      value={form.imei || ""}
-                      onChange={e => { setForm(prev => ({ ...prev, imei: e.target.value })); setSelectedInvId(""); }}
-                      placeholder="Se rellena al seleccionar la SIM"
-                      className={`${inputCls} ${selectedInvId ? "bg-teal-50 dark:bg-teal-900/20 border-teal-300 dark:border-teal-700" : ""}`}
-                      readOnly={!!selectedInvId}
-                    />
-                  </div>
+                  {/* IMEI — se rellena al elegir SIM, editable, rojo si fue modificado */}
+                  {(() => {
+                    const originalImei = selectedInvId ? inventarioItems.find(i => i.id === selectedInvId)?.imei : undefined;
+                    const changed = !!originalImei && (form.imei || "") !== originalImei;
+                    return (
+                      <div>
+                        <label className={labelCls}>
+                          IMEI
+                          {changed && <span className="ml-2 text-red-500 font-semibold text-xs">⚠ modificado — inventario: {originalImei}</span>}
+                        </label>
+                        <input
+                          value={form.imei || ""}
+                          onChange={e => setForm(prev => ({ ...prev, imei: e.target.value }))}
+                          placeholder="Se rellena al seleccionar la SIM"
+                          className={`${inputCls} ${changed ? "border-red-400 dark:border-red-500 bg-red-50 dark:bg-red-900/10 text-red-700 dark:text-red-300" : selectedInvId ? "border-teal-300 dark:border-teal-700 bg-teal-50 dark:bg-teal-900/20" : ""}`}
+                        />
+                      </div>
+                    );
+                  })()}
 
                   {/* Badge entregado */}
                   {form.entregado && (
