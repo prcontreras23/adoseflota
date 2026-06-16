@@ -10,6 +10,7 @@ import AccionesTab from "./tabs/AccionesTab";
 import MaestroTab from "./tabs/MaestroTab";
 import UsuariosTab from "./tabs/UsuariosTab";
 import AlmacenTab from "./tabs/AlmacenTab";
+import EntregasLineasTab from "./tabs/EntregasLineasTab";
 import { LineasProvider } from "@/lib/LineasContext";
 import toast from "react-hot-toast";
 
@@ -19,6 +20,7 @@ const TABS = [
     { id: "perfiles", label: "👤 Perfiles", component: PerfilesTab },
     { id: "acciones", label: "✅ Acciones", component: AccionesTab },
     { id: "almacen", label: "📦 Almacén", component: AlmacenTab },
+    { id: "entregas", label: "🤝 Entregas", component: EntregasLineasTab },
     { id: "maestro", label: "📋 Flota Maestra", component: MaestroTab },
     { id: "usuarios", label: "👥 Usuarios", component: UsuariosTab },
 ];

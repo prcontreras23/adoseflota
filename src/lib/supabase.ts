@@ -190,6 +190,10 @@ export interface LineaAltice {
     cotizacion: string;
     titular_vinculado: string;
     revisado_por: string;
+    imei: string;
+    sim: string;
+    fecha_entrega: string | null;
+    entregado: boolean;
 }
 
 export const ACCION_COLORS: Record<string, string> = {
