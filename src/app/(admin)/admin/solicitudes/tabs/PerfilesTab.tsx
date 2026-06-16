@@ -34,10 +34,8 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
   const [deleting, setDeleting] = useState(false);
   const [dispositivosStock, setDispositivosStock] = useState<{ dispositivo: string; disponibles: number }[]>([]);
   const [inventarioItems, setInventarioItems] = useState<{ id: string; marca: string; imei: string; sim: string; asignado: boolean; linea_id: string | null }[]>([]);
-  const [selectedInvId, setSelectedInvId] = useState<string>(() => {
-    // Pre-select if this line already has an inventory item assigned
-    return "";
-  });
+  const [selectedInvId, setSelectedInvId] = useState<string>("");
+  const [imeiOpen, setImeiOpen] = useState(false);
 
   useEffect(() => {
     async function cargarDatos() {
@@ -263,84 +261,96 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
 
           <section>
             <p className={sectionTitleCls}>🏷️ IMEI y SIM</p>
-            <div className="space-y-3">
-              {/* Dropdown inventario Altice */}
-              {inventarioItems.length > 0 && (() => {
-                const d = (form.dispositivo_2026 || "").toLowerCase();
-                const getKey = (s: string) => {
-                  const l = s.toLowerCase();
-                  if (l.includes("a56")) return "a56";
-                  if (l.includes("a17")) return "a17";
-                  if (l.includes("g56")) return "g56";
-                  return "";
-                };
-                const key = getKey(d);
-                const opciones = inventarioItems.filter(i =>
-                  i.linea_id === linea.id || (!i.asignado && (!key || getKey(i.marca) === key))
-                );
-                return (
-                  <div>
+            {(() => {
+              const getKey = (s: string) => {
+                const l = s.toLowerCase();
+                if (l.includes("a56")) return "a56";
+                if (l.includes("a17")) return "a17";
+                if (l.includes("g56")) return "g56";
+                return "";
+              };
+              const modeloKey = getKey(form.dispositivo_2026 || "");
+              const typed = (form.imei || "").replace(/\D/g, "");
+              const sugerencias = inventarioItems.filter(i => {
+                if (i.asignado && i.linea_id !== linea.id) return false;
+                if (modeloKey && getKey(i.marca) !== modeloKey) return false;
+                if (typed && !i.imei.includes(typed)) return false;
+                return true;
+              });
+
+              return (
+                <div className="space-y-3">
+                  {/* IMEI combobox */}
+                  <div className="relative">
                     <label className={labelCls}>
-                      Seleccionar del inventario Altice
-                      {key && <span className="text-slate-400 ml-1">— filtrando por modelo</span>}
+                      IMEI
+                      {selectedInvId && <span className="ml-2 text-teal-600 font-semibold">✓ del inventario Altice</span>}
                     </label>
-                    <select
-                      value={selectedInvId}
+                    <input
+                      value={form.imei || ""}
                       onChange={e => {
-                        setSelectedInvId(e.target.value);
-                        const item = inventarioItems.find(i => i.id === e.target.value);
-                        if (item) setForm(prev => ({ ...prev, imei: item.imei, sim: item.sim }));
-                        else if (!e.target.value) { /* keep manual values */ }
+                        setForm(prev => ({ ...prev, imei: e.target.value }));
+                        setSelectedInvId("");
+                        setImeiOpen(true);
                       }}
+                      onFocus={() => setImeiOpen(true)}
+                      onBlur={() => setTimeout(() => setImeiOpen(false), 150)}
+                      placeholder="Escribe o selecciona del inventario Altice..."
                       className={inputCls}
-                    >
-                      <option value="">— Elegir del inventario Altice —</option>
-                      {opciones.map(item => (
-                        <option key={item.id} value={item.id}>
-                          {item.imei} · SIM …{item.sim.slice(-8)}
-                          {item.linea_id === linea.id ? " ✓ asignado" : ""}
-                        </option>
-                      ))}
-                    </select>
-                    {opciones.length === 0 && (
-                      <p className="text-xs text-amber-600 mt-1">No hay unidades disponibles para este modelo en el inventario.</p>
+                      autoComplete="off"
+                    />
+                    {imeiOpen && sugerencias.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 z-30 mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl shadow-xl max-h-52 overflow-y-auto">
+                        <p className="px-3 pt-2 pb-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                          Inventario Altice — {sugerencias.length} disponible{sugerencias.length !== 1 ? "s" : ""}
+                        </p>
+                        {sugerencias.map(item => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onMouseDown={() => {
+                              setForm(prev => ({ ...prev, imei: item.imei, sim: item.sim }));
+                              setSelectedInvId(item.id);
+                              setImeiOpen(false);
+                            }}
+                            className="w-full text-left px-3 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 flex items-center gap-3 border-t border-slate-100 dark:border-slate-700 first:border-0"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <p className="font-mono text-sm text-slate-800 dark:text-white">{item.imei}</p>
+                              <p className="text-xs text-slate-400 mt-0.5">
+                                SIM: {item.sim} · {item.marca.split(" ").slice(0, 3).join(" ")}
+                                {item.linea_id === linea.id && <span className="text-teal-600 ml-2 font-semibold">✓ asignado</span>}
+                              </p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
                     )}
                   </div>
-                );
-              })()}
 
-              {/* IMEI editable */}
-              <div>
-                <label className={labelCls}>IMEI</label>
-                <input
-                  value={form.imei || ""}
-                  onChange={e => { setForm(prev => ({ ...prev, imei: e.target.value })); setSelectedInvId(""); }}
-                  placeholder="15 dígitos — ej: 352010506285538"
-                  className={inputCls}
-                />
-              </div>
+                  {/* SIM editable */}
+                  <div>
+                    <label className={labelCls}>Tarjeta SIM / ICC</label>
+                    <input
+                      value={form.sim || ""}
+                      onChange={e => setForm(prev => ({ ...prev, sim: e.target.value }))}
+                      placeholder="ej: 890101250725747238"
+                      className={inputCls}
+                    />
+                  </div>
 
-              {/* SIM editable */}
-              <div>
-                <label className={labelCls}>Tarjeta SIM / ICC</label>
-                <input
-                  value={form.sim || ""}
-                  onChange={e => setForm(prev => ({ ...prev, sim: e.target.value }))}
-                  placeholder="ej: 890101250725747238"
-                  className={inputCls}
-                />
-              </div>
-
-              {/* Badge entregado */}
-              {form.entregado && (
-                <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg px-3 py-2">
-                  <span className="text-green-600 text-base">✅</span>
-                  <p className="text-xs text-green-700 dark:text-green-300 font-medium">
-                    Entregado el {form.fecha_entrega ? new Date(form.fecha_entrega).toLocaleDateString("es-DO", { year: "numeric", month: "long", day: "numeric" }) : "—"}
-                  </p>
+                  {/* Badge entregado */}
+                  {form.entregado && (
+                    <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg px-3 py-2">
+                      <span className="text-green-600 text-base">✅</span>
+                      <p className="text-xs text-green-700 dark:text-green-300 font-medium">
+                        Entregado el {form.fecha_entrega ? new Date(form.fecha_entrega).toLocaleDateString("es-DO", { year: "numeric", month: "long", day: "numeric" }) : "—"}
+                      </p>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              );
+            })()}
           </section>
 
           <section>
