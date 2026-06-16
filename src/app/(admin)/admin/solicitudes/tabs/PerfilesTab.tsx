@@ -33,28 +33,39 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [dispositivosStock, setDispositivosStock] = useState<{ dispositivo: string; disponibles: number }[]>([]);
+  const [inventarioItems, setInventarioItems] = useState<{ id: string; marca: string; imei: string; sim: string; asignado: boolean; linea_id: string | null }[]>([]);
+  const [selectedInvId, setSelectedInvId] = useState<string>(() => {
+    // Pre-select if this line already has an inventory item assigned
+    return "";
+  });
 
   useEffect(() => {
-    async function cargarStock() {
-      const [{ data: stockData }, { data: lineasData }] = await Promise.all([
+    async function cargarDatos() {
+      const [{ data: stockData }, { data: lineasData }, { data: invData }] = await Promise.all([
         supabase.from("almacen_dispositivos").select("dispositivo, cantidad_stock").order("dispositivo"),
         supabase.from("lineas_altice").select("dispositivo_2026"),
+        supabase.from("inventario_altice").select("*").order("marca"),
       ]);
-      if (!stockData) return;
-      const conteo: Record<string, number> = {};
-      (lineasData ?? []).forEach((l: { dispositivo_2026?: string }) => {
-        const d = l.dispositivo_2026?.trim().toLowerCase();
-        if (d) conteo[d] = (conteo[d] ?? 0) + 1;
-      });
-      // Incluir TODOS los dispositivos, sin filtrar por disponibles
-      const items = stockData.map((s: { dispositivo: string; cantidad_stock: number }) => ({
-        dispositivo: s.dispositivo,
-        disponibles: s.cantidad_stock - (conteo[s.dispositivo.toLowerCase()] ?? 0),
-      }));
-      setDispositivosStock(items);
+      if (stockData) {
+        const conteo: Record<string, number> = {};
+        (lineasData ?? []).forEach((l: { dispositivo_2026?: string }) => {
+          const d = l.dispositivo_2026?.trim().toLowerCase();
+          if (d) conteo[d] = (conteo[d] ?? 0) + 1;
+        });
+        setDispositivosStock(stockData.map((s: { dispositivo: string; cantidad_stock: number }) => ({
+          dispositivo: s.dispositivo,
+          disponibles: s.cantidad_stock - (conteo[s.dispositivo.toLowerCase()] ?? 0),
+        })));
+      }
+      if (invData) {
+        setInventarioItems(invData as typeof inventarioItems);
+        // Pre-select if already assigned to this line
+        const current = (invData as typeof inventarioItems).find(i => i.linea_id === linea.id);
+        if (current) setSelectedInvId(current.id);
+      }
     }
-    cargarStock();
-  }, []);
+    cargarDatos();
+  }, [linea.id]);
 
   async function handleDelete() {
     setDeleting(true);
@@ -87,9 +98,24 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
       seguimiento: form.seguimiento,
       nota_resolucion: form.nota_resolucion,
       revisado_por: form.revisado_por,
+      imei: form.imei ?? "",
+      sim: form.sim ?? "",
     }).eq("id", linea.id);
+    if (error) { toast.error("Error al guardar"); setSaving(false); return; }
+
+    // Sync inventory assignment
+    if (selectedInvId) {
+      // Un-assign previous if different
+      const prev = inventarioItems.find(i => i.linea_id === linea.id && i.id !== selectedInvId);
+      if (prev) await supabase.from("inventario_altice").update({ asignado: false, linea_id: null }).eq("id", prev.id);
+      await supabase.from("inventario_altice").update({ asignado: true, linea_id: linea.id }).eq("id", selectedInvId);
+    } else if (!form.imei?.trim()) {
+      // If IMEI was cleared, un-assign any inventory item
+      const prev = inventarioItems.find(i => i.linea_id === linea.id);
+      if (prev) await supabase.from("inventario_altice").update({ asignado: false, linea_id: null }).eq("id", prev.id);
+    }
+
     setSaving(false);
-    if (error) { toast.error("Error al guardar"); return; }
     onSave(form);
     toast.success("Guardado ✓");
     onClose();
@@ -232,6 +258,88 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
                 <input value={form.monto_mensual} onChange={e => set("monto_mensual", e.target.value)}
                   placeholder="Ej: RD$1,200" className={inputCls} />
               </div>
+            </div>
+          </section>
+
+          <section>
+            <p className={sectionTitleCls}>🏷️ IMEI y SIM</p>
+            <div className="space-y-3">
+              {/* Dropdown inventario Altice */}
+              {inventarioItems.length > 0 && (() => {
+                const d = (form.dispositivo_2026 || "").toLowerCase();
+                const getKey = (s: string) => {
+                  const l = s.toLowerCase();
+                  if (l.includes("a56")) return "a56";
+                  if (l.includes("a17")) return "a17";
+                  if (l.includes("g56")) return "g56";
+                  return "";
+                };
+                const key = getKey(d);
+                const opciones = inventarioItems.filter(i =>
+                  i.linea_id === linea.id || (!i.asignado && (!key || getKey(i.marca) === key))
+                );
+                return (
+                  <div>
+                    <label className={labelCls}>
+                      Seleccionar del inventario Altice
+                      {key && <span className="text-slate-400 ml-1">— filtrando por modelo</span>}
+                    </label>
+                    <select
+                      value={selectedInvId}
+                      onChange={e => {
+                        setSelectedInvId(e.target.value);
+                        const item = inventarioItems.find(i => i.id === e.target.value);
+                        if (item) setForm(prev => ({ ...prev, imei: item.imei, sim: item.sim }));
+                        else if (!e.target.value) { /* keep manual values */ }
+                      }}
+                      className={inputCls}
+                    >
+                      <option value="">— Elegir del inventario Altice —</option>
+                      {opciones.map(item => (
+                        <option key={item.id} value={item.id}>
+                          {item.imei} · SIM …{item.sim.slice(-8)}
+                          {item.linea_id === linea.id ? " ✓ asignado" : ""}
+                        </option>
+                      ))}
+                    </select>
+                    {opciones.length === 0 && (
+                      <p className="text-xs text-amber-600 mt-1">No hay unidades disponibles para este modelo en el inventario.</p>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* IMEI editable */}
+              <div>
+                <label className={labelCls}>IMEI</label>
+                <input
+                  value={form.imei || ""}
+                  onChange={e => { setForm(prev => ({ ...prev, imei: e.target.value })); setSelectedInvId(""); }}
+                  placeholder="15 dígitos — ej: 352010506285538"
+                  className={inputCls}
+                />
+              </div>
+
+              {/* SIM editable */}
+              <div>
+                <label className={labelCls}>Tarjeta SIM / ICC</label>
+                <input
+                  value={form.sim || ""}
+                  onChange={e => setForm(prev => ({ ...prev, sim: e.target.value }))}
+                  placeholder="ej: 890101250725747238"
+                  className={inputCls}
+                />
+              </div>
+
+              {/* Badge entregado */}
+              {form.entregado && (
+                <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg px-3 py-2">
+                  <span className="text-green-600 text-base">✅</span>
+                  <p className="text-xs text-green-700 dark:text-green-300 font-medium">
+                    Entregado el {form.fecha_entrega ? new Date(form.fecha_entrega).toLocaleDateString("es-DO", { year: "numeric", month: "long", day: "numeric" }) : "—"}
+                  </p>
+                </div>
+              )}
             </div>
           </section>
 
