@@ -222,14 +222,15 @@ export default function AlmacenTab() {
             "Dispositivo": s.dispositivo,
             "Stock": s.cantidad_stock,
             "Solicitados": s.solicitados,
+            "Libres (sin solicitar)": s.cantidad_stock - s.solicitados,
             "Entregados": s.entregados,
             "Pendientes (IMEI asig.)": s.pendientes,
-            "Disponibles": s.disponibles,
+            "Disponibles (sin entregar)": s.disponibles,
             "Estado": badge(s.entregados, s.cantidad_stock, s.solicitados).label,
             "Notas": s.notas,
         }));
         const ws = XLSX.utils.json_to_sheet(rows);
-        ws["!cols"] = [{ wch: 30 }, { wch: 8 }, { wch: 12 }, { wch: 12 }, { wch: 20 }, { wch: 12 }, { wch: 20 }, { wch: 30 }];
+        ws["!cols"] = [{ wch: 30 }, { wch: 8 }, { wch: 12 }, { wch: 18 }, { wch: 12 }, { wch: 20 }, { wch: 22 }, { wch: 20 }, { wch: 30 }];
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Almacén Dispositivos");
         XLSX.writeFile(wb, `Almacen-Dispositivos-${new Date().toISOString().split("T")[0]}.xlsx`);
@@ -366,7 +367,7 @@ export default function AlmacenTab() {
                         <table className="w-full text-sm">
                             <thead className="bg-slate-50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-700">
                                 <tr>
-                                    {["Dispositivo", "Stock", "Entregados", "Pendientes", "Disponibles", "Progreso de entrega", "Estado", ""].map(h => (
+                                    {["Dispositivo", "Stock", "Solicitados", "Libres", "Entregados", "Pendientes", "Disponibles", "Progreso de entrega", "Estado", ""].map(h => (
                                         <th key={h} className="p-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">{h}</th>
                                     ))}
                                 </tr>
@@ -384,6 +385,21 @@ export default function AlmacenTab() {
                                                 <span className="font-bold text-slate-700 dark:text-slate-200 text-base">
                                                     {item.cantidad_stock}
                                                 </span>
+                                            </td>
+                                            <td className="p-3 text-center">
+                                                <span className={`font-semibold text-base ${item.solicitados > item.cantidad_stock ? "text-rose-600" : "text-amber-600 dark:text-amber-400"}`}>
+                                                    {item.solicitados}
+                                                </span>
+                                            </td>
+                                            <td className="p-3 text-center">
+                                                {(() => {
+                                                    const libres = item.cantidad_stock - item.solicitados;
+                                                    return (
+                                                        <span className={`font-bold text-base ${libres < 0 ? "text-rose-600" : libres === 0 ? "text-slate-400" : "text-sky-600 dark:text-sky-400"}`}>
+                                                            {libres < 0 ? libres : libres}
+                                                        </span>
+                                                    );
+                                                })()}
                                             </td>
                                             <td className="p-3 text-center">
                                                 <span className="font-bold text-base text-emerald-600 dark:text-emerald-400">
@@ -411,11 +427,6 @@ export default function AlmacenTab() {
                                                 <span className={`text-xs font-semibold px-2 py-1 rounded-full ${b.cls}`}>
                                                     {b.label}
                                                 </span>
-                                                {item.solicitados > item.cantidad_stock && (
-                                                    <p className="text-[10px] text-rose-500 mt-1">
-                                                        {item.solicitados} solicitados vs {item.cantidad_stock} stock
-                                                    </p>
-                                                )}
                                             </td>
                                             <td className="p-3 whitespace-nowrap">
                                                 <div className="flex gap-1">
