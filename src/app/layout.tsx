@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import { Montserrat } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
 
-const montserrat = Montserrat({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800", "900"] });
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
     title: "ADOSE Flota 2026",
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
     return (
         <html lang="es" suppressHydrationWarning>
-            <body className={montserrat.className}>
+            <body className={inter.className}>
                 {children}
                 <Toaster
                     position="top-right"

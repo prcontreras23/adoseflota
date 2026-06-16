@@ -127,23 +127,30 @@ export default function AdminDashboard() {
 
     return (
         <LineasProvider>
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col transition-colors duration-300">
+        <div className="min-h-screen bg-[#F4F6FA] dark:bg-[#0F1117] flex flex-col transition-colors duration-300">
+
+            {/* Accent top bar */}
+            <div className="h-[3px] bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-500 sticky top-0 z-50" />
 
             {/* Header */}
-            <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-50 shadow-sm">
-                <div className="max-w-[1440px] mx-auto w-full px-5 h-[60px] flex items-center justify-between gap-4">
+            <header className="bg-white/95 dark:bg-[#181C27]/95 backdrop-blur-sm border-b border-slate-200/70 dark:border-slate-800 sticky top-[3px] z-40">
+                <div className="max-w-[1440px] mx-auto w-full px-5 h-[58px] flex items-center justify-between gap-4">
 
                     {/* Brand */}
                     <div className="flex items-center gap-2.5 shrink-0">
-                        <Image src="/logo-adose.png" alt="ADOSE" width={30} height={30} className="rounded-lg object-contain" />
-                        <span className="font-extrabold text-[17px] text-slate-900 dark:text-white tracking-tight hidden sm:block">
-                            ADOSE <span className="text-blue-600">Flota</span>
-                            <span className="ml-1.5 text-[11px] font-semibold text-slate-400 dark:text-slate-500 tracking-widest align-middle">2026</span>
-                        </span>
+                        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-sm shadow-blue-200 dark:shadow-none overflow-hidden">
+                            <Image src="/logo-adose.png" alt="ADOSE" width={28} height={28} className="object-contain" />
+                        </div>
+                        <div className="hidden sm:flex flex-col leading-none">
+                            <span className="font-bold text-[15px] text-slate-900 dark:text-white tracking-tight">
+                                ADOSE <span className="text-blue-600">Flota</span>
+                            </span>
+                            <span className="text-[10px] font-medium text-slate-400 tracking-widest uppercase">2026</span>
+                        </div>
                     </div>
 
-                    {/* Desktop Nav */}
-                    <nav className="hidden md:flex items-center gap-0.5 flex-1 justify-center">
+                    {/* Desktop Nav — underline style */}
+                    <nav className="hidden md:flex items-stretch h-[58px] gap-0.5 flex-1 justify-center">
                         {TABS.map(tab => {
                             const active = activeTab === tab.id;
                             return (
@@ -151,14 +158,18 @@ export default function AdminDashboard() {
                                     key={tab.id}
                                     onClick={() => setActiveTab(tab.id)}
                                     className={`
-                                        flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[13px] font-semibold tracking-wide transition-all duration-150
+                                        relative flex items-center gap-1.5 px-3.5 text-[13px] font-semibold transition-all duration-150 group
                                         ${active
-                                            ? "bg-blue-600 text-white shadow-sm shadow-blue-200 dark:shadow-none"
-                                            : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
+                                            ? "text-blue-600 dark:text-blue-400"
+                                            : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
                                         }
                                     `}>
-                                    {tab.icon}
+                                    <span className={`transition-colors ${active ? "text-blue-600 dark:text-blue-400" : "text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300"}`}>
+                                        {tab.icon}
+                                    </span>
                                     {tab.label}
+                                    {/* Active indicator */}
+                                    <span className={`absolute bottom-0 left-1 right-1 h-[2px] rounded-t-full transition-all duration-200 ${active ? "bg-blue-600 dark:bg-blue-400 opacity-100" : "opacity-0"}`} />
                                 </button>
                             );
                         })}
@@ -166,18 +177,24 @@ export default function AdminDashboard() {
 
                     {/* Right actions */}
                     <div className="flex items-center gap-2 shrink-0">
-                        <div className="hidden lg:flex flex-col items-end mr-1">
-                            <span className="text-[13px] font-bold text-slate-800 dark:text-white leading-tight">{user?.nombre}</span>
-                            <span className="text-[10px] font-semibold text-blue-500 uppercase tracking-widest">Admin</span>
+                        <div className="hidden lg:flex items-center gap-2 mr-1">
+                            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-[11px] font-bold shadow-sm">
+                                {user?.nombre?.charAt(0) ?? "A"}
+                            </div>
+                            <div className="flex flex-col leading-none">
+                                <span className="text-[12px] font-semibold text-slate-800 dark:text-white">{user?.nombre}</span>
+                                <span className="text-[10px] font-medium text-blue-500 uppercase tracking-wider">Admin</span>
+                            </div>
                         </div>
+                        <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 hidden lg:block mx-1" />
                         <button
                             onClick={toggleDarkMode}
-                            className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                            className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all hover:scale-105">
                             {darkMode ? Icon.sun : Icon.moon}
                         </button>
                         <button
                             onClick={handleLogout}
-                            className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-500 transition-colors"
+                            className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-500 transition-all hover:scale-105"
                             title="Cerrar sesión">
                             {Icon.logout}
                         </button>
@@ -185,8 +202,8 @@ export default function AdminDashboard() {
                 </div>
 
                 {/* Mobile Nav */}
-                <div className="md:hidden px-3 pb-2 pt-1 overflow-x-auto border-t border-slate-100 dark:border-slate-800">
-                    <div className="flex gap-1 min-w-max">
+                <div className="md:hidden px-3 pb-1.5 overflow-x-auto border-t border-slate-100 dark:border-slate-800/60">
+                    <div className="flex gap-0.5 min-w-max pt-1">
                         {TABS.map(tab => {
                             const active = activeTab === tab.id;
                             return (
@@ -194,9 +211,9 @@ export default function AdminDashboard() {
                                     key={tab.id}
                                     onClick={() => setActiveTab(tab.id)}
                                     className={`
-                                        flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold whitespace-nowrap transition-all
+                                        flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-semibold whitespace-nowrap transition-all
                                         ${active
-                                            ? "bg-blue-600 text-white"
+                                            ? "bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400"
                                             : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
                                         }
                                     `}>
