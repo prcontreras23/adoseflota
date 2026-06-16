@@ -77,6 +77,9 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
 
   async function handleSave() {
     setSaving(true);
+    const tieneImeiSim = !!(form.imei?.trim() && form.sim?.trim());
+    const fechaHoy = new Date().toISOString().split("T")[0];
+    const nuevaFecha = tieneImeiSim ? (form.fecha_entrega || fechaHoy) : null;
     const { error } = await supabase.from("lineas_altice").update({
       telefono: form.telefono,
       usuario_linea: form.usuario_linea,
@@ -98,6 +101,8 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
       revisado_por: form.revisado_por,
       imei: form.imei ?? "",
       sim: form.sim ?? "",
+      entregado: tieneImeiSim,
+      fecha_entrega: nuevaFecha,
     }).eq("id", linea.id);
     if (error) { toast.error("Error al guardar"); setSaving(false); return; }
 
@@ -114,8 +119,9 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
     }
 
     setSaving(false);
-    onSave(form);
-    toast.success("Guardado ✓");
+    onSave({ ...form, entregado: tieneImeiSim, fecha_entrega: nuevaFecha });
+    if (tieneImeiSim && !form.entregado) toast.success("✅ IMEI/SIM asignados — marcado como entregado");
+    else toast.success("Guardado ✓");
     onClose();
   }
 

@@ -141,11 +141,17 @@ export default function EntregasLineasTab() {
                 .eq("id", selectedInvId);
         }
 
-        // Update line (mutate syncs instantly to Perfiles via Realtime)
-        const ok = await mutate(modalLinea.id, { imei, sim });
+        // Update line — assigning IMEI+SIM marks as delivered automatically
+        const fechaHoy = new Date().toISOString().split("T")[0];
+        const ok = await mutate(modalLinea.id, {
+            imei,
+            sim,
+            entregado: true,
+            fecha_entrega: modalLinea.fecha_entrega || fechaHoy,
+        });
         await loadInventario();
 
-        if (ok) toast.success("IMEI y SIM asignados ✓");
+        if (ok) toast.success("✅ IMEI/SIM asignados — marcado como entregado");
         setSaving(false);
         setModalLinea(null);
     }
