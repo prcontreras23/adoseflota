@@ -1,19 +1,19 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Montserrat } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
 
-const inter = Inter({ subsets: ["latin"] });
+const montserrat = Montserrat({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800", "900"] });
 
 export const metadata: Metadata = {
-    title: "Sistema Flotas Claro 2026 | ADOSE",
+    title: "ADOSE Flota 2026",
     description: "Gestión de flota móvil corporativa - Unión Adventista Sureste",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
     return (
         <html lang="es" suppressHydrationWarning>
-            <body className={inter.className}>
+            <body className={montserrat.className}>
                 {children}
                 <Toaster
                     position="top-right"
