@@ -332,7 +332,7 @@ export default function AdminDashboard() {
                         <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-800">
                             <h2 className="text-lg font-bold text-slate-900 dark:text-white">Cambiar PIN</h2>
                             <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                                {user?.nombre} &middot; <span className="text-blue-500 capitalize">{user?.rol}</span>
+                                {user?.nombre} &middot; <span className="text-blue-500">{user?.es_admin ? "Administrador" : "Usuario"}</span>
                             </p>
                         </div>
 

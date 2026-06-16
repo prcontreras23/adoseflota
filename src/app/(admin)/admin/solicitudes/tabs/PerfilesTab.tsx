@@ -863,8 +863,8 @@ export default function PerfilesTab() {
                   <button
                     onClick={() => { setNuevaLineaTitular(g.nombre); }}
                     title="Agregar línea a este titular"
-                    className="text-xs px-2 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 font-semibold shrink-0 transition-colors">
-                    ➕
+                    className="text-xs px-2 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 font-semibold shrink-0 transition-colors flex items-center justify-center">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                   </button>
                 )}
 
@@ -872,13 +872,13 @@ export default function PerfilesTab() {
                   <div className="relative shrink-0">
                     {vinculadoNombre ? (
                       <button onClick={() => quitarVinculo(g.nombre, vinculadoNombre)}
-                        className="text-xs px-2 py-1.5 rounded-lg bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 hover:bg-purple-200 font-semibold">
-                        🔗 Desvincular
+                        className="text-xs px-2 py-1.5 rounded-lg bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 hover:bg-purple-200 font-semibold flex items-center gap-1">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg> Desvincular
                       </button>
                     ) : (
                       <button onClick={() => setVinculandoTitular(vinculandoTitular === g.nombre ? null : g.nombre)}
-                        className="text-xs px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-purple-100 hover:text-purple-600 font-semibold">
-                        🔗 Vincular
+                        className="text-xs px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-purple-100 hover:text-purple-600 font-semibold flex items-center gap-1">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg> Vincular
                       </button>
                     )}
                     {vinculandoTitular === g.nombre && (
@@ -916,8 +916,8 @@ export default function PerfilesTab() {
                   {!tieneProblema && (
                     <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-700">
                       <button onClick={() => setNuevaLineaTitular(g.nombre)}
-                        className="w-full py-2 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-600 text-slate-400 hover:border-blue-400 hover:text-blue-500 text-sm font-semibold transition-colors">
-                        ➕ Agregar línea a {g.nombre.split(" ")[0]}
+                        className="w-full py-2 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-600 text-slate-400 hover:border-blue-400 hover:text-blue-500 text-sm font-semibold transition-colors flex items-center justify-center gap-1.5">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Agregar línea a {g.nombre.split(" ")[0]}
                       </button>
                     </div>
                   )}
@@ -925,8 +925,8 @@ export default function PerfilesTab() {
                   {lineasVinculadas.length > 0 && (
                     <div className="border-t-2 border-purple-200 dark:border-purple-800">
                       <div className="px-4 py-2.5 bg-purple-50 dark:bg-purple-900/20 flex items-center gap-2">
-                        <p className="text-xs font-bold text-purple-600 dark:text-purple-400">
-                          🔗 Dispositivos vinculados — {vinculadoNombre}
+                        <p className="text-xs font-bold text-purple-600 dark:text-purple-400 flex items-center gap-1.5">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg> Dispositivos vinculados — {vinculadoNombre}
                         </p>
                         <span className="text-xs text-purple-400 ml-auto">{lineasVinculadas.length} línea{lineasVinculadas.length !== 1 ? "s" : ""}</span>
                       </div>
@@ -948,7 +948,7 @@ export default function PerfilesTab() {
 
       {gruposFiltrados.length === 0 && (
         <div className="py-16 text-center text-slate-400">
-          <p className="text-4xl mb-2">👥</p>
+          <div className="flex justify-center mb-2"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></div>
           <p>No hay titulares con esa búsqueda</p>
         </div>
       )}
