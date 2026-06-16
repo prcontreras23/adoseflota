@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
@@ -62,6 +62,17 @@ export default function LoginPage() {
         setPin("");
         setError("");
     }
+
+    useEffect(() => {
+        function onKey(e: KeyboardEvent) {
+            if (loading) return;
+            if (/^\d$/.test(e.key)) handleDigit(e.key);
+            else if (e.key === "Backspace") handleBackspace();
+            else if (e.key === "Escape") handleClear();
+        }
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    });
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-950 via-blue-900 to-slate-900 p-4">
