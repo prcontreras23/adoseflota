@@ -316,50 +316,76 @@ export default function EntregasLineasTab() {
                                 </div>
 
                                 {!useManual ? (
-                                    <div>
-                                        <label className={labelCls}>
-                                            Dispositivo del inventario Altice
-                                            {modalLinea.dispositivo_2026 && <span className="text-slate-400 ml-1">— mostrando {modalLinea.dispositivo_2026}</span>}
-                                        </label>
-                                        <select value={selectedInvId} onChange={e => setSelectedInvId(e.target.value)} className={inputCls}>
-                                            <option value="">— Seleccionar dispositivo —</option>
-                                            {matchingInventario(modalLinea).map(item => (
-                                                <option key={item.id} value={item.id}>
-                                                    {item.imei} · SIM …{item.sim.slice(-6)}
-                                                    {item.linea_id === modalLinea.id ? " (asignado actualmente)" : ""}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        {matchingInventario(modalLinea).length === 0 && (
-                                            <p className="text-xs text-amber-600 mt-1">
-                                                No hay dispositivos disponibles para este modelo. Usa entrada manual.
-                                            </p>
-                                        )}
-                                        {selectedInvId && (() => {
-                                            const it = inventario.find(i => i.id === selectedInvId);
-                                            return it ? (
-                                                <div className="mt-2 bg-slate-50 dark:bg-slate-800 rounded-xl p-3 text-xs space-y-1">
-                                                    <p className="font-semibold text-slate-700 dark:text-slate-200">{it.marca}</p>
-                                                    <p><span className="text-slate-400 w-12 inline-block">IMEI:</span><span className="font-mono">{it.imei}</span></p>
-                                                    <p><span className="text-slate-400 w-12 inline-block">SIM:</span><span className="font-mono">{it.sim}</span></p>
+                                    (() => {
+                                        const opciones = matchingInventario(modalLinea);
+                                        const typedSim = manualSim.replace(/\D/g, "");
+                                        const filtradas = opciones.filter(i =>
+                                            !typedSim || i.sim.includes(typedSim)
+                                        );
+                                        return (
+                                            <div className="space-y-3">
+                                                {/* SIM combobox */}
+                                                <div className="relative">
+                                                    <label className={labelCls}>
+                                                        Tarjeta SIM / ICC
+                                                        {selectedInvId && <span className="ml-2 text-teal-600 font-semibold text-xs">✓ inventario Altice</span>}
+                                                    </label>
+                                                    <input
+                                                        value={manualSim}
+                                                        onChange={e => { setManualSim(e.target.value); setSelectedInvId(""); setManualImei(""); }}
+                                                        onFocus={() => { }}
+                                                        placeholder="Escribe el número de SIM para buscar..."
+                                                        className={inputCls}
+                                                        autoComplete="off"
+                                                    />
+                                                    {filtradas.length > 0 && (
+                                                        <div className="absolute top-full left-0 right-0 z-30 mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl shadow-xl max-h-52 overflow-y-auto">
+                                                            <p className="px-3 pt-2 pb-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                                                {filtradas.length} disponible{filtradas.length !== 1 ? "s" : ""}
+                                                            </p>
+                                                            {filtradas.map(item => (
+                                                                <button key={item.id} type="button"
+                                                                    onMouseDown={() => {
+                                                                        setManualSim(item.sim);
+                                                                        setManualImei(item.imei);
+                                                                        setSelectedInvId(item.id);
+                                                                    }}
+                                                                    className="w-full text-left px-3 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 border-t border-slate-100 dark:border-slate-700 first:border-0">
+                                                                    <p className="font-mono text-sm text-slate-800 dark:text-white">{item.sim}</p>
+                                                                    <p className="text-xs text-slate-400">IMEI: {item.imei} · {item.marca.split(" ").slice(0, 3).join(" ")}</p>
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            ) : null;
-                                        })()}
-                                    </div>
+                                                {/* IMEI auto-filled */}
+                                                <div>
+                                                    <label className={labelCls}>IMEI</label>
+                                                    <input
+                                                        value={manualImei}
+                                                        readOnly={!!selectedInvId}
+                                                        onChange={e => { setManualImei(e.target.value); setSelectedInvId(""); }}
+                                                        placeholder="Se rellena al seleccionar la SIM"
+                                                        className={`${inputCls} ${selectedInvId ? "bg-teal-50 dark:bg-teal-900/20 border-teal-300 dark:border-teal-700" : ""}`}
+                                                    />
+                                                </div>
+                                            </div>
+                                        );
+                                    })()
                                 ) : (
                                     <div className="space-y-3">
+                                        <div>
+                                            <label className={labelCls}>SIM / ICC manual</label>
+                                            <input value={manualSim}
+                                                onChange={e => setManualSim(e.target.value)}
+                                                placeholder="ej: 890101250725747238"
+                                                className={inputCls} />
+                                        </div>
                                         <div>
                                             <label className={labelCls}>IMEI del dispositivo <span className="text-red-500">*</span></label>
                                             <input value={manualImei}
                                                 onChange={e => setManualImei(e.target.value)}
                                                 placeholder="15 dígitos — ej: 352099001761481"
-                                                className={inputCls} />
-                                        </div>
-                                        <div>
-                                            <label className={labelCls}>Número de SIM / ICC</label>
-                                            <input value={manualSim}
-                                                onChange={e => setManualSim(e.target.value)}
-                                                placeholder="ej: 890101250725747238"
                                                 className={inputCls} />
                                         </div>
                                     </div>

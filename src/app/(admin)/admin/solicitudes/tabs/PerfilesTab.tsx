@@ -271,31 +271,32 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
               };
               const modeloKey = getKey(form.dispositivo_2026 || "");
               const typed = (form.imei || "").replace(/\D/g, "");
+              const typedSim = (form.sim || "").replace(/\D/g, "");
               const sugerencias = inventarioItems.filter(i => {
                 if (i.asignado && i.linea_id !== linea.id) return false;
                 if (modeloKey && getKey(i.marca) !== modeloKey) return false;
-                if (typed && !i.imei.includes(typed)) return false;
+                if (typedSim && !i.sim.includes(typedSim)) return false;
                 return true;
               });
 
               return (
                 <div className="space-y-3">
-                  {/* IMEI combobox */}
+                  {/* SIM combobox — el usuario elige la SIM y el IMEI aparece solo */}
                   <div className="relative">
                     <label className={labelCls}>
-                      IMEI
+                      Tarjeta SIM / ICC
                       {selectedInvId && <span className="ml-2 text-teal-600 font-semibold">✓ del inventario Altice</span>}
                     </label>
                     <input
-                      value={form.imei || ""}
+                      value={form.sim || ""}
                       onChange={e => {
-                        setForm(prev => ({ ...prev, imei: e.target.value }));
+                        setForm(prev => ({ ...prev, sim: e.target.value }));
                         setSelectedInvId("");
                         setImeiOpen(true);
                       }}
                       onFocus={() => setImeiOpen(true)}
                       onBlur={() => setTimeout(() => setImeiOpen(false), 150)}
-                      placeholder="Escribe o selecciona del inventario Altice..."
+                      placeholder="Escribe el número de SIM para buscar..."
                       className={inputCls}
                       autoComplete="off"
                     />
@@ -309,16 +310,16 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
                             key={item.id}
                             type="button"
                             onMouseDown={() => {
-                              setForm(prev => ({ ...prev, imei: item.imei, sim: item.sim }));
+                              setForm(prev => ({ ...prev, sim: item.sim, imei: item.imei }));
                               setSelectedInvId(item.id);
                               setImeiOpen(false);
                             }}
                             className="w-full text-left px-3 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 flex items-center gap-3 border-t border-slate-100 dark:border-slate-700 first:border-0"
                           >
                             <div className="flex-1 min-w-0">
-                              <p className="font-mono text-sm text-slate-800 dark:text-white">{item.imei}</p>
+                              <p className="font-mono text-sm text-slate-800 dark:text-white">{item.sim}</p>
                               <p className="text-xs text-slate-400 mt-0.5">
-                                SIM: {item.sim} · {item.marca.split(" ").slice(0, 3).join(" ")}
+                                IMEI: {item.imei} · {item.marca.split(" ").slice(0, 3).join(" ")}
                                 {item.linea_id === linea.id && <span className="text-teal-600 ml-2 font-semibold">✓ asignado</span>}
                               </p>
                             </div>
@@ -328,14 +329,15 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
                     )}
                   </div>
 
-                  {/* SIM editable */}
+                  {/* IMEI — se rellena automáticamente al elegir SIM */}
                   <div>
-                    <label className={labelCls}>Tarjeta SIM / ICC</label>
+                    <label className={labelCls}>IMEI</label>
                     <input
-                      value={form.sim || ""}
-                      onChange={e => setForm(prev => ({ ...prev, sim: e.target.value }))}
-                      placeholder="ej: 890101250725747238"
-                      className={inputCls}
+                      value={form.imei || ""}
+                      onChange={e => { setForm(prev => ({ ...prev, imei: e.target.value })); setSelectedInvId(""); }}
+                      placeholder="Se rellena al seleccionar la SIM"
+                      className={`${inputCls} ${selectedInvId ? "bg-teal-50 dark:bg-teal-900/20 border-teal-300 dark:border-teal-700" : ""}`}
+                      readOnly={!!selectedInvId}
                     />
                   </div>
 
