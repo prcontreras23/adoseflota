@@ -13,6 +13,7 @@ import AlmacenTab from "./tabs/AlmacenTab";
 import EntregasLineasTab from "./tabs/EntregasLineasTab";
 import NotasTab from "./tabs/NotasTab";
 import ConfiguracionTab from "./tabs/ConfiguracionTab";
+import DocumentosTab from "./tabs/DocumentosTab";
 import { LineasProvider } from "@/lib/LineasContext";
 import { ConfigListasProvider } from "@/lib/ConfigListasContext";
 import { NavProvider } from "@/lib/NavContext";
@@ -98,6 +99,11 @@ const Icon = {
             <polyline points="10 9 9 9 8 9"/>
         </svg>
     ),
+    documentos: (
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+        </svg>
+    ),
     config: (
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="3"/>
@@ -114,6 +120,7 @@ const TABS = [
     { id: "almacen",   label: "Almacén",       icon: Icon.almacen,  component: AlmacenTab },
     { id: "entregas",  label: "Entregas",      icon: Icon.entregas, component: EntregasLineasTab },
     { id: "usuarios",  label: "Usuarios",      icon: Icon.usuarios, component: UsuariosTab },
+    { id: "documentos", label: "Documentos",    icon: Icon.documentos, component: DocumentosTab },
     { id: "config",    label: "Configuración", icon: Icon.config,   component: ConfiguracionTab },
 ];
 
