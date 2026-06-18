@@ -381,6 +381,52 @@ export default function ConfiguracionTab() {
                 </div>
             )}
 
+            {/* ── CAMBIOS MASIVOS ─────────────────────────────────────── */}
+            <div>
+                <h2 className="text-base font-bold text-slate-900 dark:text-white mb-1">Cambios masivos</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
+                    Activa los campos que quieres poder modificar en bloque al seleccionar varias líneas.
+                </p>
+                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-700">
+                    {[
+                        { valor: "estado",           label: "Estado",           desc: "Confirmada, Por confirmar, Pendiente…" },
+                        { valor: "accion_2026",      label: "Acción 2026",      desc: "Baja, Alta, Cambio solicitado…" },
+                        { valor: "proxima_accion",   label: "Próxima acción",   desc: "Llamar, Carta, Cotizar, Cancelar" },
+                        { valor: "portabilidad",     label: "Portabilidad",     desc: "Altice, Claro, Nuevo, Baja…" },
+                        { valor: "gb_solicitado",    label: "Datos (GB)",       desc: "Plan de datos solicitado" },
+                        { valor: "dispositivo_2026", label: "Dispositivo",      desc: "Equipo asignado para 2026" },
+                        { valor: "tipo",             label: "Tipo de línea",    desc: "Titular, Familiar, Flota…" },
+                    ].map(campo => {
+                        const item = items.find(i => i.lista === "bulk_campos" && i.valor === campo.valor);
+                        const activo = item?.activo ?? false;
+                        async function toggle() {
+                            if (!item) {
+                                // Crear el registro
+                                const { data } = await supabase.from("config_listas")
+                                    .insert({ lista: "bulk_campos", valor: campo.valor, orden: 99, activo: true })
+                                    .select().single();
+                                if (data) await reload();
+                            } else {
+                                await supabase.from("config_listas").update({ activo: !activo }).eq("id", item.id);
+                                await reload();
+                            }
+                        }
+                        return (
+                            <div key={campo.valor} className="flex items-center justify-between px-4 py-3 gap-4">
+                                <div>
+                                    <p className="text-sm font-semibold text-slate-800 dark:text-white">{campo.label}</p>
+                                    <p className="text-xs text-slate-400">{campo.desc}</p>
+                                </div>
+                                <button type="button" onClick={toggle}
+                                    className={`relative w-11 h-6 rounded-full transition-colors duration-200 shrink-0 ${activo ? "bg-blue-600" : "bg-slate-300 dark:bg-slate-600"}`}>
+                                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${activo ? "translate-x-5" : "translate-x-0"}`} />
+                                </button>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+
             {/* Modal de reemplazo */}
             {pendingDelete && (
                 <ReemplazarModal

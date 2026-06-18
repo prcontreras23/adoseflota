@@ -1245,13 +1245,30 @@ export default function PerfilesTab() {
     </div>
   );
 
-  const BULK_FIELDS: { value: string; label: string; options: string[] }[] = [
-    { value: "estado", label: "Estado", options: ["CONFIRMADA", "POR CONFIRMAR", "PENDIENTE", "OK", "RESPONDIÓ", "SIN RESPUESTA"] },
-    { value: "accion_2026", label: "Acción 2026", options: ["BAJA", "ALTA", "CAMBIO SOLICITADO", "SE MANTIENE", "REVISAR"] },
-    { value: "proxima_accion", label: "Próxima acción", options: ["", "LLAMAR", "CARTA", "COTIZAR", "CANCELAR"] },
-    { value: "portabilidad", label: "Portabilidad", options: ["", "Altice", "Claro", "Nuevo", "Baja"] },
+  // Catálogo maestro de todos los campos posibles para cambios masivos
+  const ALL_BULK_FIELDS: { value: string; label: string; listKey?: string; options?: string[] }[] = [
+    { value: "estado",          label: "Estado",          listKey: "estado_linea",    options: ["CONFIRMADA","POR CONFIRMAR","PENDIENTE","OK","RESPONDIÓ","SIN RESPUESTA"] },
+    { value: "accion_2026",     label: "Acción 2026",     listKey: "accion_2026",     options: ["BAJA","ALTA","CAMBIO SOLICITADO","SE MANTIENE","REVISAR"] },
+    { value: "proxima_accion",  label: "Próxima acción",  listKey: "proxima_accion",  options: ["","LLAMAR","CARTA","COTIZAR","CANCELAR"] },
+    { value: "portabilidad",    label: "Portabilidad",    listKey: "portabilidad",    options: ["","Altice","Claro","Nuevo","Baja"] },
+    { value: "gb_solicitado",   label: "Datos (GB)",      listKey: "plan_datos" },
+    { value: "dispositivo_2026",label: "Dispositivo",     listKey: "dispositivos" },
+    { value: "tipo",            label: "Tipo de línea",   listKey: "tipo_linea" },
   ];
-  const currentBulkOptions = BULK_FIELDS.find(f => f.value === bulkField)?.options ?? [];
+  const camposHabilitados = getList("bulk_campos"); // lista desde config_listas
+  const BULK_FIELDS = camposHabilitados.length > 0
+    ? ALL_BULK_FIELDS.filter(f => camposHabilitados.includes(f.value))
+    : ALL_BULK_FIELDS.slice(0, 4); // fallback si aún no hay config
+
+  // Opciones del campo seleccionado: primero las de config_listas, si no las hardcoded
+  const currentBulkOptions: string[] = (() => {
+    const f = ALL_BULK_FIELDS.find(x => x.value === bulkField);
+    if (!f) return [];
+    const fromConfig = f.listKey ? getList(f.listKey) : [];
+    const base = fromConfig.length > 0 ? fromConfig : (f.options ?? []);
+    // Agrega vacío al inicio si el campo lo admite (proxima_accion, portabilidad, etc.)
+    return base[0] === "" ? base : ["", ...base];
+  })();
 
   return (
     <div className="space-y-4">
