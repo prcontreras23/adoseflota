@@ -278,11 +278,35 @@ export default function ConfiguracionTab() {
         await reload();
     }
 
-    // ── Editar ────────────────────────────────────────────────────────────────
-    async function handleUpdate(id: string, valor: string) {
-        const { error } = await supabase.from("config_listas").update({ valor }).eq("id", id);
+    // ── Editar — propaga el renombre a lineas_altice ──────────────────────────
+    async function handleUpdate(id: string, valorNuevo: string) {
+        // Valor anterior
+        const item = items.find(i => i.id === id);
+        const valorAnterior = item?.valor;
+        const lista = item?.lista;
+
+        const { error } = await supabase.from("config_listas").update({ valor: valorNuevo }).eq("id", id);
         if (error) { toast.error("Error al actualizar"); return; }
-        toast.success("Actualizado");
+
+        // Propagar a lineas_altice si la lista tiene columna mapeada
+        if (valorAnterior && lista && LISTA_COLUMNA[lista]) {
+            const columna = LISTA_COLUMNA[lista];
+            const { count } = await supabase
+                .from("lineas_altice")
+                .select("id", { count: "exact", head: true })
+                .eq(columna, valorAnterior);
+            if (count && count > 0) {
+                await supabase
+                    .from("lineas_altice")
+                    .update({ [columna]: valorNuevo })
+                    .eq(columna, valorAnterior);
+                toast.success(`Actualizado y propagado a ${count} línea${count !== 1 ? "s" : ""}`);
+            } else {
+                toast.success("Actualizado");
+            }
+        } else {
+            toast.success("Actualizado");
+        }
         await reload();
     }
 
