@@ -858,6 +858,83 @@ export default function DashboardTab() {
                 );
             })()}
 
+            {/* ── DATOS CONTRATADOS ────────────────────────────────────── */}
+            {(() => {
+                // Agrupa por gb_solicitado; usa lista de configuración para el orden
+                const configPlanes = getList("plan_datos"); // ej. ["5GB","10GB","15GB+5GB Bono"...]
+                const gbMap: Record<string, number> = {};
+                lineas.forEach(l => {
+                    const raw = l.gb_solicitado?.trim();
+                    if (!raw) { gbMap["Sin definir"] = (gbMap["Sin definir"] ?? 0) + 1; return; }
+                    // Normaliza: extrae solo el primer bloque "XGB" o usa el valor completo
+                    const match = raw.match(/^(\d+\s*GB)/i);
+                    const key = match ? match[1].replace(/\s+/, "") : raw;
+                    gbMap[key] = (gbMap[key] ?? 0) + 1;
+                });
+                if (Object.keys(gbMap).length === 0) return null;
+
+                // Ordena: primero los que están en configPlanes, luego resto numérico, "Sin definir" al final
+                const toNum = (s: string) => parseInt(s) || 9999;
+                const allKeys = Object.keys(gbMap);
+                const sorted = allKeys.sort((a, b) => {
+                    const ai = configPlanes.findIndex(p => p.startsWith(a) || a.startsWith(parseInt(p).toString()));
+                    const bi = configPlanes.findIndex(p => p.startsWith(b) || b.startsWith(parseInt(p).toString()));
+                    if (a === "Sin definir") return 1;
+                    if (b === "Sin definir") return -1;
+                    if (ai !== -1 && bi !== -1) return ai - bi;
+                    if (ai !== -1) return -1;
+                    if (bi !== -1) return 1;
+                    return toNum(a) - toNum(b);
+                });
+
+                const total = lineas.length || 1;
+                const PALETTE = [
+                    { bar: "bg-blue-500",    text: "text-blue-700 dark:text-blue-300",       bg: "bg-blue-50 dark:bg-blue-900/20" },
+                    { bar: "bg-violet-500",  text: "text-violet-700 dark:text-violet-300",   bg: "bg-violet-50 dark:bg-violet-900/20" },
+                    { bar: "bg-emerald-500", text: "text-emerald-700 dark:text-emerald-300", bg: "bg-emerald-50 dark:bg-emerald-900/20" },
+                    { bar: "bg-cyan-500",    text: "text-cyan-700 dark:text-cyan-300",       bg: "bg-cyan-50 dark:bg-cyan-900/20" },
+                    { bar: "bg-amber-500",   text: "text-amber-700 dark:text-amber-300",     bg: "bg-amber-50 dark:bg-amber-900/20" },
+                    { bar: "bg-pink-500",    text: "text-pink-700 dark:text-pink-300",       bg: "bg-pink-50 dark:bg-pink-900/20" },
+                    { bar: "bg-lime-500",    text: "text-lime-700 dark:text-lime-300",       bg: "bg-lime-50 dark:bg-lime-900/20" },
+                    { bar: "bg-orange-500",  text: "text-orange-700 dark:text-orange-300",   bg: "bg-orange-50 dark:bg-orange-900/20" },
+                ];
+                const sinDefinirStyle = { bar: "bg-slate-300", text: "text-slate-500 dark:text-slate-400", bg: "bg-slate-100 dark:bg-slate-700/40" };
+
+                return (
+                    <div>
+                        <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3">Datos contratados (2026)</h3>
+                        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 space-y-3">
+                            {/* Barra stacked */}
+                            <div className="flex rounded-full overflow-hidden h-3 gap-px">
+                                {sorted.map((k, i) => {
+                                    const c = k === "Sin definir" ? sinDefinirStyle : PALETTE[i % PALETTE.length];
+                                    return (
+                                        <div key={k} title={`${k}: ${gbMap[k]}`}
+                                            style={{ width: `${((gbMap[k] ?? 0) / total) * 100}%` }}
+                                            className={`${c.bar} transition-all`} />
+                                    );
+                                })}
+                            </div>
+                            {/* Tarjetas */}
+                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2">
+                                {sorted.map((k, i) => {
+                                    const c = k === "Sin definir" ? sinDefinirStyle : PALETTE[i % PALETTE.length];
+                                    const v = gbMap[k] ?? 0;
+                                    return (
+                                        <button key={k}
+                                            onClick={() => goToPerfiles({ search: k === "Sin definir" ? "" : k })}
+                                            className={`flex items-center justify-between gap-2 px-3 py-2 rounded-xl ${c.bg} hover:opacity-80 transition-opacity`}>
+                                            <span className={`text-xs font-semibold ${c.text}`}>{k}</span>
+                                            <span className={`text-sm font-black ${c.text}`}>{v}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
+
             {/* ── DISTRIBUCIÓN POR TIPO ────────────────────────────────── */}
             <div>
                 <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3">Distribución por tipo</h3>
