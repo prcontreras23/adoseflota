@@ -185,6 +185,7 @@ export interface LineaAltice {
     observaciones: string;
     seguimiento: string;
     nota_resolucion: string;
+    portabilidad: string;
     updated_at?: string;
     monto_mensual: string;
     cotizacion: string;
@@ -212,6 +213,15 @@ export const ACCION_COLORS: Record<string, string> = {
     "REVISAR": "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
     "SE MANTIENE": "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300",
     "NO REQUIERE FLOTA": "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400",
+};
+
+export const PORTABILIDAD_OPTIONS = ["", "Altice", "Claro", "Nuevo", "Baja"] as const;
+
+export const PORTABILIDAD_COLORS: Record<string, string> = {
+    "Claro":  "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+    "Nuevo":  "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+    "Baja":   "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-400",
+    "Altice": "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
 };
 
 export const ESTADO_LINEA_COLORS: Record<string, string> = {

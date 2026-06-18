@@ -74,7 +74,7 @@ export default function RecepcionTab() {
 
             {solicitudes.length === 0 ? (
                 <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 py-20 text-center">
-                    <p className="text-4xl mb-3">📦</p>
+                    <div className="flex justify-center mb-3 text-slate-300 dark:text-slate-600"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></div>
                     <p className="text-slate-500 dark:text-slate-400">No hay dispositivos esperando recepción</p>
                 </div>
             ) : (
@@ -125,14 +125,14 @@ export default function RecepcionTab() {
                                         </button>
                                         <button onClick={() => handleRecibir(s)} disabled={saving}
                                             className="flex-1 bg-green-600 hover:bg-green-500 text-white rounded-xl py-2.5 text-sm font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-                                            {saving ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Guardando...</> : "✅ Marcar como Recibido"}
+                                            {saving ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Guardando...</> : <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.1 9 11.1"/></svg> Marcar como Recibido</>}
                                         </button>
                                     </div>
                                 </div>
                             ) : (
                                 <button onClick={() => { setEditing(s.id); setForm({ imei: "", numero_telefono: "", sim: "", fecha_contrato: new Date().toISOString().split("T")[0] }); }}
-                                    className="w-full bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 border border-slate-200 dark:border-slate-600 rounded-xl py-2.5 text-sm text-slate-600 dark:text-slate-300 font-medium transition-colors">
-                                    📦 Registrar Recepción
+                                    className="w-full bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 border border-slate-200 dark:border-slate-600 rounded-xl py-2.5 text-sm text-slate-600 dark:text-slate-300 font-medium transition-colors flex items-center justify-center gap-1.5">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Registrar Recepción
                                 </button>
                             )}
                         </div>

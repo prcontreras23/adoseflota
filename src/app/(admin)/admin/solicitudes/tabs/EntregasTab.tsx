@@ -71,7 +71,7 @@ export default function EntregasTab() {
         // Print acta
         printActa(item);
 
-        toast.success(`✅ Entrega registrada para ${item.nombre}`);
+        toast.success(`Entrega registrada para ${item.nombre}`);
         setDelivering(null);
         setSigned(false);
         loadData();
@@ -126,7 +126,7 @@ export default function EntregasTab() {
 
             {items.length === 0 ? (
                 <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 py-20 text-center">
-                    <p className="text-4xl mb-3">🤝</p>
+                    <div className="flex justify-center mb-3 text-slate-300 dark:text-slate-600"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></div>
                     <p className="text-slate-500">No hay entregas pendientes</p>
                 </div>
             ) : items.map(item => (
@@ -135,8 +135,11 @@ export default function EntregasTab() {
                         <div>
                             <h3 className="font-bold text-slate-800 dark:text-white">{item.nombre}</h3>
                             <p className="text-sm text-slate-500 dark:text-slate-400">{item.cargo} · {item.area}</p>
-                            <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">
-                                📱 {(item as any).catalogo_dispositivos?.modelo} · 📞 {item.numero_telefono}
+                            <p className="text-sm text-slate-600 dark:text-slate-300 mt-1 flex items-center gap-1.5">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                                {(item as any).catalogo_dispositivos?.modelo} ·{" "}
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.86 9.11a19.79 19.79 0 01-3.07-8.67A2 2 0 012.77.5h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 8.34a16 16 0 006.29 6.29l1.1-1.1a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+                                {item.numero_telefono}
                             </p>
                         </div>
                         <span className="text-xs font-semibold px-2 py-1 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
@@ -168,14 +171,14 @@ export default function EntregasTab() {
                                 </button>
                                 <button onClick={() => handleEntregar(item)} disabled={saving}
                                     className="flex-1 bg-green-600 hover:bg-green-500 text-white rounded-xl py-2.5 text-sm font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-                                    {saving ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Guardando...</> : "🤝 Registrar Entrega + Imprimir Acta"}
+                                    {saving ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Guardando...</> : <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg> Registrar Entrega + Imprimir Acta</>}
                                 </button>
                             </div>
                         </div>
                     ) : (
                         <button onClick={() => setDelivering(item.id)}
-                            className="w-full bg-orange-50 dark:bg-orange-950/30 hover:bg-orange-100 dark:hover:bg-orange-900/40 border border-orange-200 dark:border-orange-800 rounded-xl py-2.5 text-sm text-orange-700 dark:text-orange-300 font-medium transition-colors">
-                            🤝 Registrar Entrega
+                            className="w-full bg-orange-50 dark:bg-orange-950/30 hover:bg-orange-100 dark:hover:bg-orange-900/40 border border-orange-200 dark:border-orange-800 rounded-xl py-2.5 text-sm text-orange-700 dark:text-orange-300 font-medium transition-colors flex items-center justify-center gap-1.5">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg> Registrar Entrega
                         </button>
                     )}
                 </div>

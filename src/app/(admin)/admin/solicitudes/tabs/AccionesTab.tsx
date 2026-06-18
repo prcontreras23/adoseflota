@@ -144,7 +144,7 @@ export default function AccionesTab() {
                     ))}
                 </div>
                 <input value={search} onChange={e => setSearch(e.target.value)}
-                    placeholder="🔍 Buscar por nombre, titular, teléfono o acción..."
+                    placeholder="Buscar por nombre, titular, teléfono o acción..."
                     className="w-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
 
@@ -168,7 +168,7 @@ export default function AccionesTab() {
                                         disabled={estaCargando}
                                         title="Marcar como completada"
                                         className="w-6 h-6 rounded-full border-2 border-slate-300 dark:border-slate-600 hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all shrink-0 mt-0.5 flex items-center justify-center disabled:opacity-40 group">
-                                        <span className="text-emerald-500 text-xs opacity-0 group-hover:opacity-100 transition-opacity">✓</span>
+                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity"><polyline points="20 6 9 17 4 12"/></svg>
                                     </button>
 
                                     {/* Info */}
@@ -239,7 +239,7 @@ export default function AccionesTab() {
                         {completadasSesion.map(item => (
                             <div key={item.id}
                                 className="bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800 rounded-2xl px-4 py-2.5 flex items-center gap-3">
-                                <span className="w-6 h-6 rounded-full bg-emerald-500 text-white text-xs flex items-center justify-center shrink-0">✓</span>
+                                <span className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
                                 <div className="flex-1 min-w-0">
                                     <span className="font-medium text-sm text-slate-700 dark:text-slate-200">{item.usuario}</span>
                                     <span className="font-mono text-xs text-slate-400 ml-2">{item.telefono}</span>
@@ -277,8 +277,8 @@ function SeguimientoInline({ id, value, onSave }: { id: string; value: string; o
                     <textarea value={draft} onChange={e => setDraft(e.target.value)} rows={2}
                         className="flex-1 text-xs border border-blue-400 rounded-lg p-2 bg-white dark:bg-slate-700 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
                     <div className="flex flex-col gap-1">
-                        <button onClick={commit} className="text-xs bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-500">✓</button>
-                        <button onClick={() => setEditing(false)} className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-500 px-3 py-1 rounded-lg">✕</button>
+                        <button onClick={commit} className="text-xs bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-500 flex items-center justify-center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>
+                        <button onClick={() => setEditing(false)} className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-500 px-3 py-1 rounded-lg flex items-center justify-center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                     </div>
                 </div>
             ) : (

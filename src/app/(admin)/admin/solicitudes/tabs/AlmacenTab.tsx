@@ -255,11 +255,11 @@ export default function AlmacenTab() {
                     <div className="absolute inset-0 bg-black/40" onClick={() => setModal("closed")} />
                     <div className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 space-y-4">
                         <div className="flex items-center justify-between">
-                            <p className="font-bold text-slate-800 dark:text-white text-base">
-                                {modal === "nuevo" ? "➕ Agregar al almacén" : "✏️ Editar stock"}
+                            <p className="font-bold text-slate-800 dark:text-white text-base flex items-center gap-1.5">
+                                {modal === "nuevo" ? (<><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Agregar al almacén</>) : (<><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Editar stock</>)}
                             </p>
                             <button onClick={() => setModal("closed")}
-                                className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 hover:text-slate-800 text-lg">✕</button>
+                                className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 hover:text-slate-800"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                         </div>
 
                         <div>
@@ -307,19 +307,19 @@ export default function AlmacenTab() {
             {/* ── HEADER ─────────────────────────────────────────────── */}
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                    <h2 className="text-lg font-bold text-slate-800 dark:text-white">📦 Almacén de Dispositivos</h2>
+                    <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-1.5"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg> Almacén de Dispositivos</h2>
                     <p className="text-sm text-slate-500 dark:text-slate-400">
                         Stock real vs. solicitados en las líneas
                     </p>
                 </div>
                 <div className="flex gap-2">
                     <button onClick={exportarAlmacen} disabled={stock.length === 0}
-                        className="text-sm bg-green-600 hover:bg-green-500 disabled:opacity-40 text-white px-4 py-2 rounded-xl font-semibold transition-colors">
-                        📊 Exportar Excel
+                        className="flex items-center gap-1.5 text-sm bg-green-600 hover:bg-green-500 disabled:opacity-40 text-white px-4 py-2 rounded-xl font-semibold transition-colors">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Exportar Excel
                     </button>
                     <button onClick={() => abrirNuevo()}
-                        className="text-sm bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl font-semibold transition-colors">
-                        ➕ Agregar dispositivo
+                        className="flex items-center gap-1.5 text-sm bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl font-semibold transition-colors">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Agregar dispositivo
                     </button>
                 </div>
             </div>
@@ -342,7 +342,7 @@ export default function AlmacenTab() {
             {/* ── ALERTA DEFICIT ─────────────────────────────────────── */}
             {conDeficit > 0 && (
                 <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-2xl p-4 flex items-start gap-3">
-                    <span className="text-xl mt-0.5">🔴</span>
+                    <span className="mt-0.5"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
                     <div>
                         <p className="font-bold text-rose-700 dark:text-rose-400 text-sm">
                             {conDeficit} modelo{conDeficit > 1 ? "s" : ""} con déficit de stock
@@ -358,7 +358,7 @@ export default function AlmacenTab() {
             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
                 {stock.length === 0 ? (
                     <div className="py-16 text-center text-slate-400">
-                        <p className="text-4xl mb-2">📦</p>
+                        <p className="mb-2"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg></p>
                         <p className="font-medium">No hay dispositivos en el almacén</p>
                         <p className="text-xs mt-1">Agrega los modelos que recibiste con el botón de arriba</p>
                     </div>
@@ -432,8 +432,8 @@ export default function AlmacenTab() {
                                                 <div className="flex gap-1">
                                                     <button
                                                         onClick={() => abrirEditar(item)}
-                                                        className="text-xs px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:text-blue-600 transition-colors font-medium">
-                                                        ✏️ Editar
+                                                        className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:text-blue-600 transition-colors font-medium">
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Editar
                                                     </button>
                                                     {confirmDeleteId === item.id ? (
                                                         <div className="flex gap-1">
@@ -452,8 +452,8 @@ export default function AlmacenTab() {
                                                     ) : (
                                                         <button
                                                             onClick={() => setConfirmDeleteId(item.id)}
-                                                            className="text-xs px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-400 hover:bg-rose-100 dark:hover:bg-rose-900/30 hover:text-rose-600 transition-colors">
-                                                            🗑
+                                                            className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-400 hover:bg-rose-100 dark:hover:bg-rose-900/30 hover:text-rose-600 transition-colors">
+                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
                                                         </button>
                                                     )}
                                                 </div>
@@ -470,8 +470,8 @@ export default function AlmacenTab() {
             {/* ── DISPOSITIVOS NO CATALOGADOS ─────────────────────────── */}
             {sinCatalogar.length > 0 && (
                 <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-2xl p-4">
-                    <p className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-widest mb-3">
-                        ⚠️ Dispositivos en líneas sin entrada en almacén ({sinCatalogar.length})
+                    <p className="flex items-center gap-1.5 text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-widest mb-3">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Dispositivos en líneas sin entrada en almacén ({sinCatalogar.length})
                     </p>
                     <div className="flex flex-wrap gap-2">
                         {sinCatalogar.map(({ nombre, cantidad }) => (

@@ -73,7 +73,7 @@ export default function MaestroTab() {
                 });
                 imported++;
             }
-            toast.success(`✅ ${imported} registros importados desde Excel`);
+            toast.success(`${imported} registros importados desde Excel`);
             loadData();
         } catch (err) {
             toast.error("Error al leer el archivo Excel");
@@ -100,19 +100,19 @@ export default function MaestroTab() {
                     <input ref={importRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleImport} className="hidden" id="import-excel" />
                     <label htmlFor="import-excel"
                         className="cursor-pointer text-sm bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 px-4 py-2 rounded-xl font-medium transition-colors flex items-center gap-2">
-                        {importing ? <span className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" /> : "📥"}
+                        {importing ? <span className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" /> : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>}
                         Importar Excel
                     </label>
                     <button onClick={exportExcel}
                         className="text-sm bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-xl font-semibold transition-colors flex items-center gap-2">
-                        📊 Exportar Excel
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Exportar Excel
                     </button>
                 </div>
             </div>
 
             {/* Filters */}
             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 flex flex-wrap gap-3">
-                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Buscar por nombre o teléfono..."
+                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nombre o teléfono..."
                     className="flex-1 min-w-48 border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 <select value={filterArea} onChange={e => setFilterArea(e.target.value)}
                     className="border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -172,7 +172,7 @@ export default function MaestroTab() {
                 </div>
                 {filtered.length === 0 && (
                     <div className="py-16 text-center text-slate-400">
-                        <p className="text-4xl mb-2">📊</p><p>No hay registros</p>
+                        <div className="mb-2 flex justify-center"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300 dark:text-slate-600"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg></div><p>No hay registros</p>
                     </div>
                 )}
             </div>
@@ -180,7 +180,7 @@ export default function MaestroTab() {
             {/* Changeover alerts */}
             {flota.filter(r => r.fecha_cambio_18m && new Date(r.fecha_cambio_18m) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)).length > 0 && (
                 <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-2xl p-4">
-                    <h3 className="font-semibold text-amber-700 dark:text-amber-400 mb-2">⚠️ Cambiazo próximo o vencido</h3>
+                    <h3 className="font-semibold text-amber-700 dark:text-amber-400 mb-2 flex items-center gap-1.5"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Cambiazo próximo o vencido</h3>
                     <div className="space-y-1">
                         {flota.filter(r => r.fecha_cambio_18m && new Date(r.fecha_cambio_18m) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)).map(r => (
                             <p key={r.id} className="text-sm text-amber-700 dark:text-amber-400">

@@ -34,7 +34,7 @@ export default function CortesTab() {
 
             {cortes.length === 0 ? (
                 <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 py-20 text-center">
-                    <p className="text-4xl mb-3">📤</p>
+                    <p className="mb-3"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></p>
                     <p className="text-slate-500 dark:text-slate-400">No hay cortes generados aún</p>
                     <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">Ve a "Solicitudes" y selecciona solicitudes pendientes para generar un corte</p>
                 </div>

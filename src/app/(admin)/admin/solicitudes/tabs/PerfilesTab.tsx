@@ -1,11 +1,45 @@
 "use client";
 import { useEffect, useState } from "react";
-import { supabase, type LineaAltice, ACCION_COLORS, ESTADO_LINEA_COLORS } from "@/lib/supabase";
+import { supabase, type LineaAltice, ACCION_COLORS, ESTADO_LINEA_COLORS, PORTABILIDAD_COLORS, PORTABILIDAD_OPTIONS } from "@/lib/supabase";
 import { useLineas } from "@/lib/LineasContext";
 import * as XLSX from "xlsx";
 import toast from "react-hot-toast";
 import NuevaLineaModal from "./NuevaLineaModal";
 import FormularioPanel from "./FormularioPanel";
+
+interface HistorialEntry {
+  id: string;
+  linea_id: string;
+  usuario_id: string | null;
+  usuario_nombre: string;
+  campo: string;
+  valor_anterior: string | null;
+  valor_nuevo: string | null;
+  created_at: string;
+}
+
+const CAMPOS_ETIQUETAS: Partial<Record<keyof LineaAltice, string>> = {
+  usuario_linea: "Usuario",
+  titular_responsable: "Titular",
+  telefono: "Teléfono",
+  tipo: "Tipo",
+  accion_2026: "Acción 2026",
+  estado: "Estado",
+  proxima_accion: "Próxima acción",
+  gb_antes: "GB antes",
+  gb_solicitado: "GB solicitado",
+  min_antes: "Min antes",
+  min_solicitados: "Min solicitados",
+  dispositivo_2026: "Dispositivo",
+  cotizacion: "Cotización",
+  monto_mensual: "Monto mensual",
+  imei: "IMEI",
+  sim: "SIM",
+  revisado_por: "Revisado por",
+  nota_resolucion: "Nota de resolución",
+  observaciones: "Observaciones",
+  seguimiento: "Seguimiento",
+};
 
 const PLANES_DATA = [
   "",
@@ -22,11 +56,12 @@ interface TitularGroup {
   lineas: LineaAltice[];
 }
 
-function EditModal({ linea, onClose, onSave, onDelete }: {
+function EditModal({ linea, onClose, onSave, onDelete, session }: {
   linea: LineaAltice;
   onClose: () => void;
   onSave: (updated: LineaAltice) => void;
   onDelete: (id: string) => void;
+  session: { id: string; nombre: string } | null;
 }) {
   const [form, setForm] = useState<LineaAltice>({ ...linea });
   const [saving, setSaving] = useState(false);
@@ -37,6 +72,21 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
   const [selectedInvId, setSelectedInvId] = useState<string>("");
   const [imeiOpen, setImeiOpen] = useState(false);
   const [imeiDropOpen, setImeiDropOpen] = useState(false);
+  const [historial, setHistorial] = useState<HistorialEntry[]>([]);
+  const [historialLoading, setHistorialLoading] = useState(true);
+
+  useEffect(() => {
+    supabase
+      .from("historial_cambios")
+      .select("*")
+      .eq("linea_id", linea.id)
+      .order("created_at", { ascending: false })
+      .limit(50)
+      .then(({ data }) => {
+        setHistorial((data ?? []) as HistorialEntry[]);
+        setHistorialLoading(false);
+      });
+  }, [linea.id]);
 
   useEffect(() => {
     async function cargarDatos() {
@@ -99,6 +149,7 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
       observaciones: form.observaciones,
       seguimiento: form.seguimiento,
       nota_resolucion: form.nota_resolucion,
+      portabilidad: form.portabilidad ?? "",
       revisado_por: form.revisado_por,
       imei: form.imei ?? "",
       sim: form.sim ?? "",
@@ -119,10 +170,31 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
       if (prev) await supabase.from("inventario_altice").update({ asignado: false, linea_id: null }).eq("id", prev.id);
     }
 
+    // Log changed fields to historial
+    if (session) {
+      const registros = (Object.keys(CAMPOS_ETIQUETAS) as (keyof LineaAltice)[])
+        .filter(campo => {
+          const prev = (linea[campo] ?? "").toString().trim();
+          const next = (form[campo] ?? "").toString().trim();
+          return prev !== next;
+        })
+        .map(campo => ({
+          linea_id: linea.id,
+          usuario_id: session.id,
+          usuario_nombre: session.nombre,
+          campo: CAMPOS_ETIQUETAS[campo]!,
+          valor_anterior: (linea[campo] ?? "").toString() || null,
+          valor_nuevo: (form[campo] ?? "").toString() || null,
+        }));
+      if (registros.length > 0) {
+        await supabase.from("historial_cambios").insert(registros);
+      }
+    }
+
     setSaving(false);
     onSave({ ...form, entregado: tieneImeiSim, fecha_entrega: nuevaFecha });
-    if (tieneImeiSim && !form.entregado) toast.success("✅ IMEI/SIM asignados — marcado como entregado");
-    else toast.success("Guardado ✓");
+    if (tieneImeiSim && !form.entregado) toast.success("IMEI/SIM asignados — marcado como entregado");
+    else toast.success("Guardado");
     onClose();
   }
 
@@ -143,7 +215,9 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
             <p className="font-bold text-slate-800 dark:text-white text-base">Editar línea</p>
             <p className="text-xs text-slate-400 flex items-center gap-1">{linea.telefono}{!linea.telefono?.startsWith("NUEVA") && <a href={`tel:+1${linea.telefono?.replace(/-/g, "")}`} title="Llamar" className="text-blue-500 hover:text-blue-700"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg></a>} · {linea.usuario_linea}</p>
           </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 hover:text-slate-800 text-lg">✕</button>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 hover:text-slate-800">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
         </div>
 
         <div className="p-4 space-y-6 flex-1">
@@ -226,8 +300,8 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
                     const etiqueta = d.disponibles > 0
                       ? `${d.disponibles} disponible${d.disponibles !== 1 ? "s" : ""}`
                       : d.disponibles === 0
-                        ? "⚠ Agotado"
-                        : `⚠ Déficit (${Math.abs(d.disponibles)} de más)`;
+                        ? "Agotado"
+                        : `Déficit (${Math.abs(d.disponibles)} de más)`;
                     return (
                       <option key={d.dispositivo} value={d.dispositivo}>
                         {d.dispositivo} — {etiqueta}
@@ -301,7 +375,7 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
                   <div className="relative">
                     <label className={labelCls}>
                       Tarjeta SIM / ICC
-                      {selectedInvId && <span className="ml-2 text-teal-600 font-semibold">✓ del inventario Altice</span>}
+                      {selectedInvId && <span className="ml-2 text-teal-600 font-semibold">del inventario Altice</span>}
                     </label>
                     <input
                       value={form.sim || ""}
@@ -336,7 +410,7 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
                               <p className="font-mono text-sm text-slate-800 dark:text-white">{item.sim}</p>
                               <p className="text-xs text-slate-400 mt-0.5">
                                 IMEI: {item.imei} · {item.marca.split(" ").slice(0, 3).join(" ")}
-                                {item.linea_id === linea.id && <span className="text-teal-600 ml-2 font-semibold">✓ asignado</span>}
+                                {item.linea_id === linea.id && <span className="text-teal-600 ml-2 font-semibold">asignado</span>}
                               </p>
                             </div>
                           </button>
@@ -349,7 +423,7 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
                   <div className="relative">
                     <label className={labelCls}>
                       IMEI
-                      {selectedInvId && <span className="ml-2 text-teal-600 font-semibold">✓ del inventario Altice</span>}
+                      {selectedInvId && <span className="ml-2 text-teal-600 font-semibold">del inventario Altice</span>}
                     </label>
                     <input
                       value={form.imei || ""}
@@ -385,7 +459,7 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
                               <p className="font-mono text-sm text-slate-800 dark:text-white">{item.imei}</p>
                               <p className="text-xs text-slate-400 mt-0.5">
                                 SIM: {item.sim} · {item.marca.split(" ").slice(0, 3).join(" ")}
-                                {item.linea_id === linea.id && <span className="text-teal-600 ml-2 font-semibold">✓ asignado</span>}
+                                {item.linea_id === linea.id && <span className="text-teal-600 ml-2 font-semibold">asignado</span>}
                               </p>
                             </div>
                           </button>
@@ -435,6 +509,15 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
                   ))}
                 </select>
               </div>
+              <div>
+                <label className={labelCls}>📶 Portabilidad</label>
+                <select value={form.portabilidad ?? ""} onChange={e => set("portabilidad", e.target.value)}
+                  className={`${inputCls} font-semibold ${PORTABILIDAD_COLORS[form.portabilidad ?? ""] ?? ""}`}>
+                  {PORTABILIDAD_OPTIONS.map(v => (
+                    <option key={v} value={v}>{v || "(sin portabilidad)"}</option>
+                  ))}
+                </select>
+              </div>
               <div className="col-span-2">
                 <label className={`${labelCls} flex items-center gap-1`}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> Nota de resolución</label>
                 <textarea value={form.nota_resolucion} onChange={e => set("nota_resolucion", e.target.value)}
@@ -472,6 +555,45 @@ function EditModal({ linea, onClose, onSave, onDelete }: {
                   rows={3} className={inputCls + " resize-none"} />
               </div>
             </div>
+          </section>
+
+          {/* Historial de cambios */}
+          <section>
+            <p className={`${sectionTitleCls} flex items-center gap-1.5`}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              Historial de cambios
+            </p>
+            {historialLoading ? (
+              <div className="flex justify-center py-4">
+                <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : historial.length === 0 ? (
+              <p className="text-xs text-slate-400 text-center py-4">Sin cambios registrados aún</p>
+            ) : (
+              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                {historial.map(entry => (
+                  <div key={entry.id} className="text-xs bg-slate-50 dark:bg-slate-800 rounded-xl px-3 py-2.5 border border-slate-100 dark:border-slate-700">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+                        {entry.usuario_nombre}
+                      </span>
+                      <span className="text-slate-400 text-[10px]">
+                        {new Date(entry.created_at).toLocaleDateString("es-DO", { day: "2-digit", month: "short", year: "numeric" })}
+                        {" "}
+                        {new Date(entry.created_at).toLocaleTimeString("es-DO", { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                    <p className="text-slate-600 dark:text-slate-300">
+                      <span className="font-medium">{entry.campo}:</span>{" "}
+                      <span className="line-through text-rose-400">{entry.valor_anterior || "(vacío)"}</span>
+                      <span className="mx-1 text-slate-400">→</span>
+                      <span className="text-emerald-600 dark:text-emerald-400">{entry.valor_nuevo || "(eliminado)"}</span>
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
         </div>
 
@@ -551,6 +673,11 @@ function LineaRow({ linea, onEdit, dimmed }: { linea: LineaAltice; onEdit: () =>
           <span className={`text-xs font-semibold px-2 py-1 rounded-lg ${ACCION_COLORS[linea.accion_2026] ?? "bg-slate-100 text-slate-500"}`}>
             {linea.accion_2026 || "—"}
           </span>
+          {linea.portabilidad && (
+            <span className={`text-xs font-semibold px-2 py-1 rounded-lg ${PORTABILIDAD_COLORS[linea.portabilidad] ?? "bg-slate-100 text-slate-500"}`}>
+              📶 {linea.portabilidad}
+            </span>
+          )}
           {linea.estado && (
             <span className={`text-xs font-semibold px-2 py-1 rounded-lg ${ESTADO_LINEA_COLORS[linea.estado] ?? "bg-slate-100 text-slate-500"}`}>
               {linea.estado}
@@ -586,6 +713,10 @@ function LineaRow({ linea, onEdit, dimmed }: { linea: LineaAltice; onEdit: () =>
 
 export default function PerfilesTab() {
   const { lineas: all, loading, upsertLocal, removeLocal, patchLocal } = useLineas();
+  const [session] = useState<{ id: string; nombre: string } | null>(() => {
+    if (typeof window === "undefined") return null;
+    try { return JSON.parse(localStorage.getItem("flota_session") ?? "null"); } catch { return null; }
+  });
   const [search, setSearch] = useState("");
   const [filterDispositivo, setFilterDispositivo] = useState("");
   const [filterGb, setFilterGb] = useState("");
@@ -600,6 +731,7 @@ export default function PerfilesTab() {
   const [chipConSeguimiento, setChipConSeguimiento] = useState(false);
   const [chipSinRevisar, setChipSinRevisar] = useState(false);
   const [filterRevisadoPor, setFilterRevisadoPor] = useState("");
+  const [filterPortabilidad, setFilterPortabilidad] = useState("");
   const [expandedTitular, setExpandedTitular] = useState<string | null>(null);
   const [editingLinea, setEditingLinea] = useState<LineaAltice | null>(null);
   const [vinculandoTitular, setVinculandoTitular] = useState<string | null>(null);
@@ -653,6 +785,7 @@ export default function PerfilesTab() {
       "Próxima Acción": r.proxima_accion,
       "Seguimiento": r.seguimiento,
       "Observaciones": r.observaciones,
+      "Portabilidad": r.portabilidad,
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     ws["!cols"] = Object.keys(rows[0] || {}).map(k => ({ wch: Math.max(k.length, 14) }));
@@ -682,7 +815,7 @@ export default function PerfilesTab() {
   const opcionesGb = [...new Set(all.map(r => r.gb_solicitado?.trim() || r.gb_antes?.trim()).filter(Boolean))].sort((a, b) => parseFloat(a!) - parseFloat(b!)) as string[];
   const opcionesMin = [...new Set(all.map(r => r.min_solicitados?.trim() || r.min_antes?.trim()).filter(Boolean))].sort((a, b) => parseFloat(a!) - parseFloat(b!)) as string[];
 
-  const hayFiltros = !!(search || filterDispositivo || filterGb || filterMin || filterProximaAccion || filterAccion || filterEstado || filterTipo || chipSinDispositivo || chipSinMonto || chipConSeguimiento || chipSinRevisar || filterRevisadoPor);
+  const hayFiltros = !!(search || filterDispositivo || filterGb || filterMin || filterProximaAccion || filterAccion || filterEstado || filterTipo || filterPortabilidad || chipSinDispositivo || chipSinMonto || chipConSeguimiento || chipSinRevisar || filterRevisadoPor);
 
   const gruposFiltrados = grupos.filter(g => {
     const q = search.toLowerCase();
@@ -708,10 +841,11 @@ export default function PerfilesTab() {
       if (chipConSeguimiento && !l.seguimiento?.trim()) return false;
       if (chipSinRevisar && l.revisado_por?.trim()) return false;
       if (filterRevisadoPor && l.revisado_por?.trim() !== filterRevisadoPor) return false;
+      if (filterPortabilidad && l.portabilidad !== filterPortabilidad) return false;
       return true;
     });
 
-    if (filterAccion || filterEstado || filterTipo || filterDispositivo || filterGb || filterMin || filterProximaAccion || chipSinDispositivo || chipSinMonto || chipConSeguimiento || chipSinRevisar || filterRevisadoPor) {
+    if (filterAccion || filterEstado || filterTipo || filterDispositivo || filterGb || filterMin || filterProximaAccion || filterPortabilidad || chipSinDispositivo || chipSinMonto || chipConSeguimiento || chipSinRevisar || filterRevisadoPor) {
       return tieneAlgunaLinea;
     }
     return true;
@@ -745,6 +879,7 @@ export default function PerfilesTab() {
           onClose={() => setEditingLinea(null)}
           onSave={(updated) => upsertLocal(updated)}
           onDelete={(id) => removeLocal(id)}
+          session={session}
         />
       )}
 
@@ -792,7 +927,7 @@ export default function PerfilesTab() {
             {/* Fila 1 */}
             <div className="flex flex-wrap gap-2">
               <input value={search} onChange={e => setSearch(e.target.value)}
-                placeholder="🔍 Buscar titular, usuario, teléfono o notas..."
+                placeholder="Buscar titular, usuario, teléfono o notas..."
                 className={`flex-1 min-w-48 ${selCls}`} />
               <select value={filterAccion} onChange={e => setFilterAccion(e.target.value)} className={selCls}>
                 <option value="">Todas las acciones</option>
@@ -815,22 +950,26 @@ export default function PerfilesTab() {
                 {TIPOS_LIST.map(a => <option key={a} value={a}>{a}</option>)}
               </select>
               <select value={filterDispositivo} onChange={e => setFilterDispositivo(e.target.value)} className={selCls}>
-                <option value="">📱 Todos los equipos</option>
+                <option value="">Todos los equipos</option>
                 {opcionesDispositivo.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
               <select value={filterGb} onChange={e => setFilterGb(e.target.value)} className={selCls}>
-                <option value="">📶 Todos los GB</option>
+                <option value="">Todos los GB</option>
                 {opcionesGb.map(g => <option key={g} value={g}>{g} GB</option>)}
               </select>
               <select value={filterMin} onChange={e => setFilterMin(e.target.value)} className={selCls}>
-                <option value="">📞 Todos los min</option>
+                <option value="">Todos los min</option>
                 {opcionesMin.map(m => <option key={m} value={m}>{m} min</option>)}
               </select>
+              <select value={filterPortabilidad} onChange={e => setFilterPortabilidad(e.target.value)} className={selCls}>
+                <option value="">Portabilidad</option>
+                {PORTABILIDAD_OPTIONS.filter(Boolean).map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
               <select value={filterRevisadoPor} onChange={e => setFilterRevisadoPor(e.target.value)} className={selCls}>
-                <option value="">✅ Revisor — todos</option>
-                <option value="Francis">✅ Francis</option>
-                <option value="Carlos">✅ Carlos</option>
-                <option value="Soto">✅ Soto</option>
+                <option value="">Revisor — todos</option>
+                <option value="Francis">Francis</option>
+                <option value="Carlos">Carlos</option>
+                <option value="Soto">Soto</option>
               </select>
             </div>
 
@@ -850,8 +989,8 @@ export default function PerfilesTab() {
                 </button>
               ))}
               {hayFiltros && (
-                <button onClick={limpiarTodo} className="text-xs text-slate-400 hover:text-rose-500 underline ml-auto whitespace-nowrap">
-                  ✕ Limpiar todo
+                <button onClick={limpiarTodo} className="text-xs text-slate-400 hover:text-rose-500 underline ml-auto whitespace-nowrap flex items-center gap-1">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Limpiar todo
                 </button>
               )}
             </div>

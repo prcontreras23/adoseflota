@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
-import { supabase, type LineaAltice, ACCION_COLORS, ESTADO_LINEA_COLORS } from "@/lib/supabase";
+import { supabase, type LineaAltice, ACCION_COLORS, ESTADO_LINEA_COLORS, PORTABILIDAD_COLORS, PORTABILIDAD_OPTIONS } from "@/lib/supabase";
 import { useLineas } from "@/lib/LineasContext";
 import * as XLSX from "xlsx";
 import toast from "react-hot-toast";
@@ -54,6 +54,7 @@ export default function LineasTab() {
     const [filterMin, setFilterMin] = useState("");
     const [filterProximaAccion, setFilterProximaAccion] = useState("");
     const [filterTitular, setFilterTitular] = useState("");
+    const [filterPortabilidad, setFilterPortabilidad] = useState("");
     // Quick chips (toggles)
     const [chipSinTitular, setChipSinTitular] = useState(false);
     const [chipSinDispositivo, setChipSinDispositivo] = useState(false);
@@ -74,6 +75,7 @@ export default function LineasTab() {
         if (filterMin) f = f.filter(r => (r.min_solicitados?.trim() || r.min_antes?.trim()) === filterMin);
         if (filterProximaAccion) f = f.filter(r => r.proxima_accion === filterProximaAccion);
         if (filterTitular) f = f.filter(r => r.titular_responsable === filterTitular);
+        if (filterPortabilidad) f = f.filter(r => r.portabilidad === filterPortabilidad);
         if (chipSinTitular) f = f.filter(r => !r.titular_responsable?.trim());
         if (chipSinDispositivo) f = f.filter(r => !r.dispositivo_2026?.trim() || r.dispositivo_2026.trim() === "SIN CAMBIO" || r.dispositivo_2026.trim() === "—");
         if (chipSinMonto) f = f.filter(r => !r.monto_mensual?.trim() || parseFloat(r.monto_mensual.replace(/[^0-9.]/g, "")) === 0);
@@ -90,7 +92,7 @@ export default function LineasTab() {
         }
         setFiltered(f);
     }, [all, filterAccion, filterEstado, filterTipo, filterDispositivo, filterGb, filterMin,
-        filterProximaAccion, filterTitular, chipSinTitular, chipSinDispositivo, chipSinMonto, chipConSeguimiento, search]);
+        filterProximaAccion, filterTitular, filterPortabilidad, chipSinTitular, chipSinDispositivo, chipSinMonto, chipConSeguimiento, search]);
 
     async function updateField(id: string, field: keyof LineaAltice, value: string) {
         const ok = await mutate(id, { [field]: value });
@@ -123,6 +125,7 @@ export default function LineasTab() {
         "Observaciones": "observaciones",
         "Seguimiento": "seguimiento",
         "Titular Vinculado": "titular_vinculado",
+        "Portabilidad": "portabilidad",
     };
 
     function exportarFiltradas() {
@@ -145,6 +148,7 @@ export default function LineasTab() {
             "Monto Mensual": r.monto_mensual,
             "Observaciones": r.observaciones,
             "Seguimiento": r.seguimiento,
+            "Portabilidad": r.portabilidad,
         }));
         const ws = XLSX.utils.json_to_sheet(rows);
         ws["!cols"] = Object.keys(rows[0] || {}).map(k => ({ wch: Math.max(k.length, 14) }));
@@ -176,6 +180,7 @@ export default function LineasTab() {
             "Observaciones": r.observaciones,
             "Seguimiento": r.seguimiento,
             "Titular Vinculado": r.titular_vinculado,
+            "Portabilidad": r.portabilidad,
         }));
         const ws = XLSX.utils.json_to_sheet(rows);
         // Ancho mínimo por columna
@@ -242,7 +247,7 @@ export default function LineasTab() {
             if (errCount > 0) {
                 toast.error(`Importado con ${errCount} lotes con error`);
             } else {
-                toast.success(`✅ ${rows.length} líneas actualizadas en Supabase`);
+                toast.success(`${rows.length} líneas actualizadas`);
             }
 
             // Recargar datos
@@ -274,22 +279,22 @@ export default function LineasTab() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                     <button onClick={() => setShowNueva(true)}
-                        className="text-sm bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl font-semibold transition-colors">
-                        ➕ Nueva Línea
+                        className="flex items-center gap-1.5 text-sm bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl font-semibold transition-colors">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Nueva Línea
                     </button>
                     <button onClick={exportarFiltradas}
-                        className="text-sm bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-xl font-semibold transition-colors">
-                        📊 Exportar Excel
+                        className="flex items-center gap-1.5 text-sm bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-xl font-semibold transition-colors">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Exportar Excel
                     </button>
                     <button onClick={exportPlantilla}
-                        className="text-sm bg-emerald-700 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl font-semibold transition-colors">
-                        📥 Plantilla completa
+                        className="flex items-center gap-1.5 text-sm bg-emerald-700 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl font-semibold transition-colors">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Plantilla completa
                     </button>
                     <button
                         onClick={() => importRef.current?.click()}
                         disabled={importing}
-                        className="text-sm bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white px-4 py-2 rounded-xl font-semibold transition-colors">
-                        {importing ? "⏳ Importando..." : "📤 Importar Excel"}
+                        className="flex items-center gap-1.5 text-sm bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white px-4 py-2 rounded-xl font-semibold transition-colors">
+                        {importing ? "Importando..." : <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Importar Excel</>}
                     </button>
                     <input
                         ref={importRef}
@@ -307,7 +312,7 @@ export default function LineasTab() {
                 const opcionesGb = [...new Set(all.map(r => r.gb_solicitado?.trim() || r.gb_antes?.trim()).filter(Boolean))].sort((a, b) => parseFloat(a!) - parseFloat(b!)) as string[];
                 const opcionesMin = [...new Set(all.map(r => r.min_solicitados?.trim() || r.min_antes?.trim()).filter(Boolean))].sort((a, b) => parseFloat(a!) - parseFloat(b!)) as string[];
                 const opcionesTitular = [...new Set(all.map(r => r.titular_responsable).filter(Boolean))].sort() as string[];
-                const hayFiltros = !!(filterAccion || filterEstado || filterTipo || filterDispositivo || filterGb || filterMin || filterProximaAccion || filterTitular || search || chipSinTitular || chipSinDispositivo || chipSinMonto || chipConSeguimiento);
+                const hayFiltros = !!(filterAccion || filterEstado || filterTipo || filterDispositivo || filterGb || filterMin || filterProximaAccion || filterTitular || filterPortabilidad || search || chipSinTitular || chipSinDispositivo || chipSinMonto || chipConSeguimiento);
                 const selCls = "border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
 
                 const limpiarTodo = () => {
@@ -329,7 +334,7 @@ export default function LineasTab() {
                         {/* Fila 1: búsqueda + filtros principales */}
                         <div className="flex flex-wrap gap-2">
                             <input value={search} onChange={e => setSearch(e.target.value)}
-                                placeholder="🔍 Buscar nombre, titular, teléfono, notas..."
+                                placeholder="Buscar nombre, titular, teléfono, notas..."
                                 className={`flex-1 min-w-48 ${selCls}`} />
                             <select value={filterAccion} onChange={e => setFilterAccion(e.target.value)} className={selCls}>
                                 <option value="">Todas las acciones</option>
@@ -352,20 +357,24 @@ export default function LineasTab() {
                                 {TIPOS.filter(Boolean).map(a => <option key={a} value={a}>{a}</option>)}
                             </select>
                             <select value={filterTitular} onChange={e => setFilterTitular(e.target.value)} className={selCls}>
-                                <option value="">👤 Todos los titulares</option>
+                                <option value="">Todos los titulares</option>
                                 {opcionesTitular.map(t => <option key={t} value={t}>{t}</option>)}
                             </select>
                             <select value={filterDispositivo} onChange={e => setFilterDispositivo(e.target.value)} className={selCls}>
-                                <option value="">📱 Todos los equipos</option>
+                                <option value="">Todos los equipos</option>
                                 {opcionesDispositivo.map(d => <option key={d} value={d}>{d}</option>)}
                             </select>
                             <select value={filterGb} onChange={e => setFilterGb(e.target.value)} className={selCls}>
-                                <option value="">📶 Todos los GB</option>
+                                <option value="">Todos los GB</option>
                                 {opcionesGb.map(g => <option key={g} value={g}>{g} GB</option>)}
                             </select>
                             <select value={filterMin} onChange={e => setFilterMin(e.target.value)} className={selCls}>
-                                <option value="">📞 Todos los min</option>
+                                <option value="">Todos los min</option>
                                 {opcionesMin.map(m => <option key={m} value={m}>{m} min</option>)}
+                            </select>
+                            <select value={filterPortabilidad} onChange={e => setFilterPortabilidad(e.target.value)} className={selCls}>
+                                <option value="">Portabilidad</option>
+                                {PORTABILIDAD_OPTIONS.filter(Boolean).map(p => <option key={p} value={p}>{p}</option>)}
                             </select>
                         </div>
 
@@ -373,29 +382,31 @@ export default function LineasTab() {
                         <div className="flex flex-wrap gap-2 items-center">
                             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Rápido:</span>
                             <button className={chipCls(chipSinTitular)} onClick={() => setChipSinTitular(v => !v)}>
-                                ⚠️ Sin titular
+                                <span className="flex items-center gap-1"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Sin titular</span>
                             </button>
                             <button className={chipCls(chipSinDispositivo)} onClick={() => setChipSinDispositivo(v => !v)}>
-                                📵 Sin dispositivo
+                                <span className="flex items-center gap-1"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg> Sin dispositivo</span>
                             </button>
                             <button className={chipCls(chipSinMonto)} onClick={() => setChipSinMonto(v => !v)}>
-                                💸 Sin monto
+                                <span className="flex items-center gap-1"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg> Sin monto</span>
                             </button>
                             <button className={chipCls(chipConSeguimiento)} onClick={() => setChipConSeguimiento(v => !v)}>
-                                📝 Con notas
+                                <span className="flex items-center gap-1"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> Con notas</span>
                             </button>
                             {/* Atajos de próxima acción como chips */}
                             {["LLAMAR", "CARTA", "COTIZAR", "CANCELAR"].map(a => (
                                 <button key={a}
                                     className={chipCls(filterProximaAccion === a)}
                                     onClick={() => setFilterProximaAccion(v => v === a ? "" : a)}>
-                                    {a === "LLAMAR" ? "📲" : a === "CARTA" ? "✉️" : a === "COTIZAR" ? "💲" : "🚫"} {a}
+                                    <span className="flex items-center gap-1">
+                                        {a === "LLAMAR" ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.86 9.11a19.79 19.79 0 01-3.07-8.67A2 2 0 012.77 .5h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 8.34a16 16 0 006.29 6.29l1.1-1.1a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg> : a === "CARTA" ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> : a === "COTIZAR" ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg> : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>} {a}
+                                    </span>
                                 </button>
                             ))}
                             {hayFiltros && (
                                 <button onClick={limpiarTodo}
-                                    className="text-xs text-slate-400 hover:text-rose-500 underline ml-auto whitespace-nowrap">
-                                    ✕ Limpiar todo
+                                    className="text-xs text-slate-400 hover:text-rose-500 underline ml-auto whitespace-nowrap flex items-center gap-1">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Limpiar todo
                                 </button>
                             )}
                         </div>
@@ -409,7 +420,7 @@ export default function LineasTab() {
                     <table className="w-full text-xs">
                         <thead className="bg-slate-50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10">
                             <tr>
-                                {["Teléfono", "Usuario / Titular", "Tipo", "Acción 2026", "GB Antes → 2026", "Min", "Dispositivo 2026", "Estado", "Seguimiento"].map(h => (
+                                {["Teléfono", "Usuario / Titular", "Tipo", "Portabilidad", "Acción 2026", "GB Antes → 2026", "Min", "Dispositivo 2026", "Estado", "Seguimiento"].map(h => (
                                     <th key={h} className="p-2.5 text-left font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">{h}</th>
                                 ))}
                             </tr>
@@ -421,7 +432,7 @@ export default function LineasTab() {
                                         className="hover:bg-slate-50 dark:hover:bg-slate-700/30 cursor-pointer"
                                         onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}>
                                         <td className="p-2.5 font-mono font-medium text-slate-700 dark:text-slate-200 whitespace-nowrap">
-                                            {r.telefono?.startsWith("NUEVA") ? <span className="text-green-600 font-bold">{r.telefono}</span> : <span className="flex items-center gap-1">{r.telefono}<a href={`tel:+1${r.telefono?.replace(/-/g, "")}`} onClick={e => e.stopPropagation()} title="Llamar" className="text-blue-500 hover:text-blue-700 ml-1">📞</a></span>}
+                                            {r.telefono?.startsWith("NUEVA") ? <span className="text-green-600 font-bold">{r.telefono}</span> : <span className="flex items-center gap-1">{r.telefono}<a href={`tel:+1${r.telefono?.replace(/-/g, "")}`} onClick={e => e.stopPropagation()} title="Llamar" className="text-blue-500 hover:text-blue-700 ml-1"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.86 9.11a19.79 19.79 0 01-3.07-8.67A2 2 0 012.77 .5h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 8.34a16 16 0 006.29 6.29l1.1-1.1a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg></a></span>}
                                         </td>
                                         <td className="p-2.5">
                                             <p className="font-medium text-slate-800 dark:text-white">{r.usuario_linea || "—"}</p>
@@ -433,6 +444,13 @@ export default function LineasTab() {
                                                 onChange={e => updateField(r.id, "tipo", e.target.value)}
                                                 className="text-xs px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
                                                 {TIPOS.map(t => <option key={t} value={t}>{t || "(tipo)"}</option>)}
+                                            </select>
+                                        </td>
+                                        <td className="p-2.5 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                                            <select value={r.portabilidad ?? ""}
+                                                onChange={e => updateField(r.id, "portabilidad", e.target.value)}
+                                                className={`text-xs font-semibold px-2 py-1 rounded-lg border-0 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer ${PORTABILIDAD_COLORS[r.portabilidad ?? ""] ?? "bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300"}`}>
+                                                {PORTABILIDAD_OPTIONS.map(p => <option key={p} value={p}>{p || "(portabilidad)"}</option>)}
                                             </select>
                                         </td>
                                         <td className="p-2.5 whitespace-nowrap">
@@ -465,7 +483,7 @@ export default function LineasTab() {
                                     </tr>
                                     {expandedId === r.id && (
                                         <tr key={r.id + "-exp"} className="bg-blue-50/50 dark:bg-blue-900/10">
-                                            <td colSpan={9} className="p-4">
+                                            <td colSpan={10} className="p-4">
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
                                                     <div>
                                                         <p className="font-bold text-slate-500 dark:text-slate-400 mb-1">PRÓXIMA ACCIÓN</p>
@@ -490,7 +508,7 @@ export default function LineasTab() {
                 </div>
                 {filtered.length === 0 && (
                     <div className="py-16 text-center text-slate-400">
-                        <p className="text-4xl mb-2">🔍</p>
+                        <div className="flex justify-center mb-2"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
                         <p>No hay líneas con esos filtros</p>
                     </div>
                 )}

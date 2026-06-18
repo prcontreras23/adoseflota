@@ -42,6 +42,10 @@ export default function EntregasLineasTab() {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [signed, setSigned] = useState(false);
     const [drawing, setDrawing] = useState(false);
+    const [session] = useState<{ id: string; nombre: string } | null>(() => {
+        if (typeof window === "undefined") return null;
+        try { return JSON.parse(localStorage.getItem("flota_session") ?? "null"); } catch { return null; }
+    });
 
     // Lines that need delivery (synced via LineasContext — same source as Perfiles)
     const lineas = all.filter(l =>
@@ -151,7 +155,14 @@ export default function EntregasLineasTab() {
         });
         await loadInventario();
 
-        if (ok) toast.success("✅ IMEI/SIM asignados — marcado como entregado");
+        if (ok && session) {
+            const registros = [];
+            if (imei !== (modalLinea.imei ?? "")) registros.push({ linea_id: modalLinea.id, usuario_id: session.id, usuario_nombre: session.nombre, campo: "IMEI", valor_anterior: modalLinea.imei || null, valor_nuevo: imei || null });
+            if (sim !== (modalLinea.sim ?? "")) registros.push({ linea_id: modalLinea.id, usuario_id: session.id, usuario_nombre: session.nombre, campo: "SIM", valor_anterior: modalLinea.sim || null, valor_nuevo: sim || null });
+            if (!modalLinea.entregado) registros.push({ linea_id: modalLinea.id, usuario_id: session.id, usuario_nombre: session.nombre, campo: "Entregado", valor_anterior: "No", valor_nuevo: "Sí" });
+            if (registros.length > 0) await supabase.from("historial_cambios").insert(registros);
+        }
+        if (ok) toast.success("IMEI/SIM asignados — marcado como entregado");
         setSaving(false);
         setModalLinea(null);
     }
@@ -163,8 +174,18 @@ export default function EntregasLineasTab() {
         setSaving(true);
         const ok = await mutate(modalLinea.id, { entregado: true, fecha_entrega: fechaEntrega });
         if (ok) {
+            if (session) {
+                await supabase.from("historial_cambios").insert([{
+                    linea_id: modalLinea.id,
+                    usuario_id: session.id,
+                    usuario_nombre: session.nombre,
+                    campo: "Entregado",
+                    valor_anterior: "No",
+                    valor_nuevo: `Sí — ${fechaEntrega}`,
+                }]);
+            }
             imprimirActa(modalLinea);
-            toast.success("Entrega registrada ✓");
+            toast.success("Entrega registrada");
         }
         setSaving(false);
         setModalLinea(null);
@@ -189,7 +210,7 @@ export default function EntregasLineasTab() {
           .firma-nombre{margin-top:8px;border-top:1px solid #334155;padding-top:4px;font-size:12px;width:280px}
         </style></head>
         <body>
-          <h1>🤝 Acta de Entrega de Dispositivo</h1>
+          <h1>Acta de Entrega de Dispositivo</h1>
           <h2>Renovación Flota Claro 2026 — ADOSE / Unión Adventista Sureste</h2>
           <span class="badge">ENTREGADO</span>
           <table>
@@ -304,7 +325,7 @@ export default function EntregasLineasTab() {
                                 </p>
                             </div>
                             <button onClick={() => setModalLinea(null)}
-                                className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 hover:text-slate-800 text-lg flex-shrink-0">✕</button>
+                                className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 hover:text-slate-800 flex-shrink-0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                         </div>
 
                         {modalMode === "imei" ? (
@@ -334,7 +355,7 @@ export default function EntregasLineasTab() {
                                                 <div className="relative">
                                                     <label className={labelCls}>
                                                         Tarjeta SIM / ICC
-                                                        {selectedInvId && <span className="ml-2 text-teal-600 font-semibold text-xs">✓ inventario Altice</span>}
+                                                        {selectedInvId && <span className="ml-2 text-teal-600 font-semibold text-xs">inventario Altice</span>}
                                                     </label>
                                                     <input
                                                         value={manualSim}

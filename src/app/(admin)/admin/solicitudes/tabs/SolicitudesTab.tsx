@@ -72,7 +72,7 @@ export default function SolicitudesTab() {
         XLSX.utils.book_append_sheet(wb, ws, "Solicitudes");
         XLSX.writeFile(wb, `${corteId}.xlsx`);
 
-        toast.success(`✅ Corte ${corteId} generado y exportado`);
+        toast.success(`Corte ${corteId} generado y exportado`);
         setSelected(new Set());
         loadData();
         setGeneratingCorte(false);
@@ -91,7 +91,7 @@ export default function SolicitudesTab() {
             {/* Filters */}
             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
                 <div className="flex flex-wrap gap-3">
-                    <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Buscar por nombre, ID..."
+                    <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nombre, ID..."
                         className="flex-1 min-w-48 border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                     <select value={filterEstado} onChange={e => setFilterEstado(e.target.value)}
                         className="border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -114,7 +114,7 @@ export default function SolicitudesTab() {
                     <span className="text-blue-700 dark:text-blue-300 text-sm font-medium">{selected.size} solicitud(es) seleccionada(s)</span>
                     <button onClick={generarCorte} disabled={generatingCorte}
                         className="bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors disabled:opacity-50 flex items-center gap-2">
-                        {generatingCorte ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Generando...</> : "📤 Generar Corte + Exportar Excel"}
+                        {generatingCorte ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Generando...</> : <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Generar Corte + Exportar Excel</>}
                     </button>
                 </div>
             )}
@@ -185,7 +185,7 @@ export default function SolicitudesTab() {
                 </div>
                 {filtered.length === 0 && (
                     <div className="py-16 text-center text-slate-400 dark:text-slate-500">
-                        <p className="text-4xl mb-2">📋</p><p>No hay solicitudes que coincidan</p>
+                        <div className="flex justify-center mb-2 text-slate-300 dark:text-slate-600"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></div><p>No hay solicitudes que coincidan</p>
                     </div>
                 )}
             </div>
