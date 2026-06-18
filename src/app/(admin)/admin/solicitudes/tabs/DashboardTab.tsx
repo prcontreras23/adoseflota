@@ -76,8 +76,13 @@ export default function DashboardTab() {
     const lineas = useMemo(() => todasLineas.filter(r => !r.archivada), [todasLineas]);
     const stats = useMemo(() => calcStats(lineas), [lineas]);
 
-    const StatCard = ({ label, value, color, icon }: { label: string; value: number; color: string; icon: React.ReactNode }) => (
-        <div className={`rounded-2xl p-4 flex items-center gap-4 ${color}`}>
+    const StatCard = ({ label, value, color, icon, onClick }: { label: string; value: number; color: string; icon: React.ReactNode; onClick?: () => void }) => (
+        <div
+            onClick={onClick}
+            role={onClick ? "button" : undefined}
+            tabIndex={onClick ? 0 : undefined}
+            onKeyDown={onClick ? e => { if (e.key === "Enter" || e.key === " ") onClick(); } : undefined}
+            className={`rounded-2xl p-4 flex items-center gap-4 ${color} ${onClick ? "cursor-pointer hover:brightness-95 active:scale-[0.99] transition-all" : ""}`}>
             <span className="shrink-0">{icon}</span>
             <div>
                 <p className="text-2xl font-black leading-none">{value}</p>
@@ -136,35 +141,41 @@ export default function DashboardTab() {
                 {/* Barra segmentada */}
                 <div className="w-full h-4 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden flex">
                     {pctConfirmadas > 0 && (
-                        <div className="h-full bg-emerald-500 transition-all duration-700"
-                            style={{ width: `${pctConfirmadas}%` }} title={`Confirmadas: ${stats.confirmadas}`} />
+                        <div className="h-full bg-emerald-500 transition-all duration-700 cursor-pointer hover:brightness-90"
+                            style={{ width: `${pctConfirmadas}%` }} title={`Confirmadas: ${stats.confirmadas}`}
+                            onClick={() => goToPerfiles({ estado: "CONFIRMADA" })} />
                     )}
                     {pctPorConfirmar > 0 && (
-                        <div className="h-full bg-blue-400 transition-all duration-700"
-                            style={{ width: `${pctPorConfirmar}%` }} title={`Por confirmar: ${stats.porConfirmar}`} />
+                        <div className="h-full bg-blue-400 transition-all duration-700 cursor-pointer hover:brightness-90"
+                            style={{ width: `${pctPorConfirmar}%` }} title={`Por confirmar: ${stats.porConfirmar}`}
+                            onClick={() => goToPerfiles({ estado: "POR CONFIRMAR" })} />
                     )}
                     {pctRespondio > 0 && (
-                        <div className="h-full bg-amber-400 transition-all duration-700"
-                            style={{ width: `${pctRespondio}%` }} title={`Respondió: ${stats.respondio}`} />
+                        <div className="h-full bg-amber-400 transition-all duration-700 cursor-pointer hover:brightness-90"
+                            style={{ width: `${pctRespondio}%` }} title={`Respondió: ${stats.respondio}`}
+                            onClick={() => goToPerfiles({ estado: "RESPONDIÓ" })} />
                     )}
                     {pctPendientes > 0 && (
-                        <div className="h-full bg-slate-200 dark:bg-slate-600 transition-all duration-700"
-                            style={{ width: `${pctPendientes}%` }} />
+                        <div className="h-full bg-slate-200 dark:bg-slate-600 transition-all duration-700 cursor-pointer hover:brightness-90"
+                            style={{ width: `${pctPendientes}%` }}
+                            onClick={() => goToPerfiles({ estado: "PENDIENTE" })} />
                     )}
                 </div>
 
                 {/* Leyenda */}
                 <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2.5">
                     {[
-                        { color: "bg-emerald-500", label: "Confirmadas", count: stats.confirmadas },
-                        { color: "bg-blue-400",    label: "Por confirmar", count: stats.porConfirmar },
-                        { color: "bg-amber-400",   label: "Respondió",    count: stats.respondio },
-                        { color: "bg-slate-300 dark:bg-slate-600", label: "Pendientes", count: stats.pendientes },
+                        { color: "bg-emerald-500", label: "Confirmadas", count: stats.confirmadas, estado: "CONFIRMADA" },
+                        { color: "bg-blue-400",    label: "Por confirmar", count: stats.porConfirmar, estado: "POR CONFIRMAR" },
+                        { color: "bg-amber-400",   label: "Respondió",    count: stats.respondio, estado: "RESPONDIÓ" },
+                        { color: "bg-slate-300 dark:bg-slate-600", label: "Pendientes", count: stats.pendientes, estado: "PENDIENTE" },
                     ].map(item => (
-                        <span key={item.label} className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                        <button key={item.label}
+                            onClick={() => goToPerfiles({ estado: item.estado })}
+                            className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
                             <span className={`w-2.5 h-2.5 rounded-full inline-block ${item.color}`} />
                             {item.label} ({item.count})
-                        </span>
+                        </button>
                     ))}
                 </div>
             </div>
@@ -204,24 +215,30 @@ export default function DashboardTab() {
             <div>
                 <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3">Acciones 2026</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-                    <StatCard label="Total registros" value={stats.total} icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>} color="bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-white" />
-                    <StatCard label="Bajas" value={stats.bajas} icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>} color="bg-rose-50 text-rose-800 dark:bg-rose-900/20 dark:text-rose-300" />
-                    <StatCard label="Altas solicitadas" value={stats.altas} icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>} color="bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-300" />
-                    <StatCard label="Cambios" value={stats.cambios} icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>} color="bg-blue-50 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300" />
-                    <StatCard label="A revisar" value={stats.revisar} icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>} color="bg-orange-50 text-orange-800 dark:bg-orange-900/20 dark:text-orange-300" />
+                    <StatCard label="Total registros" value={stats.total} icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>} color="bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-white" onClick={() => goToPerfiles()} />
+                    <StatCard label="Bajas" value={stats.bajas} icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>} color="bg-rose-50 text-rose-800 dark:bg-rose-900/20 dark:text-rose-300" onClick={() => goToPerfiles({ accion: "BAJA" })} />
+                    <StatCard label="Altas solicitadas" value={stats.altas} icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>} color="bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-300" onClick={() => goToPerfiles({ accion: "ALTA" })} />
+                    <StatCard label="Cambios" value={stats.cambios} icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>} color="bg-blue-50 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300" onClick={() => goToPerfiles({ accion: "CAMBIO SOLICITADO" })} />
+                    <StatCard label="A revisar" value={stats.revisar} icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>} color="bg-orange-50 text-orange-800 dark:bg-orange-900/20 dark:text-orange-300" onClick={() => goToPerfiles({ accion: "REVISAR" })} />
                 </div>
             </div>
 
             {/* ── ALERTAS ─────────────────────────────────────────────── */}
+            {stats.sinTitular > 0 && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-4 flex items-center gap-3">
-                    <span className="shrink-0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
+                <div
+                    role="button" tabIndex={0}
+                    onClick={() => goToPerfiles({ search: "SIN TITULAR" })}
+                    onKeyDown={e => { if (e.key === "Enter" || e.key === " ") goToPerfiles({ search: "SIN TITULAR" }); }}
+                    className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-4 flex items-center gap-3 cursor-pointer hover:brightness-95 active:scale-[0.99] transition-all group">
+                    <span className="shrink-0 text-amber-600"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
                     <div>
                         <p className="font-bold text-amber-700 dark:text-amber-400">{stats.sinTitular} líneas sin titular identificado</p>
-                        <p className="text-xs text-amber-600 dark:text-amber-500">Requieren regularización antes del cierre</p>
+                        <p className="text-xs text-amber-600 dark:text-amber-500 group-hover:underline">Requieren regularización antes del cierre →</p>
                     </div>
                 </div>
             </div>
+            )}
 
             {/* ── ADVERTENCIAS ────────────────────────────────────────── */}
             {(() => {
@@ -252,15 +269,6 @@ export default function DashboardTab() {
 
                 interface Advertencia { nivel: "rojo" | "naranja" | "azul"; titulo: string; desc: string; accion?: () => void; ctaLabel?: string; }
                 const advertencias: Advertencia[] = [];
-
-                // Email sin seguimiento — siempre crítico hasta que se resuelva
-                advertencias.push({
-                    nivel: "rojo",
-                    titulo: "Email de Anyelis Montero (Altice) sin respuesta — 15 mayo",
-                    desc: `Lleva más de 30 días esperando respuesta sobre formalizar la negociación y asegurar los equipos. Responder o llamar es urgente para no perder las condiciones acordadas.`,
-                    ctaLabel: "Ver líneas LLAMAR",
-                    accion: () => goToPerfiles({ proximaAccion: "LLAMAR" }),
-                });
 
                 if (hasDiff) advertencias.push({
                     nivel: "rojo",

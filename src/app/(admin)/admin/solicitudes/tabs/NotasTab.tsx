@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useMemo, useRef } from "react";
 import { supabase } from "@/lib/supabase";
+import { useLineas } from "@/lib/LineasContext";
 import toast from "react-hot-toast";
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
@@ -255,6 +256,7 @@ function NotaCard({ nota, onEdit, onDelete }: CardProps) {
 
 // ── Tab principal ─────────────────────────────────────────────────────────────
 export default function NotasTab() {
+    const { lineas } = useLineas();
     const [notas, setNotas] = useState<Nota[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
@@ -296,11 +298,13 @@ export default function NotasTab() {
         return () => { supabase.removeChannel(channel); };
     }, []);
 
-    // Listas únicas
+    // Listas únicas — titulares vienen de lineas_altice para que el dropdown esté siempre completo
     const titulares = useMemo(() => {
-        const set = new Set(notas.map(n => n.titular_responsable).filter(Boolean));
-        return Array.from(set).sort();
-    }, [notas]);
+        const fromLineas = lineas.map(l => l.titular_responsable).filter(Boolean);
+        const fromNotas = notas.map(n => n.titular_responsable).filter(Boolean);
+        const set = new Set([...fromLineas, ...fromNotas]);
+        return Array.from(set).sort() as string[];
+    }, [lineas, notas]);
 
     const autores = useMemo(() => {
         const set = new Set(notas.map(n => n.autor).filter(Boolean));
