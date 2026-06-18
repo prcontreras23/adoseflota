@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { supabase, type LineaAltice, ACCION_COLORS, ESTADO_LINEA_COLORS, PORTABILIDAD_COLORS, PORTABILIDAD_OPTIONS } from "@/lib/supabase";
 import { useLineas } from "@/lib/LineasContext";
 import { useNav } from "@/lib/NavContext";
+import { useConfigListas } from "@/lib/ConfigListasContext";
 import * as XLSX from "xlsx";
 import toast from "react-hot-toast";
 import NuevaLineaModal from "./NuevaLineaModal";
@@ -42,15 +43,7 @@ const CAMPOS_ETIQUETAS: Partial<Record<keyof LineaAltice, string>> = {
   seguimiento: "Seguimiento",
 };
 
-const PLANES_DATA = [
-  "",
-  "Data 5GB + Bono 2GB (RD$711.00)",
-  "Data 10GB + Bono 5GB (RD$1,161.00)",
-  "Data 15GB + Bono 5GB (RD$1,251.00)",
-  "Data 25GB + Bono 5GB (RD$1,791.00)",
-  "Data 50GB + Bono 50GB (RD$3,681.00)",
-  "No deseo internet",
-];
+// PLANES_DATA se carga desde config_listas (plan_datos) vía useConfigListas()
 
 interface TitularGroup {
   nombre: string;
@@ -204,6 +197,12 @@ function EditModal({ linea, onClose, onSave, onDelete, session, upsertLocal, tit
   upsertLocal: (l: LineaAltice) => void;
   titularLineas?: LineaAltice[];
 }) {
+  const { getList } = useConfigListas();
+  const PLANES_DATA = ["", ...getList("plan_datos")];
+  const PORTABILIDAD_CFG = getList("portabilidad");
+  const REVISORES_CFG = getList("revisor");
+  const TIPOS_CFG = getList("tipo_linea");
+
   const [form, setForm] = useState<LineaAltice>({ ...linea });
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -403,8 +402,9 @@ function EditModal({ linea, onClose, onSave, onDelete, session, upsertLocal, tit
               <div>
                 <label className={labelCls}>Tipo</label>
                 <select value={form.tipo} onChange={e => set("tipo", e.target.value)} className={inputCls}>
-                  {["", "EMPLEADO", "EMPLEADO 2", "FAMILIAR", "PASTORES", "DEPARTAMENTAL", "INSTITUCION", "JUBILADO", "EXTERNO", "UD", "DESVINCULAR", "N/D", "CONFLICTO"].map(v => (
-                    <option key={v} value={v}>{v || "(sin tipo)"}</option>
+                  <option value="">(sin tipo)</option>
+                  {(TIPOS_CFG.length ? TIPOS_CFG : ["EMPLEADO","EMPLEADO 2","FAMILIAR","PASTORES","DEPARTAMENTAL","INSTITUCION","JUBILADO","EXTERNO","UD","DESVINCULAR","N/D","CONFLICTO"]).map(v => (
+                    <option key={v} value={v}>{v}</option>
                   ))}
                 </select>
               </div>
@@ -734,8 +734,9 @@ function EditModal({ linea, onClose, onSave, onDelete, session, upsertLocal, tit
                 <label className={labelCls}>📶 Portabilidad</label>
                 <select value={form.portabilidad ?? ""} onChange={e => set("portabilidad", e.target.value)}
                   className={`${inputCls} font-semibold ${PORTABILIDAD_COLORS[form.portabilidad ?? ""] ?? ""}`}>
-                  {PORTABILIDAD_OPTIONS.map(v => (
-                    <option key={v} value={v}>{v || "(sin portabilidad)"}</option>
+                  <option value="">(sin portabilidad)</option>
+                  {(PORTABILIDAD_CFG.length ? PORTABILIDAD_CFG : PORTABILIDAD_OPTIONS.filter(Boolean)).map(v => (
+                    <option key={v} value={v}>{v}</option>
                   ))}
                 </select>
               </div>
@@ -755,9 +756,7 @@ function EditModal({ linea, onClose, onSave, onDelete, session, upsertLocal, tit
               <label className={labelCls}>Revisado por</label>
               <select value={form.revisado_por} onChange={e => set("revisado_por", e.target.value)} className={inputCls}>
                 <option value="">(sin revisar)</option>
-                <option value="Francis">Francis</option>
-                <option value="Carlos">Carlos</option>
-                <option value="Soto">Soto</option>
+                {(REVISORES_CFG.length ? REVISORES_CFG : ["Francis", "Carlos", "Soto"]).map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
           </section>}
@@ -966,6 +965,16 @@ function LineaRow({ linea, onEdit, dimmed, onMutate, selected, onToggleSelect }:
 export default function PerfilesTab() {
   const { lineas: all, loading, mutate, upsertLocal, removeLocal, patchLocal } = useLineas();
   const { consumeFilter } = useNav();
+  const { getList } = useConfigListas();
+
+  // Listas configurables (con fallbacks por si aún no cargó el contexto)
+  const PLANES_DATA = ["", ...getList("plan_datos")];
+  const ACCIONES_LIST_CFG = getList("accion_2026");
+  const ESTADOS_LIST_CFG = getList("estado_linea");
+  const TIPOS_LIST_CFG = getList("tipo_linea");
+  const PORTABILIDAD_CFG = getList("portabilidad");
+  const REVISORES_CFG = getList("revisor");
+  const PROXIMA_ACCION_CFG = getList("proxima_accion");
 
   // Aplica filtro entrante desde el Dashboard al montarse
   useEffect(() => {
@@ -1322,9 +1331,9 @@ export default function PerfilesTab() {
 
       {/* Barra de filtros */}
       {(() => {
-        const ACCIONES_LIST = ["BAJA", "ALTA", "CAMBIO SOLICITADO", "SE MANTIENE", "REVISAR", "NO REQUIERE FLOTA"];
-        const ESTADOS_LIST = ["CONFIRMADA", "POR CONFIRMAR", "PENDIENTE", "OK", "RESPONDIÓ", "SIN RESPUESTA"];
-        const TIPOS_LIST = ["EMPLEADO", "EMPLEADO 2", "FAMILIAR", "PASTORES", "DEPARTAMENTAL", "INSTITUCION", "JUBILADO", "EXTERNO", "UD", "DESVINCULAR", "N/D", "CONFLICTO"];
+        const ACCIONES_LIST = ACCIONES_LIST_CFG.length ? ACCIONES_LIST_CFG : ["BAJA", "ALTA", "CAMBIO SOLICITADO", "SE MANTIENE", "REVISAR", "NO REQUIERE FLOTA"];
+        const ESTADOS_LIST = ESTADOS_LIST_CFG.length ? ESTADOS_LIST_CFG : ["CONFIRMADA", "POR CONFIRMAR", "PENDIENTE", "OK", "RESPONDIÓ", "SIN RESPUESTA"];
+        const TIPOS_LIST = TIPOS_LIST_CFG.length ? TIPOS_LIST_CFG : ["EMPLEADO", "EMPLEADO 2", "FAMILIAR", "PASTORES", "DEPARTAMENTAL", "INSTITUCION", "JUBILADO", "EXTERNO", "UD", "DESVINCULAR", "N/D", "CONFLICTO"];
         const selCls = "border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
         const chipCls = (active: boolean) => `text-xs font-semibold px-3 py-1.5 rounded-full border cursor-pointer transition-all select-none ${active ? "bg-blue-600 text-white border-blue-600" : "bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:border-blue-400 hover:text-blue-600"}`;
         const limpiarTodo = () => {
@@ -1350,7 +1359,7 @@ export default function PerfilesTab() {
               </select>
               <select value={filterProximaAccion} onChange={e => setFilterProximaAccion(e.target.value)} className={selCls}>
                 <option value="">▶ Próxima acción</option>
-                {["LLAMAR", "CARTA", "COTIZAR", "CANCELAR"].map(a => <option key={a} value={a}>{a}</option>)}
+                {(PROXIMA_ACCION_CFG.length ? PROXIMA_ACCION_CFG : ["LLAMAR", "CARTA", "COTIZAR", "CANCELAR"]).map(a => <option key={a} value={a}>{a}</option>)}
               </select>
             </div>
 
@@ -1375,13 +1384,11 @@ export default function PerfilesTab() {
               <select value={filterPortabilidad} onChange={e => setFilterPortabilidad(e.target.value)} className={selCls}>
                 <option value="">Portabilidad</option>
                 <option value="__VACIO__">— Sin marcar</option>
-                {PORTABILIDAD_OPTIONS.filter(Boolean).map(p => <option key={p} value={p}>{p}</option>)}
+                {(PORTABILIDAD_CFG.length ? PORTABILIDAD_CFG : PORTABILIDAD_OPTIONS.filter(Boolean)).map(p => <option key={p} value={p}>{p}</option>)}
               </select>
               <select value={filterRevisadoPor} onChange={e => setFilterRevisadoPor(e.target.value)} className={selCls}>
                 <option value="">Revisor — todos</option>
-                <option value="Francis">Francis</option>
-                <option value="Carlos">Carlos</option>
-                <option value="Soto">Soto</option>
+                {(REVISORES_CFG.length ? REVISORES_CFG : ["Francis", "Carlos", "Soto"]).map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
 
