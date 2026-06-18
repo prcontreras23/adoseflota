@@ -1173,7 +1173,8 @@ export default function PerfilesTab() {
       if (chipConSeguimiento && !l.seguimiento?.trim()) return false;
       if (chipSinRevisar && l.revisado_por?.trim()) return false;
       if (filterRevisadoPor && l.revisado_por?.trim() !== filterRevisadoPor) return false;
-      if (filterPortabilidad && l.portabilidad !== filterPortabilidad) return false;
+      if (filterPortabilidad === "__VACIO__" && l.portabilidad?.trim()) return false;
+      if (filterPortabilidad && filterPortabilidad !== "__VACIO__" && l.portabilidad !== filterPortabilidad) return false;
       if (chipSinPortabilidad && l.portabilidad?.trim()) return false;
       if (filterDispositivoContains && !l.dispositivo_2026?.toLowerCase().includes(filterDispositivoContains.toLowerCase())) return false;
       return true;
@@ -1373,6 +1374,7 @@ export default function PerfilesTab() {
               </select>
               <select value={filterPortabilidad} onChange={e => setFilterPortabilidad(e.target.value)} className={selCls}>
                 <option value="">Portabilidad</option>
+                <option value="__VACIO__">— Sin marcar</option>
                 {PORTABILIDAD_OPTIONS.filter(Boolean).map(p => <option key={p} value={p}>{p}</option>)}
               </select>
               <select value={filterRevisadoPor} onChange={e => setFilterRevisadoPor(e.target.value)} className={selCls}>
