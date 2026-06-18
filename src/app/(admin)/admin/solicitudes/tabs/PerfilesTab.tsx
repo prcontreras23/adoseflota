@@ -1554,7 +1554,8 @@ export default function PerfilesTab() {
                         CARTA:   "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
                         CANCELAR:"bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300",
                       };
-                      const tareas = g.lineas.filter(l => l.proxima_accion?.trim());
+                      const ACCIONES_CORTAS = Object.keys(tareasCls);
+                      const tareas = g.lineas.filter(l => ACCIONES_CORTAS.includes(l.proxima_accion?.trim() ?? ""));
                       if (tareas.length === 0) return null;
                       return (
                         <div className="flex gap-1 flex-wrap justify-end">
