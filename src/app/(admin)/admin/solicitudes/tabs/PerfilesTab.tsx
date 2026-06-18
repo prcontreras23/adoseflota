@@ -1158,6 +1158,36 @@ export default function PerfilesTab() {
 
   const hayFiltros = !!(search || filterDispositivo || filterGb || filterMin || filterProximaAccion || filterAccion || filterEstado || filterTipo || filterPortabilidad || chipSinDispositivo || chipSinMonto || chipConSeguimiento || chipSinRevisar || filterRevisadoPor || chipSinPortabilidad || filterDispositivoContains);
 
+  // Vista plana: líneas individuales que cumplen los filtros (se usa cuando hayFiltros)
+  const lineasFiltradas = hayFiltros
+    ? allActivas.filter(l => {
+        const q = search.toLowerCase();
+        if (q && !(
+          l.titular_responsable?.toLowerCase().includes(q) ||
+          l.usuario_linea?.toLowerCase().includes(q) ||
+          l.telefono?.includes(q) ||
+          l.seguimiento?.toLowerCase().includes(q)
+        )) return false;
+        if (filterAccion && l.accion_2026 !== filterAccion) return false;
+        if (filterEstado && l.estado !== filterEstado) return false;
+        if (filterTipo && l.tipo !== filterTipo) return false;
+        if (filterDispositivo && l.dispositivo_2026?.trim() !== filterDispositivo) return false;
+        if (filterGb) { const gb = l.gb_solicitado?.trim() || l.gb_antes?.trim(); if (gb !== filterGb) return false; }
+        if (filterMin) { const mn = l.min_solicitados?.trim() || l.min_antes?.trim(); if (mn !== filterMin) return false; }
+        if (filterProximaAccion && l.proxima_accion !== filterProximaAccion) return false;
+        if (chipSinDispositivo && l.dispositivo_2026?.trim() && l.dispositivo_2026.trim() !== "SIN CAMBIO" && l.dispositivo_2026.trim() !== "—") return false;
+        if (chipSinMonto && l.monto_mensual?.trim() && parseFloat(l.monto_mensual.replace(/[^0-9.]/g, "")) > 0) return false;
+        if (chipConSeguimiento && !l.seguimiento?.trim()) return false;
+        if (chipSinRevisar && l.revisado_por?.trim()) return false;
+        if (filterRevisadoPor && l.revisado_por?.trim() !== filterRevisadoPor) return false;
+        if (filterPortabilidad === "__VACIO__" && l.portabilidad?.trim()) return false;
+        if (filterPortabilidad && filterPortabilidad !== "__VACIO__" && l.portabilidad !== filterPortabilidad) return false;
+        if (chipSinPortabilidad && l.portabilidad?.trim()) return false;
+        if (filterDispositivoContains && !l.dispositivo_2026?.toLowerCase().includes(filterDispositivoContains.toLowerCase())) return false;
+        return true;
+      })
+    : [];
+
   const gruposFiltrados = grupos.filter(g => {
     const q = search.toLowerCase();
     const coincideTexto = !search || g.nombre.toLowerCase().includes(q) ||
@@ -1417,7 +1447,34 @@ export default function PerfilesTab() {
         );
       })()}
 
-      <div className="space-y-3">
+      {/* ── VISTA PLANA (con filtros activos) ──────────────────────────── */}
+      {hayFiltros && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 px-1">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+            <span><strong>{lineasFiltradas.length}</strong> líneas coinciden con el filtro</span>
+          </div>
+          {lineasFiltradas.length === 0 ? (
+            <div className="py-16 text-center text-slate-400">
+              <div className="flex justify-center mb-2">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              </div>
+              <p>Ninguna línea coincide con los filtros activos</p>
+            </div>
+          ) : (
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-700">
+              {lineasFiltradas
+                .sort((a, b) => ACCIONES_ORDEN.indexOf(a.accion_2026) - ACCIONES_ORDEN.indexOf(b.accion_2026))
+                .map(linea => (
+                  <LineaRow key={linea.id} linea={linea} onEdit={() => setEditingLinea(linea)} onMutate={mutate} selected={selectedIds.has(linea.id)} onToggleSelect={toggleSelect} />
+                ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── VISTA AGRUPADA (sin filtros) ─────────────────────────────── */}
+      <div className={`space-y-3 ${hayFiltros ? "hidden" : ""}`}>
         {gruposFiltrados.map(g => {
           const isOpen = expandedTitular === g.nombre;
           const tieneProblema = !g.nombre || g.nombre === "Sin titular identificado";
@@ -1465,11 +1522,35 @@ export default function PerfilesTab() {
                       {vinculadoNombre && <span className="text-purple-500 font-semibold flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg> {vinculadoNombre}</span>}
                     </p>
                   </div>
-                  <div className="flex gap-1 flex-wrap shrink-0">
-                    {acciones.includes("BAJA") && <span className="text-xs px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 font-semibold">BAJA</span>}
-                    {acciones.includes("ALTA") && <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 font-semibold">ALTA</span>}
-                    {acciones.includes("CAMBIO SOLICITADO") && <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 font-semibold">CAMBIO</span>}
-                    {acciones.includes("REVISAR") && <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 font-semibold">REVISAR</span>}
+                  <div className="flex flex-col gap-1 shrink-0 items-end">
+                    <div className="flex gap-1 flex-wrap justify-end">
+                      {acciones.includes("BAJA") && <span className="text-xs px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 font-semibold">BAJA</span>}
+                      {acciones.includes("ALTA") && <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 font-semibold">ALTA</span>}
+                      {acciones.includes("CAMBIO SOLICITADO") && <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 font-semibold">CAMBIO</span>}
+                      {acciones.includes("REVISAR") && <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 font-semibold">REVISAR</span>}
+                    </div>
+                    {/* Tareas pendientes en vista rápida */}
+                    {(() => {
+                      const tareasCls: Record<string, string> = {
+                        LLAMAR:  "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+                        COTIZAR: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+                        CARTA:   "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
+                        CANCELAR:"bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300",
+                      };
+                      const tareas = g.lineas.filter(l => l.proxima_accion?.trim());
+                      if (tareas.length === 0) return null;
+                      return (
+                        <div className="flex gap-1 flex-wrap justify-end">
+                          {tareas.map(l => (
+                            <span key={l.id} title={`${l.usuario_linea || l.telefono}: ${l.proxima_accion}`}
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${tareasCls[l.proxima_accion!] ?? "bg-slate-100 text-slate-500"}`}>
+                              {l.proxima_accion}
+                              <span className="opacity-60 font-normal">{l.usuario_linea?.split(" ")[0] || l.telefono?.slice(-4)}</span>
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
                   <span className="text-slate-400 text-sm ml-1 shrink-0">{isOpen ? "▲" : "▼"}</span>
                 </button>
@@ -1560,14 +1641,14 @@ export default function PerfilesTab() {
             </div>
           );
         })}
-      </div>
 
-      {gruposFiltrados.length === 0 && (
-        <div className="py-16 text-center text-slate-400">
-          <div className="flex justify-center mb-2"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></div>
-          <p>No hay titulares con esa búsqueda</p>
-        </div>
-      )}
+        {gruposFiltrados.length === 0 && !hayFiltros && (
+          <div className="py-16 text-center text-slate-400">
+            <div className="flex justify-center mb-2"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></div>
+            <p>No hay titulares con esa búsqueda</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

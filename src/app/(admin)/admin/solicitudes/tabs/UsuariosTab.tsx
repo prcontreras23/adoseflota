@@ -7,6 +7,7 @@ interface AccessPin {
     id: string;
     nombre: string;
     pin: string;
+    email: string;
     es_admin: boolean;
     permisos: string[];
     activo: boolean;
@@ -14,16 +15,18 @@ interface AccessPin {
 }
 
 const ALL_TABS = [
-    { id: "dashboard", label: "Resumen",  desc: "Panel de estadísticas generales" },
-    { id: "lineas",    label: "Líneas",   desc: "Ver y editar todas las líneas" },
-    { id: "perfiles",  label: "Perfiles", desc: "Editar perfiles de cada línea" },
-    { id: "acciones",  label: "Acciones", desc: "Gestionar acciones 2026" },
-    { id: "almacen",   label: "Almacén",  desc: "Stock de dispositivos" },
-    { id: "entregas",  label: "Entregas", desc: "Registrar entregas de equipos" },
-    { id: "usuarios",  label: "Usuarios", desc: "Gestionar usuarios y accesos" },
+    { id: "dashboard",  label: "Resumen",        desc: "Panel de estadísticas generales" },
+    { id: "perfiles",   label: "Perfiles",        desc: "Editar perfiles de cada línea" },
+    { id: "tareas",     label: "Tareas",          desc: "Gestionar tareas del proyecto" },
+    { id: "notas",      label: "Notas",           desc: "Notas y comunicaciones internas" },
+    { id: "almacen",    label: "Almacén",         desc: "Stock de dispositivos" },
+    { id: "entregas",   label: "Entregas",        desc: "Registrar entregas de equipos" },
+    { id: "usuarios",   label: "Usuarios",        desc: "Gestionar usuarios y accesos" },
+    { id: "documentos", label: "Documentos",      desc: "Documentos y archivos del proyecto" },
+    { id: "config",     label: "Configuración",   desc: "Ajustes generales de la aplicación" },
 ];
 
-const VACIO = { nombre: "", pin: "", es_admin: false, permisos: ["entregas"] as string[], activo: true };
+const VACIO = { nombre: "", pin: "", email: "", es_admin: false, permisos: ["entregas"] as string[], activo: true };
 
 const IcoPlus = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
 const IcoEdit = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>;
@@ -65,7 +68,7 @@ export default function UsuariosTab() {
 
     function openEdit(u: AccessPin) {
         setEditingId(u.id);
-        setForm({ nombre: u.nombre, pin: u.pin, es_admin: u.es_admin, permisos: [...u.permisos], activo: u.activo });
+        setForm({ nombre: u.nombre, pin: u.pin, email: u.email ?? "", es_admin: u.es_admin, permisos: [...u.permisos], activo: u.activo });
         setShowPin(false);
         setShowModal(true);
     }
@@ -96,6 +99,7 @@ export default function UsuariosTab() {
         const payload = {
             nombre: form.nombre.trim(),
             pin: form.pin,
+            email: form.email.trim().toLowerCase(),
             es_admin: form.es_admin,
             permisos: form.es_admin ? ALL_TABS.map(t => t.id) : form.permisos,
             activo: form.activo,
@@ -167,7 +171,7 @@ export default function UsuariosTab() {
                                             </div>
                                             <div>
                                                 <p className="font-semibold text-slate-800 dark:text-white">{u.nombre}</p>
-                                                <p className="text-xs text-slate-400 font-mono">{"•".repeat(6)}</p>
+                                                <p className="text-xs text-slate-400">{u.email || <span className="italic">sin correo</span>}</p>
                                             </div>
                                         </div>
                                     </td>
@@ -238,6 +242,11 @@ export default function UsuariosTab() {
                             <div>
                                 <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5 block">Nombre</label>
                                 <input value={form.nombre} onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))} placeholder="Ej. Juan Pérez" className={inputCls} />
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5 block">Correo electrónico <span className="text-slate-400 font-normal normal-case">(para recuperar PIN)</span></label>
+                                <input value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} type="email" placeholder="usuario@correo.com" className={inputCls} />
                             </div>
 
                             <div>

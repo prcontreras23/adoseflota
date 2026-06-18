@@ -10,6 +10,32 @@ export default function LoginPage() {
     const [error, setError] = useState("");
     const [shake, setShake] = useState(false);
 
+    // Recuperación de PIN
+    const [showRecovery, setShowRecovery] = useState(false);
+    const [recoveryEmail, setRecoveryEmail] = useState("");
+    const [recoveryLoading, setRecoveryLoading] = useState(false);
+    const [recoveredPin, setRecoveredPin] = useState<string | null>(null);
+    const [recoveryError, setRecoveryError] = useState("");
+
+    async function handleRecovery() {
+        if (!recoveryEmail.trim()) return;
+        setRecoveryLoading(true);
+        setRecoveryError("");
+        setRecoveredPin(null);
+        const { data } = await supabase
+            .from("access_pins")
+            .select("pin, nombre")
+            .eq("email", recoveryEmail.trim().toLowerCase())
+            .eq("activo", true)
+            .single();
+        setRecoveryLoading(false);
+        if (!data) {
+            setRecoveryError("No se encontró ningún usuario con ese correo.");
+        } else {
+            setRecoveredPin(data.pin);
+        }
+    }
+
     async function handlePinSubmit(currentPin: string) {
         if (currentPin.length !== 6) return;
         setLoading(true);
@@ -179,12 +205,54 @@ export default function LoginPage() {
                     </div>
                 </div>
 
-                {/* Footer */}
-                <p className="text-center text-blue-400/40 text-xs mt-6">
-                    © 2026 ADOSE · Todos los derechos reservados
-                </p>
+                {/* Recuperar PIN */}
+                {!showRecovery ? (
+                    <button
+                        onClick={() => { setShowRecovery(true); setRecoveredPin(null); setRecoveryError(""); setRecoveryEmail(""); }}
+                        className="w-full text-center text-blue-300/60 hover:text-blue-300 text-xs mt-4 transition-colors"
+                    >
+                        ¿Olvidaste tu PIN?
+                    </button>
+                ) : (
+                    <div className="mt-4 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-4 space-y-3">
+                        <p className="text-white/80 text-xs font-semibold text-center">Recuperar PIN</p>
+                        {recoveredPin ? (
+                            <div className="text-center space-y-2">
+                                <p className="text-blue-200 text-xs">Tu PIN de acceso es:</p>
+                                <p className="text-white font-black text-3xl tracking-[0.4em] font-mono">{recoveredPin}</p>
+                                <button onClick={() => { setShowRecovery(false); setRecoveredPin(null); }} className="text-blue-300 text-xs hover:text-white transition-colors">
+                                    Volver al login
+                                </button>
+                            </div>
+                        ) : (
+                            <>
+                                <input
+                                    type="email"
+                                    value={recoveryEmail}
+                                    onChange={e => { setRecoveryEmail(e.target.value); setRecoveryError(""); }}
+                                    placeholder="Tu correo electrónico"
+                                    className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-white text-sm placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                    onKeyDown={e => e.key === "Enter" && handleRecovery()}
+                                />
+                                {recoveryError && <p className="text-red-400 text-xs text-center">{recoveryError}</p>}
+                                <div className="flex gap-2">
+                                    <button onClick={() => setShowRecovery(false)} className="flex-1 py-2 rounded-xl border border-white/20 text-white/60 hover:text-white text-xs transition-colors">
+                                        Cancelar
+                                    </button>
+                                    <button onClick={handleRecovery} disabled={recoveryLoading || !recoveryEmail.trim()} className="flex-1 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-colors disabled:opacity-50">
+                                        {recoveryLoading ? "Buscando..." : "Mostrar PIN"}
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                )}
             </div>
 
+            {/* Footer */}
+            <p className="text-center text-blue-400/40 text-xs mt-6">
+                © 2026 ADOSE · Todos los derechos reservados
+            </p>
             <style jsx global>{`
                 @keyframes shake {
                     0%, 100% { transform: translateX(0); }
