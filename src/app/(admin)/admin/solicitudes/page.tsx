@@ -12,6 +12,7 @@ import UsuariosTab from "./tabs/UsuariosTab";
 import AlmacenTab from "./tabs/AlmacenTab";
 import EntregasLineasTab from "./tabs/EntregasLineasTab";
 import { LineasProvider } from "@/lib/LineasContext";
+import { NavProvider } from "@/lib/NavContext";
 
 // ── SVG Icons ──────────────────────────────────────────────────────────────────
 const Icon = {
@@ -215,6 +216,7 @@ export default function AdminDashboard() {
 
     return (
         <LineasProvider>
+        <NavProvider onNavigate={setActiveTab}>
         <div className="min-h-screen bg-[#F4F6FA] dark:bg-[#0F1117] flex flex-col transition-colors duration-300">
 
             {/* Accent top bar */}
@@ -410,6 +412,7 @@ export default function AdminDashboard() {
                 </div>
             )}
         </div>
+        </NavProvider>
         </LineasProvider>
     );
 }

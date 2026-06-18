@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { supabase, type LineaAltice, ACCION_COLORS, ESTADO_LINEA_COLORS, PORTABILIDAD_COLORS, PORTABILIDAD_OPTIONS } from "@/lib/supabase";
 import { useLineas } from "@/lib/LineasContext";
+import { useNav } from "@/lib/NavContext";
 import * as XLSX from "xlsx";
 import toast from "react-hot-toast";
 import NuevaLineaModal from "./NuevaLineaModal";
@@ -770,6 +771,19 @@ function LineaRow({ linea, onEdit, dimmed, onMutate, selected, onToggleSelect }:
 
 export default function PerfilesTab() {
   const { lineas: all, loading, mutate, upsertLocal, removeLocal, patchLocal } = useLineas();
+  const { consumeFilter } = useNav();
+
+  // Aplica filtro entrante desde el Dashboard al montarse
+  useEffect(() => {
+    const f = consumeFilter();
+    if (!f) return;
+    if (f.proximaAccion) setFilterProximaAccion(f.proximaAccion);
+    if (f.accion)        setFilterAccion(f.accion);
+    if (f.estado)        setFilterEstado(f.estado);
+    if (f.titular)       setSearch(f.titular);
+    if (f.search)        setSearch(f.search);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [session] = useState<{ id: string; nombre: string } | null>(() => {
     if (typeof window === "undefined") return null;
     try { return JSON.parse(localStorage.getItem("flota_session") ?? "null"); } catch { return null; }
@@ -829,6 +843,28 @@ export default function PerfilesTab() {
     setBulkField("");
     setBulkValue("");
     toast.success(`${ids.length} líneas actualizadas ✓`);
+  }
+
+  async function bulkArchivar() {
+    if (selectedIds.size === 0) return;
+    setApplyingBulk(true);
+    const ids = [...selectedIds];
+    await Promise.all(ids.map(id => mutate(id, { archivada: true } as Partial<LineaAltice>)));
+    setApplyingBulk(false);
+    setSelectedIds(new Set());
+    toast.success(`${ids.length} líneas archivadas ✓`);
+  }
+
+  async function bulkEliminar() {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`¿Eliminar definitivamente ${selectedIds.size} líneas? Esta acción no se puede deshacer.`)) return;
+    setApplyingBulk(true);
+    const ids = [...selectedIds];
+    await Promise.all(ids.map(id => supabase.from("lineas_altice").delete().eq("id", id)));
+    ids.forEach(id => removeLocal(id));
+    setApplyingBulk(false);
+    setSelectedIds(new Set());
+    toast.success(`${ids.length} líneas eliminadas`);
   }
 
   const todosLosTitulares = [...new Set(all.map(r => r.titular_responsable).filter(Boolean))].sort();
@@ -1002,10 +1038,20 @@ export default function PerfilesTab() {
               </button>
             )}
           </div>
-          <button onClick={() => setSelectedIds(new Set())}
-            className="text-slate-400 hover:text-white text-xs shrink-0 flex items-center gap-1">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Cancelar
-          </button>
+          <div className="flex gap-2 shrink-0">
+            <button onClick={bulkArchivar} disabled={applyingBulk}
+              className="text-amber-300 hover:text-amber-200 disabled:opacity-50 text-xs font-semibold flex items-center gap-1 border border-amber-700 rounded-lg px-2 py-1 hover:bg-amber-900/30 transition-colors">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l1 11a2 2 0 002 2h12a2 2 0 002-2L21 9"/><path d="M21 3H3v6h18V3z"/><path d="M10 14h4"/></svg> Archivar
+            </button>
+            <button onClick={bulkEliminar} disabled={applyingBulk}
+              className="text-rose-400 hover:text-rose-300 disabled:opacity-50 text-xs font-semibold flex items-center gap-1 border border-rose-800 rounded-lg px-2 py-1 hover:bg-rose-900/30 transition-colors">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg> Eliminar
+            </button>
+            <button onClick={() => setSelectedIds(new Set())}
+              className="text-slate-400 hover:text-white text-xs flex items-center gap-1">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
         </div>
       )}
 

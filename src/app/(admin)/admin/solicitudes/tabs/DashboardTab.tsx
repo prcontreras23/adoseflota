@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import React from "react";
 import { type LineaAltice, ACCION_COLORS } from "@/lib/supabase";
 import { useLineas } from "@/lib/LineasContext";
+import { useNav } from "@/lib/NavContext";
 
 interface Stats {
     total: number;
@@ -77,7 +78,10 @@ function formatRD(amount: number): string {
 }
 
 export default function DashboardTab() {
-    const { lineas, loading, reload } = useLineas();
+    const { lineas: todasLineas, loading, reload } = useLineas();
+    const { goToPerfiles } = useNav();
+    // Excluir archivadas de todos los conteos del dashboard
+    const lineas = useMemo(() => todasLineas.filter(r => !r.archivada), [todasLineas]);
     const stats = useMemo(() => calcStats(lineas), [lineas]);
 
     const StatCard = ({ label, value, color, icon }: { label: string; value: number; color: string; icon: React.ReactNode }) => (
@@ -411,10 +415,12 @@ export default function DashboardTab() {
                         <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3">Próximas acciones pendientes</h3>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                             {accionesPendientes.map(a => (
-                                <div key={a.label} className={`rounded-2xl p-4 text-center ${a.color}`}>
+                                <button key={a.label} onClick={() => goToPerfiles({ proximaAccion: a.label })}
+                                    className={`rounded-2xl p-4 text-center w-full transition-transform hover:scale-105 active:scale-95 cursor-pointer ${a.color}`}>
                                     <p className="text-3xl font-black leading-none">{a.count}</p>
                                     <p className="text-xs font-semibold mt-1 opacity-80">{a.label}</p>
-                                </div>
+                                    <p className="text-[10px] opacity-50 mt-0.5">Ver →</p>
+                                </button>
                             ))}
                         </div>
                     </div>
@@ -507,16 +513,19 @@ export default function DashboardTab() {
                     <h3 className="text-xs font-bold text-rose-500 uppercase tracking-widest mb-3 flex items-center gap-1.5"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg> Casos críticos abiertos</h3>
                     <div className="space-y-2">
                         {lineas.filter(r => CRITICOS.includes(r.telefono)).map(r => (
-                            <div key={r.telefono} className="bg-white dark:bg-slate-800 border border-rose-200 dark:border-rose-800 rounded-2xl p-4">
+                            <button key={r.telefono}
+                                onClick={() => goToPerfiles({ search: r.titular_responsable || r.usuario_linea || r.telefono })}
+                                className="w-full text-left bg-white dark:bg-slate-800 border border-rose-200 dark:border-rose-800 rounded-2xl p-4 hover:border-rose-400 dark:hover:border-rose-600 hover:shadow-md transition-all group">
                                 <div className="flex flex-wrap items-center gap-2 mb-1">
                                     <span className="font-bold text-slate-800 dark:text-white">{r.usuario_linea}</span>
                                     <span className="font-mono text-xs text-slate-500">{r.telefono}</span>
                                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${ACCION_COLORS[r.accion_2026] ?? "bg-slate-100 text-slate-500"}`}>
                                         {r.accion_2026 || "—"}
                                     </span>
+                                    <span className="ml-auto text-xs text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity">Ver perfil →</span>
                                 </div>
                                 <p className="text-sm text-slate-600 dark:text-slate-300">{r.proxima_accion || r.observaciones}</p>
-                            </div>
+                            </button>
                         ))}
                     </div>
                 </div>
