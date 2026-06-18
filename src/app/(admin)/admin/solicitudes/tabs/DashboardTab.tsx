@@ -13,7 +13,6 @@ interface Stats {
     revisar: number;
     seMantiene: number;
     sinTitular: number;
-    criticos: number;
     confirmadas: number;
     porConfirmar: number;
     respondio: number;
@@ -24,12 +23,6 @@ interface Stats {
     lineasSinMonto: number;
 }
 
-const CRITICOS = [
-    "829-521-5406",
-    "829-679-7928",
-    "829-755-8327",
-    "829-420-7725",
-];
 
 function parseMonto(str: string): number {
     if (!str) return 0;
@@ -56,7 +49,6 @@ function calcStats(rows: LineaAltice[]): Stats {
         revisar: rows.filter(r => r.accion_2026 === "REVISAR").length,
         seMantiene: rows.filter(r => r.accion_2026 === "SE MANTIENE").length,
         sinTitular: rows.filter(r => !r.titular_responsable || r.titular_responsable.includes("SIN TITULAR")).length,
-        criticos: rows.filter(r => CRITICOS.includes(r.telefono)).length,
         confirmadas,
         porConfirmar,
         respondio,
@@ -222,13 +214,6 @@ export default function DashboardTab() {
 
             {/* ── ALERTAS ─────────────────────────────────────────────── */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800 rounded-2xl p-4 flex items-center gap-3">
-                    <span className="shrink-0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg></span>
-                    <div>
-                        <p className="font-bold text-rose-700 dark:text-rose-400">{stats.criticos} casos críticos abiertos</p>
-                        <p className="text-xs text-rose-600 dark:text-rose-500">Requieren llamada o reunión urgente</p>
-                    </div>
-                </div>
                 <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-4 flex items-center gap-3">
                     <span className="shrink-0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
                     <div>
@@ -265,7 +250,7 @@ export default function DashboardTab() {
                 };
                 const hasDiff = Object.keys(propuesta).some(k => (actual[k] ?? 0) !== propuesta[k]);
 
-                interface Advertencia { nivel: "rojo" | "naranja" | "azul"; titulo: string; desc: string; }
+                interface Advertencia { nivel: "rojo" | "naranja" | "azul"; titulo: string; desc: string; accion?: () => void; ctaLabel?: string; }
                 const advertencias: Advertencia[] = [];
 
                 // Email sin seguimiento — siempre crítico hasta que se resuelva
@@ -273,48 +258,64 @@ export default function DashboardTab() {
                     nivel: "rojo",
                     titulo: "Email de Anyelis Montero (Altice) sin respuesta — 15 mayo",
                     desc: `Lleva más de 30 días esperando respuesta sobre formalizar la negociación y asegurar los equipos. Responder o llamar es urgente para no perder las condiciones acordadas.`,
+                    ctaLabel: "Ver líneas LLAMAR",
+                    accion: () => goToPerfiles({ proximaAccion: "LLAMAR" }),
                 });
 
                 if (hasDiff) advertencias.push({
                     nivel: "rojo",
                     titulo: "La propuesta enviada a Altice no refleja el levantamiento actual",
                     desc: `Enviaste 4 iPhone Pro Max y 107 Motorola G56; el levantamiento real muestra ${actual["iPhone 17 Pro Max"]} Pro Max y ${actual["Motorola G56 5G"]} Motorola G56. Altice necesita los números actualizados antes de firmar.`,
+                    ctaLabel: "Ver iPhone 17 Pro Max",
+                    accion: () => goToPerfiles({ dispositivoContains: "iPhone 17 Pro Max" }),
                 });
 
                 if (cotizar > 0) advertencias.push({
                     nivel: "rojo",
                     titulo: `${cotizar} líneas pendientes de cotización bloquean el cierre`,
                     desc: `Son equipos de alto costo (iPhone 17 Pro Max, S26 Ultra, A56) que Altice no puede comprometer sin cotización formal aprobada.`,
+                    ctaLabel: `Ver ${cotizar} líneas →`,
+                    accion: () => goToPerfiles({ proximaAccion: "COTIZAR" }),
                 });
 
                 if (sinMonto > 0) advertencias.push({
                     nivel: "naranja",
                     titulo: `${sinMonto} líneas sin monto mensual registrado`,
                     desc: `Sin montos no puedes calcular el costo total del contrato ni comparar con Claro. Agrega los precios una vez Altice envíe la propuesta formal.`,
+                    ctaLabel: `Ver ${sinMonto} líneas →`,
+                    accion: () => goToPerfiles({ sinMonto: true }),
                 });
 
                 if (s26 > 0) advertencias.push({
                     nivel: "naranja",
                     titulo: `${s26} Samsung S26 Ultra no estaban en la propuesta original`,
                     desc: `Este equipo no fue incluido en la solicitud de abril. Altice no tiene precio reservado para él y requiere cotización especial con aprobación directiva.`,
+                    ctaLabel: `Ver ${s26} líneas →`,
+                    accion: () => goToPerfiles({ dispositivoContains: "S26" }),
                 });
 
                 if (sinRespuesta > 0) advertencias.push({
                     nivel: "naranja",
                     titulo: `${sinRespuesta} titulares sin respuesta o pendientes`,
                     desc: `Confirmar estas personas antes de formalizar el contrato evita comprometerte con solicitudes que aún pueden cambiar.`,
+                    ctaLabel: `Ver ${sinRespuesta} líneas →`,
+                    accion: () => goToPerfiles({ estado: "PENDIENTE" }),
                 });
 
                 if (cartas > 0) advertencias.push({
                     nivel: "naranja",
                     titulo: `${cartas} cartas de suspensión/notificación pendientes de enviar`,
-                    desc: `Sin carta formal, las bajas pueden ser impugnadas. Filtra por "CARTA" en la pestaña Acciones para verlas.`,
+                    desc: `Sin carta formal, las bajas pueden ser impugnadas.`,
+                    ctaLabel: `Ver ${cartas} cartas →`,
+                    accion: () => goToPerfiles({ proximaAccion: "CARTA" }),
                 });
 
                 if (sinPorta > 5) advertencias.push({
                     nivel: "azul",
                     titulo: `${sinPorta} líneas sin portabilidad marcada`,
-                    desc: `El campo portabilidad (Altice / Claro / Nuevo / Baja) acaba de agregarse. Las 35 altas y los casos de portabilidad desde Claro necesitan marcarse.`,
+                    desc: `El campo portabilidad (Altice / Claro / Nuevo / Baja) necesita completarse. Las altas y portabilidades desde Claro son prioritarias.`,
+                    ctaLabel: `Completar ${sinPorta} líneas →`,
+                    accion: () => goToPerfiles({ sinPortabilidad: true }),
                 });
 
                 const clsBorder: Record<string, string> = {
@@ -346,11 +347,21 @@ export default function DashboardTab() {
                         </h3>
                         <div className="space-y-2.5">
                             {advertencias.map((a, i) => (
-                                <div key={i} className={`border rounded-2xl p-4 flex gap-3 ${clsBorder[a.nivel]}`}>
+                                <div key={i}
+                                    role={a.accion ? "button" : undefined}
+                                    tabIndex={a.accion ? 0 : undefined}
+                                    onClick={a.accion}
+                                    onKeyDown={a.accion ? (e) => { if (e.key === "Enter" || e.key === " ") a.accion?.(); } : undefined}
+                                    className={`border rounded-2xl p-4 flex gap-3 ${clsBorder[a.nivel]} ${a.accion ? "cursor-pointer hover:brightness-95 active:scale-[0.99] transition-all group" : ""}`}>
                                     <span className={clsTitle[a.nivel]}>{icon[a.nivel]}</span>
-                                    <div>
+                                    <div className="flex-1 min-w-0">
                                         <p className={`text-sm font-bold mb-0.5 ${clsTitle[a.nivel]}`}>{a.titulo}</p>
                                         <p className={`text-xs leading-relaxed ${clsDesc[a.nivel]}`}>{a.desc}</p>
+                                        {a.ctaLabel && (
+                                            <span className={`inline-block mt-2 text-xs font-semibold underline underline-offset-2 opacity-70 group-hover:opacity-100 transition-opacity ${clsTitle[a.nivel]}`}>
+                                                {a.ctaLabel}
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
                             ))}
@@ -448,88 +459,7 @@ export default function DashboardTab() {
                 </div>
             </div>
 
-            {/* ── GRÁFICO DE DISPOSITIVOS ─────────────────────────────── */}
-            <div>
-                <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3">
-                    Dispositivos solicitados 2026
-                </h3>
-                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">
-                    {(() => {
-                        const conteo = Object.entries(
-                            lineas.reduce((acc, r) => {
-                                const d = r.dispositivo_2026?.trim() || "Sin especificar";
-                                acc[d] = (acc[d] || 0) + 1;
-                                return acc;
-                            }, {} as Record<string, number>)
-                        ).sort((a, b) => b[1] - a[1]).slice(0, 12);
 
-                        const max = Math.max(...conteo.map(([, n]) => n), 1);
-
-                        const COLORES = [
-                            "bg-blue-500",
-                            "bg-emerald-500",
-                            "bg-violet-500",
-                            "bg-amber-500",
-                            "bg-rose-500",
-                            "bg-cyan-500",
-                            "bg-orange-500",
-                            "bg-teal-500",
-                            "bg-pink-500",
-                            "bg-indigo-500",
-                            "bg-lime-500",
-                            "bg-slate-400",
-                        ];
-
-                        return (
-                            <div className="space-y-2.5">
-                                {conteo.map(([dispositivo, cantidad], i) => (
-                                    <div key={dispositivo} className="flex items-center gap-3">
-                                        <div className="w-44 text-xs text-slate-600 dark:text-slate-300 truncate shrink-0 text-right" title={dispositivo}>
-                                            {dispositivo}
-                                        </div>
-                                        <div className="flex-1 flex items-center gap-2">
-                                            <div className="flex-1 bg-slate-100 dark:bg-slate-700 rounded-full h-6 overflow-hidden">
-                                                <div
-                                                    className={`h-full rounded-full ${COLORES[i % COLORES.length]} transition-all duration-500 flex items-center justify-end pr-2`}
-                                                    style={{ width: `${Math.max((cantidad / max) * 100, 4)}%` }}
-                                                >
-                                                </div>
-                                            </div>
-                                            <span className="text-xs font-bold text-slate-700 dark:text-slate-200 w-6 text-right shrink-0">
-                                                {cantidad}
-                                            </span>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        );
-                    })()}
-                </div>
-            </div>
-
-            {/* ── CASOS CRÍTICOS ──────────────────────────────────────── */}
-            {lineas.some(r => CRITICOS.includes(r.telefono)) && (
-                <div>
-                    <h3 className="text-xs font-bold text-rose-500 uppercase tracking-widest mb-3 flex items-center gap-1.5"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg> Casos críticos abiertos</h3>
-                    <div className="space-y-2">
-                        {lineas.filter(r => CRITICOS.includes(r.telefono)).map(r => (
-                            <button key={r.telefono}
-                                onClick={() => goToPerfiles({ search: r.titular_responsable || r.usuario_linea || r.telefono })}
-                                className="w-full text-left bg-white dark:bg-slate-800 border border-rose-200 dark:border-rose-800 rounded-2xl p-4 hover:border-rose-400 dark:hover:border-rose-600 hover:shadow-md transition-all group">
-                                <div className="flex flex-wrap items-center gap-2 mb-1">
-                                    <span className="font-bold text-slate-800 dark:text-white">{r.usuario_linea}</span>
-                                    <span className="font-mono text-xs text-slate-500">{r.telefono}</span>
-                                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${ACCION_COLORS[r.accion_2026] ?? "bg-slate-100 text-slate-500"}`}>
-                                        {r.accion_2026 || "—"}
-                                    </span>
-                                    <span className="ml-auto text-xs text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity">Ver perfil →</span>
-                                </div>
-                                <p className="text-sm text-slate-600 dark:text-slate-300">{r.proxima_accion || r.observaciones}</p>
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

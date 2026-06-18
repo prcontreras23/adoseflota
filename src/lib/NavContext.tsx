@@ -7,6 +7,9 @@ export interface NavFilter {
     estado?: string;
     titular?: string;
     search?: string;
+    sinMonto?: boolean;
+    sinPortabilidad?: boolean;
+    dispositivoContains?: string;
 }
 
 interface NavContextValue {

@@ -57,13 +57,152 @@ interface TitularGroup {
   lineas: LineaAltice[];
 }
 
-function EditModal({ linea, onClose, onSave, onDelete, session, upsertLocal }: {
+interface NotaPerfil {
+  id: string;
+  titular_responsable: string;
+  telefono?: string;
+  texto: string;
+  autor: string;
+  created_at: string;
+}
+
+function NotasPanel({ titular, telefono, session }: {
+  titular: string;
+  telefono?: string;
+  session: { id: string; nombre: string } | null;
+}) {
+  const [notas, setNotas] = useState<NotaPerfil[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [texto, setTexto] = useState("");
+  const [asociarLinea, setAsociarLinea] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editTexto, setEditTexto] = useState("");
+
+  useEffect(() => {
+    supabase.from("notas_perfil")
+      .select("*")
+      .eq("titular_responsable", titular)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => { setNotas((data ?? []) as NotaPerfil[]); setLoading(false); });
+  }, [titular]);
+
+  async function agregar() {
+    if (!texto.trim()) return;
+    setGuardando(true);
+    const { data, error } = await supabase.from("notas_perfil").insert({
+      titular_responsable: titular,
+      telefono: asociarLinea && telefono ? telefono : null,
+      texto: texto.trim(),
+      autor: session?.nombre ?? "Francis",
+    }).select().single();
+    if (!error && data) {
+      setNotas(prev => [data as NotaPerfil, ...prev]);
+      setTexto("");
+      setAsociarLinea(false);
+    }
+    setGuardando(false);
+  }
+
+  async function eliminar(id: string) {
+    await supabase.from("notas_perfil").delete().eq("id", id);
+    setNotas(prev => prev.filter(n => n.id !== id));
+  }
+
+  async function guardarEdicion(id: string) {
+    if (!editTexto.trim()) return;
+    const { error } = await supabase.from("notas_perfil").update({ texto: editTexto.trim(), updated_at: new Date().toISOString() }).eq("id", id);
+    if (!error) {
+      setNotas(prev => prev.map(n => n.id === id ? { ...n, texto: editTexto.trim() } : n));
+      setEditId(null);
+    }
+  }
+
+  return (
+    <section>
+      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        Notas del perfil {notas.length > 0 && <span className="ml-1 bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 rounded-full px-1.5 text-[10px] font-bold">{notas.length}</span>}
+      </p>
+
+      {/* Formulario de nueva nota */}
+      <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 mb-3 border border-slate-200 dark:border-slate-700">
+        <textarea
+          value={texto}
+          onChange={e => setTexto(e.target.value)}
+          placeholder="Escribe una nota sobre este titular…"
+          rows={2}
+          className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+        />
+        <div className="flex items-center justify-between mt-2 gap-2">
+          <label className="flex items-center gap-1.5 text-xs text-slate-500 cursor-pointer select-none">
+            <input type="checkbox" checked={asociarLinea} onChange={e => setAsociarLinea(e.target.checked)}
+              className="rounded border-slate-300" />
+            Asociar a {telefono ?? "esta línea"}
+          </label>
+          <button onClick={agregar} disabled={guardando || !texto.trim()}
+            className="bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            {guardando ? "Guardando…" : "Agregar"}
+          </button>
+        </div>
+      </div>
+
+      {/* Lista de notas */}
+      {loading ? (
+        <div className="flex justify-center py-3">
+          <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : notas.length === 0 ? (
+        <p className="text-xs text-slate-400 text-center py-3 italic">Sin notas aún</p>
+      ) : (
+        <div className="space-y-2 max-h-64 overflow-y-auto pr-0.5">
+          {notas.map(n => (
+            <div key={n.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5">
+              {editId === n.id ? (
+                <div className="space-y-2">
+                  <textarea value={editTexto} onChange={e => setEditTexto(e.target.value)} rows={2}
+                    className="w-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+                  <div className="flex gap-2">
+                    <button onClick={() => guardarEdicion(n.id)} className="text-xs font-semibold text-blue-600 hover:text-blue-500">Guardar</button>
+                    <button onClick={() => setEditId(null)} className="text-xs text-slate-400 hover:text-slate-600">Cancelar</button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <p className="text-xs text-slate-700 dark:text-slate-200 leading-relaxed whitespace-pre-wrap">{n.texto}</p>
+                  <div className="flex items-center justify-between mt-1.5 gap-2">
+                    <div className="flex items-center gap-2 text-[10px] text-slate-400">
+                      <span>{n.autor || "Francis"}</span>
+                      <span>·</span>
+                      <span>{new Date(n.created_at).toLocaleDateString("es-DO", { day: "2-digit", month: "short", year: "numeric" })}</span>
+                      {n.telefono && <span className="font-mono">· {n.telefono}</span>}
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <button onClick={() => { setEditId(n.id); setEditTexto(n.texto); }}
+                        className="text-[10px] text-slate-400 hover:text-blue-500 transition-colors">Editar</button>
+                      <button onClick={() => eliminar(n.id)}
+                        className="text-[10px] text-slate-400 hover:text-rose-500 transition-colors">Eliminar</button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function EditModal({ linea, onClose, onSave, onDelete, session, upsertLocal, titularLineas }: {
   linea: LineaAltice;
   onClose: () => void;
   onSave: (updated: LineaAltice) => void;
   onDelete: (id: string) => void;
   session: { id: string; nombre: string } | null;
   upsertLocal: (l: LineaAltice) => void;
+  titularLineas?: LineaAltice[];
 }) {
   const [form, setForm] = useState<LineaAltice>({ ...linea });
   const [saving, setSaving] = useState(false);
@@ -280,13 +419,65 @@ function EditModal({ linea, onClose, onSave, onDelete, session, upsertLocal }: {
             </div>
           </section>}
 
-          <section>
-            <p className={`${sectionTitleCls} flex items-center gap-1.5`}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> Plan</p>
+          {drawerTab === "avanzado" && <section>
+            <p className={`${sectionTitleCls} flex items-center gap-1.5`}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> Plan actual (antes del cambio)</p>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={labelCls}>Data actual (GB)</label>
                 <input value={form.gb_antes} onChange={e => set("gb_antes", e.target.value)} className={inputCls} placeholder="Ej: 5" />
               </div>
+              <div>
+                <label className={labelCls}>Minutos actuales</label>
+                <input value={form.min_antes} onChange={e => set("min_antes", e.target.value)} className={inputCls} placeholder="Ej: 300" />
+              </div>
+            </div>
+          </section>}
+
+          {/* Tareas del titular — solo en área rápida */}
+          {drawerTab === "resumen" && (() => {
+            const tareas = (titularLineas ?? [linea])
+              .filter(l => l.proxima_accion?.trim())
+              .sort((a, b) => {
+                const ord: Record<string, number> = { LLAMAR: 0, COTIZAR: 1, CARTA: 2, CANCELAR: 3 };
+                return (ord[a.proxima_accion!] ?? 9) - (ord[b.proxima_accion!] ?? 9);
+              });
+            if (tareas.length === 0) return null;
+            const clsAccion: Record<string, string> = {
+              LLAMAR: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+              COTIZAR: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+              CARTA: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
+              CANCELAR: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300",
+            };
+            return (
+              <section>
+                <p className={`${sectionTitleCls} flex items-center gap-1.5`}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+                  Tareas pendientes ({tareas.length})
+                </p>
+                <div className="space-y-2">
+                  {tareas.map(l => (
+                    <div key={l.id} className={`rounded-xl px-3 py-2.5 flex items-start gap-2.5 ${clsAccion[l.proxima_accion!] ?? "bg-slate-100 text-slate-600"}`}>
+                      <span className="mt-0.5 shrink-0">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold leading-none">{l.proxima_accion}</p>
+                        <p className="text-[11px] mt-0.5 opacity-75 truncate">{l.usuario_linea || l.telefono}</p>
+                        {l.nota_resolucion?.trim() && (
+                          <p className="text-[11px] mt-1 opacity-60 italic line-clamp-2">{l.nota_resolucion}</p>
+                        )}
+                      </div>
+                      <span className="text-[10px] font-mono opacity-60 shrink-0">{l.telefono}</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            );
+          })()}
+
+          <section>
+            <p className={`${sectionTitleCls} flex items-center gap-1.5`}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> Plan solicitado</p>
+            <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
                 <label className={labelCls}>Plan de datos solicitado</label>
                 <select value={form.gb_solicitado} onChange={e => set("gb_solicitado", e.target.value)} className={inputCls}>
@@ -298,11 +489,7 @@ function EditModal({ linea, onClose, onSave, onDelete, session, upsertLocal }: {
                   </p>
                 )}
               </div>
-              <div>
-                <label className={labelCls}>Minutos actuales</label>
-                <input value={form.min_antes} onChange={e => set("min_antes", e.target.value)} className={inputCls} placeholder="Ej: 300" />
-              </div>
-              <div>
+              <div className="col-span-2">
                 <label className={labelCls}>Minutos solicitados</label>
                 <input value={form.min_solicitados} onChange={e => set("min_solicitados", e.target.value)} className={inputCls} placeholder="Ej: 500" />
               </div>
@@ -508,6 +695,13 @@ function EditModal({ linea, onClose, onSave, onDelete, session, upsertLocal }: {
               );
             })()}
           </section>}
+
+          {/* Módulo de notas — visible en ambas pestañas */}
+          <NotasPanel
+            titular={linea.titular_responsable ?? ""}
+            telefono={linea.telefono}
+            session={session}
+          />
 
           <section>
             <p className={`${sectionTitleCls} flex items-center gap-1.5`}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> Estatus</p>
@@ -777,11 +971,14 @@ export default function PerfilesTab() {
   useEffect(() => {
     const f = consumeFilter();
     if (!f) return;
-    if (f.proximaAccion) setFilterProximaAccion(f.proximaAccion);
-    if (f.accion)        setFilterAccion(f.accion);
-    if (f.estado)        setFilterEstado(f.estado);
-    if (f.titular)       setSearch(f.titular);
-    if (f.search)        setSearch(f.search);
+    if (f.proximaAccion)       setFilterProximaAccion(f.proximaAccion);
+    if (f.accion)              setFilterAccion(f.accion);
+    if (f.estado)              setFilterEstado(f.estado);
+    if (f.titular)             setSearch(f.titular);
+    if (f.search)              setSearch(f.search);
+    if (f.sinMonto)            setChipSinMonto(true);
+    if (f.sinPortabilidad)     setChipSinPortabilidad(true);
+    if (f.dispositivoContains) setFilterDispositivoContains(f.dispositivoContains);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [session] = useState<{ id: string; nombre: string } | null>(() => {
@@ -801,8 +998,10 @@ export default function PerfilesTab() {
   const [chipSinMonto, setChipSinMonto] = useState(false);
   const [chipConSeguimiento, setChipConSeguimiento] = useState(false);
   const [chipSinRevisar, setChipSinRevisar] = useState(false);
+  const [chipSinPortabilidad, setChipSinPortabilidad] = useState(false);
   const [filterRevisadoPor, setFilterRevisadoPor] = useState("");
   const [filterPortabilidad, setFilterPortabilidad] = useState("");
+  const [filterDispositivoContains, setFilterDispositivoContains] = useState("");
   const [expandedTitular, setExpandedTitular] = useState<string | null>(null);
   const [editingLinea, setEditingLinea] = useState<LineaAltice | null>(null);
   const [vinculandoTitular, setVinculandoTitular] = useState<string | null>(null);
@@ -948,7 +1147,7 @@ export default function PerfilesTab() {
   const opcionesGb = [...new Set(all.map(r => r.gb_solicitado?.trim() || r.gb_antes?.trim()).filter(Boolean))].sort((a, b) => parseFloat(a!) - parseFloat(b!)) as string[];
   const opcionesMin = [...new Set(all.map(r => r.min_solicitados?.trim() || r.min_antes?.trim()).filter(Boolean))].sort((a, b) => parseFloat(a!) - parseFloat(b!)) as string[];
 
-  const hayFiltros = !!(search || filterDispositivo || filterGb || filterMin || filterProximaAccion || filterAccion || filterEstado || filterTipo || filterPortabilidad || chipSinDispositivo || chipSinMonto || chipConSeguimiento || chipSinRevisar || filterRevisadoPor);
+  const hayFiltros = !!(search || filterDispositivo || filterGb || filterMin || filterProximaAccion || filterAccion || filterEstado || filterTipo || filterPortabilidad || chipSinDispositivo || chipSinMonto || chipConSeguimiento || chipSinRevisar || filterRevisadoPor || chipSinPortabilidad || filterDispositivoContains);
 
   const gruposFiltrados = grupos.filter(g => {
     const q = search.toLowerCase();
@@ -975,10 +1174,12 @@ export default function PerfilesTab() {
       if (chipSinRevisar && l.revisado_por?.trim()) return false;
       if (filterRevisadoPor && l.revisado_por?.trim() !== filterRevisadoPor) return false;
       if (filterPortabilidad && l.portabilidad !== filterPortabilidad) return false;
+      if (chipSinPortabilidad && l.portabilidad?.trim()) return false;
+      if (filterDispositivoContains && !l.dispositivo_2026?.toLowerCase().includes(filterDispositivoContains.toLowerCase())) return false;
       return true;
     });
 
-    if (filterAccion || filterEstado || filterTipo || filterDispositivo || filterGb || filterMin || filterProximaAccion || filterPortabilidad || chipSinDispositivo || chipSinMonto || chipConSeguimiento || chipSinRevisar || filterRevisadoPor) {
+    if (filterAccion || filterEstado || filterTipo || filterDispositivo || filterGb || filterMin || filterProximaAccion || filterPortabilidad || chipSinDispositivo || chipSinMonto || chipConSeguimiento || chipSinRevisar || filterRevisadoPor || chipSinPortabilidad || filterDispositivoContains) {
       return tieneAlgunaLinea;
     }
     return true;
@@ -1063,6 +1264,9 @@ export default function PerfilesTab() {
           onDelete={(id) => removeLocal(id)}
           session={session}
           upsertLocal={upsertLocal}
+          titularLineas={editingLinea.titular_responsable
+            ? all.filter(l => l.titular_responsable === editingLinea.titular_responsable)
+            : [editingLinea]}
         />
       )}
 
