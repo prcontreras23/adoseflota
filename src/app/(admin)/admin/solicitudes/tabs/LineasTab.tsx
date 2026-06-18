@@ -60,13 +60,14 @@ export default function LineasTab() {
     const [chipSinDispositivo, setChipSinDispositivo] = useState(false);
     const [chipSinMonto, setChipSinMonto] = useState(false);
     const [chipConSeguimiento, setChipConSeguimiento] = useState(false);
+    const [showArchivadas, setShowArchivadas] = useState(false);
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [showNueva, setShowNueva] = useState(false);
     const [importing, setImporting] = useState(false);
     const importRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
-        let f = all;
+        let f = showArchivadas ? all : all.filter(r => !r.archivada);
         if (filterAccion) f = f.filter(r => r.accion_2026 === filterAccion);
         if (filterEstado) f = f.filter(r => r.estado === filterEstado);
         if (filterTipo) f = f.filter(r => r.tipo === filterTipo);
@@ -92,7 +93,7 @@ export default function LineasTab() {
         }
         setFiltered(f);
     }, [all, filterAccion, filterEstado, filterTipo, filterDispositivo, filterGb, filterMin,
-        filterProximaAccion, filterTitular, filterPortabilidad, chipSinTitular, chipSinDispositivo, chipSinMonto, chipConSeguimiento, search]);
+        filterProximaAccion, filterTitular, filterPortabilidad, chipSinTitular, chipSinDispositivo, chipSinMonto, chipConSeguimiento, showArchivadas, search]);
 
     async function updateField(id: string, field: keyof LineaAltice, value: string) {
         const ok = await mutate(id, { [field]: value });
@@ -496,6 +497,15 @@ export default function LineasTab() {
                                                     <div>
                                                         <p className="font-bold text-slate-500 dark:text-slate-400 mb-1">DETALLE / ORIGEN</p>
                                                         <p className="text-slate-600 dark:text-slate-300">{r.detalle_origen || "—"}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-slate-500 dark:text-slate-400 mb-1">ARCHIVAR</p>
+                                                        <button
+                                                            onClick={() => updateField(r.id, "archivada" as keyof LineaAltice, (!r.archivada) as unknown as string)}
+                                                            className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors flex items-center gap-1.5 ${r.archivada ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-700" : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:bg-amber-50"}`}>
+                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l1 11a2 2 0 002 2h12a2 2 0 002-2L21 9"/><path d="M21 3H3v6h18V3z"/><path d="M10 14h4"/></svg>
+                                                            {r.archivada ? "Restaurar" : "Archivar"}
+                                                        </button>
                                                     </div>
                                                 </div>
                                             </td>

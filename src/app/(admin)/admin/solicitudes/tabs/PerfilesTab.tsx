@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { supabase, type LineaAltice, ACCION_COLORS, ESTADO_LINEA_COLORS, PORTABILIDAD_COLORS, PORTABILIDAD_OPTIONS } from "@/lib/supabase";
 import { useLineas } from "@/lib/LineasContext";
 import * as XLSX from "xlsx";
@@ -56,17 +56,19 @@ interface TitularGroup {
   lineas: LineaAltice[];
 }
 
-function EditModal({ linea, onClose, onSave, onDelete, session }: {
+function EditModal({ linea, onClose, onSave, onDelete, session, upsertLocal }: {
   linea: LineaAltice;
   onClose: () => void;
   onSave: (updated: LineaAltice) => void;
   onDelete: (id: string) => void;
   session: { id: string; nombre: string } | null;
+  upsertLocal: (l: LineaAltice) => void;
 }) {
   const [form, setForm] = useState<LineaAltice>({ ...linea });
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [archivando, setArchivando] = useState(false);
   const [dispositivosStock, setDispositivosStock] = useState<{ dispositivo: string; disponibles: number }[]>([]);
   const [inventarioItems, setInventarioItems] = useState<{ id: string; marca: string; imei: string; sim: string; asignado: boolean; linea_id: string | null }[]>([]);
   const [selectedInvId, setSelectedInvId] = useState<string>("");
@@ -123,6 +125,17 @@ function EditModal({ linea, onClose, onSave, onDelete, session }: {
     if (error) { toast.error("Error al eliminar"); return; }
     toast.success("Línea eliminada");
     onDelete(linea.id);
+    onClose();
+  }
+
+  async function handleArchivar() {
+    const nuevaVal = !linea.archivada;
+    setArchivando(true);
+    const { error } = await supabase.from("lineas_altice").update({ archivada: nuevaVal }).eq("id", linea.id);
+    setArchivando(false);
+    if (error) { toast.error("Error al archivar"); return; }
+    upsertLocal({ ...linea, archivada: nuevaVal });
+    toast.success(nuevaVal ? "Línea archivada — oculta del listado principal" : "Línea restaurada ✓");
     onClose();
   }
 
@@ -205,6 +218,7 @@ function EditModal({ linea, onClose, onSave, onDelete, session }: {
   const inputCls = "w-full border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
   const labelCls = "text-xs text-slate-500 mb-1 block font-medium";
   const sectionTitleCls = "text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3";
+  const [drawerTab, setDrawerTab] = React.useState<"resumen" | "avanzado">("resumen");
 
   return (
     <div className="fixed inset-0 z-50 flex">
@@ -220,14 +234,26 @@ function EditModal({ linea, onClose, onSave, onDelete, session }: {
           </button>
         </div>
 
+        {/* Tabs Resumen / Avanzado */}
+        <div className="flex border-b border-slate-200 dark:border-slate-700 px-4 gap-1 sticky top-[61px] bg-white dark:bg-slate-900 z-10">
+          {(["resumen", "avanzado"] as const).map(t => (
+            <button key={t} onClick={() => setDrawerTab(t)}
+              className={`py-2.5 px-4 text-sm font-semibold border-b-2 transition-colors capitalize -mb-px ${drawerTab === t ? "border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400" : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"}`}>
+              {t === "resumen" ? "⚡ Rápido" : "⚙️ Avanzado"}
+            </button>
+          ))}
+        </div>
+
         <div className="p-4 space-y-6 flex-1">
           {/* Panel de respuesta del formulario */}
-          <FormularioPanel
-            titular={linea.titular_responsable ?? ""}
-            usuario={linea.usuario_linea ?? ""}
-          />
+          {drawerTab === "avanzado" && (
+            <FormularioPanel
+              titular={linea.titular_responsable ?? ""}
+              usuario={linea.usuario_linea ?? ""}
+            />
+          )}
 
-          <section>
+          {drawerTab === "avanzado" && <section>
             <p className={`${sectionTitleCls} flex items-center gap-1.5`}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Identificación</p>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -251,7 +277,7 @@ function EditModal({ linea, onClose, onSave, onDelete, session }: {
                 <input value={form.titular_responsable} onChange={e => set("titular_responsable", e.target.value)} className={inputCls} />
               </div>
             </div>
-          </section>
+          </section>}
 
           <section>
             <p className={`${sectionTitleCls} flex items-center gap-1.5`}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> Plan</p>
@@ -340,7 +366,7 @@ function EditModal({ linea, onClose, onSave, onDelete, session }: {
             </div>
           </section>
 
-          <section>
+          {drawerTab === "avanzado" && <section>
             <p className={`${sectionTitleCls} flex items-center gap-1.5`}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg> IMEI y SIM</p>
             {(() => {
               const getKey = (s: string) => {
@@ -480,7 +506,7 @@ function EditModal({ linea, onClose, onSave, onDelete, session }: {
                 </div>
               );
             })()}
-          </section>
+          </section>}
 
           <section>
             <p className={`${sectionTitleCls} flex items-center gap-1.5`}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> Estatus</p>
@@ -528,7 +554,7 @@ function EditModal({ linea, onClose, onSave, onDelete, session }: {
             </div>
           </section>
 
-          <section>
+          {drawerTab === "avanzado" && <section>
             <p className={`${sectionTitleCls} flex items-center gap-1.5`}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.1 9 11.1"/></svg> Revisión</p>
             <div>
               <label className={labelCls}>Revisado por</label>
@@ -539,9 +565,9 @@ function EditModal({ linea, onClose, onSave, onDelete, session }: {
                 <option value="Soto">Soto</option>
               </select>
             </div>
-          </section>
+          </section>}
 
-          <section>
+          {drawerTab === "avanzado" && <section>
             <p className={`${sectionTitleCls} flex items-center gap-1.5`}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Notas</p>
             <div className="space-y-3">
               <div>
@@ -555,10 +581,10 @@ function EditModal({ linea, onClose, onSave, onDelete, session }: {
                   rows={3} className={inputCls + " resize-none"} />
               </div>
             </div>
-          </section>
+          </section>}
 
           {/* Historial de cambios */}
-          <section>
+          {drawerTab === "avanzado" && <section>
             <p className={`${sectionTitleCls} flex items-center gap-1.5`}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
               Historial de cambios
@@ -594,7 +620,7 @@ function EditModal({ linea, onClose, onSave, onDelete, session }: {
                 ))}
               </div>
             )}
-          </section>
+          </section>}
         </div>
 
         <div className="border-t border-slate-200 dark:border-slate-700 sticky bottom-0 bg-white dark:bg-slate-900">
@@ -623,6 +649,12 @@ function EditModal({ linea, onClose, onSave, onDelete, session }: {
           )}
 
           <div className="p-4 flex gap-3">
+            <button onClick={handleArchivar} disabled={archivando}
+              className={`py-2.5 px-4 rounded-xl text-sm font-semibold transition-colors flex items-center gap-1.5 border ${linea.archivada ? "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100" : "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700"}`}>
+              {linea.archivada
+                ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l1 11a2 2 0 002 2h12a2 2 0 002-2L21 9"/><path d="M21 3H3v6h18V3z"/><path d="M10 14h4"/></svg> Restaurar</>
+                : <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l1 11a2 2 0 002 2h12a2 2 0 002-2L21 9"/><path d="M21 3H3v6h18V3z"/><path d="M10 14h4"/></svg> Archivar</>}
+            </button>
             <button onClick={() => setConfirmDelete(true)}
               disabled={confirmDelete}
               className="py-2.5 px-4 rounded-xl bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 text-sm font-semibold hover:bg-rose-100 dark:hover:bg-rose-950/40 disabled:opacity-40 transition-colors border border-rose-200 dark:border-rose-800 flex items-center gap-1.5">
@@ -643,10 +675,20 @@ function EditModal({ linea, onClose, onSave, onDelete, session }: {
   );
 }
 
-function LineaRow({ linea, onEdit, dimmed }: { linea: LineaAltice; onEdit: () => void; dimmed?: boolean }) {
+function LineaRow({ linea, onEdit, dimmed, onMutate, selected, onToggleSelect }: {
+  linea: LineaAltice; onEdit: () => void; dimmed?: boolean;
+  onMutate: (id: string, patch: Partial<LineaAltice>) => void;
+  selected?: boolean; onToggleSelect?: (id: string) => void;
+}) {
   return (
-    <div className={`p-4 ${dimmed ? "opacity-80 bg-purple-50/30 dark:bg-purple-900/10" : ""}`}>
+    <div className={`p-4 ${dimmed ? "opacity-80 bg-purple-50/30 dark:bg-purple-900/10" : ""} ${selected ? "bg-blue-50/60 dark:bg-blue-900/10" : ""}`}>
       <div className="flex items-start gap-3">
+        {onToggleSelect && (
+          <button onClick={e => { e.stopPropagation(); onToggleSelect(linea.id); }}
+            className={`mt-0.5 w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${selected ? "bg-blue-600 border-blue-600" : "border-slate-300 dark:border-slate-500 hover:border-blue-400"}`}>
+            {selected && <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5"><polyline points="20 6 9 17 4 12"/></svg>}
+          </button>
+        )}
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-1">
             <span className="font-semibold text-sm text-slate-800 dark:text-white">{linea.usuario_linea || "Sin nombre"}</span>
@@ -663,11 +705,21 @@ function LineaRow({ linea, onEdit, dimmed }: { linea: LineaAltice; onEdit: () =>
           {linea.seguimiento && (
             <p className="mt-1.5 text-xs text-slate-400 dark:text-slate-500 italic line-clamp-1 flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> {linea.seguimiento}</p>
           )}
-          {linea.proxima_accion && (
-            <span className="mt-1.5 inline-block text-[11px] bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 rounded px-2 py-0.5 font-semibold">
-              ▶ {linea.proxima_accion}
-            </span>
-          )}
+          <div className="mt-1.5" onClick={e => e.stopPropagation()}>
+            <select
+              value={linea.proxima_accion ?? ""}
+              onChange={e => onMutate(linea.id, { proxima_accion: e.target.value })}
+              className={`text-[11px] font-semibold px-2 py-0.5 rounded border cursor-pointer focus:outline-none focus:ring-1 focus:ring-amber-400 transition-colors ${
+                linea.proxima_accion
+                  ? "bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800"
+                  : "bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-600"
+              }`}>
+              <option value="">▷ (sin próxima acción)</option>
+              {["LLAMAR", "CARTA", "COTIZAR", "CANCELAR"].map(v => (
+                <option key={v} value={v}>▶ {v}</option>
+              ))}
+            </select>
+          </div>
         </div>
         <div className="flex flex-col gap-1.5 items-end shrink-0">
           <span className={`text-xs font-semibold px-2 py-1 rounded-lg ${ACCION_COLORS[linea.accion_2026] ?? "bg-slate-100 text-slate-500"}`}>
@@ -676,6 +728,11 @@ function LineaRow({ linea, onEdit, dimmed }: { linea: LineaAltice; onEdit: () =>
           {linea.portabilidad && (
             <span className={`text-xs font-semibold px-2 py-1 rounded-lg ${PORTABILIDAD_COLORS[linea.portabilidad] ?? "bg-slate-100 text-slate-500"}`}>
               📶 {linea.portabilidad}
+            </span>
+          )}
+          {linea.archivada && (
+            <span className="text-xs font-semibold px-2 py-1 rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 flex items-center gap-1">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l1 11a2 2 0 002 2h12a2 2 0 002-2L21 9"/><path d="M21 3H3v6h18V3z"/><path d="M10 14h4"/></svg> Archivada
             </span>
           )}
           {linea.estado && (
@@ -712,7 +769,7 @@ function LineaRow({ linea, onEdit, dimmed }: { linea: LineaAltice; onEdit: () =>
 }
 
 export default function PerfilesTab() {
-  const { lineas: all, loading, upsertLocal, removeLocal, patchLocal } = useLineas();
+  const { lineas: all, loading, mutate, upsertLocal, removeLocal, patchLocal } = useLineas();
   const [session] = useState<{ id: string; nombre: string } | null>(() => {
     if (typeof window === "undefined") return null;
     try { return JSON.parse(localStorage.getItem("flota_session") ?? "null"); } catch { return null; }
@@ -737,6 +794,42 @@ export default function PerfilesTab() {
   const [vinculandoTitular, setVinculandoTitular] = useState<string | null>(null);
   // Modal nueva línea: null = cerrado, string = titular pre-llenado (puede ser "")
   const [nuevaLineaTitular, setNuevaLineaTitular] = useState<string | null>(null);
+  // Selección masiva
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkField, setBulkField] = useState("");
+  const [bulkValue, setBulkValue] = useState("");
+  const [applyingBulk, setApplyingBulk] = useState(false);
+
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function selectGroup(ids: string[]) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      const allSelected = ids.every(id => next.has(id));
+      if (allSelected) ids.forEach(id => next.delete(id));
+      else ids.forEach(id => next.add(id));
+      return next;
+    });
+  }
+
+  async function applyBulk() {
+    if (!bulkField || !bulkValue || selectedIds.size === 0) return;
+    setApplyingBulk(true);
+    const ids = [...selectedIds];
+    const patch: Partial<LineaAltice> = { [bulkField]: bulkValue };
+    await Promise.all(ids.map(id => mutate(id, patch)));
+    setApplyingBulk(false);
+    setSelectedIds(new Set());
+    setBulkField("");
+    setBulkValue("");
+    toast.success(`${ids.length} líneas actualizadas ✓`);
+  }
 
   const todosLosTitulares = [...new Set(all.map(r => r.titular_responsable).filter(Boolean))].sort();
 
@@ -801,8 +894,12 @@ export default function PerfilesTab() {
     if (linea.titular_responsable) setExpandedTitular(linea.titular_responsable);
   }
 
+  const [showArchivadas, setShowArchivadas] = useState(false);
+  const allActivas = showArchivadas ? all : all.filter(r => !r.archivada);
+  const totalArchivadas = all.filter(r => r.archivada).length;
+
   const grupos: TitularGroup[] = Object.values(
-    all.reduce((acc, r) => {
+    allActivas.reduce((acc, r) => {
       const key = r.titular_responsable || "Sin titular identificado";
       if (!acc[key]) acc[key] = { nombre: key, lineas: [] };
       acc[key].lineas.push(r);
@@ -871,8 +968,47 @@ export default function PerfilesTab() {
     </div>
   );
 
+  const BULK_FIELDS: { value: string; label: string; options: string[] }[] = [
+    { value: "estado", label: "Estado", options: ["CONFIRMADA", "POR CONFIRMAR", "PENDIENTE", "OK", "RESPONDIÓ", "SIN RESPUESTA"] },
+    { value: "accion_2026", label: "Acción 2026", options: ["BAJA", "ALTA", "CAMBIO SOLICITADO", "SE MANTIENE", "REVISAR"] },
+    { value: "proxima_accion", label: "Próxima acción", options: ["", "LLAMAR", "CARTA", "COTIZAR", "CANCELAR"] },
+    { value: "portabilidad", label: "Portabilidad", options: ["", "Altice", "Claro", "Nuevo", "Baja"] },
+  ];
+  const currentBulkOptions = BULK_FIELDS.find(f => f.value === bulkField)?.options ?? [];
+
   return (
     <div className="space-y-4">
+      {/* Barra flotante de edición masiva */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 dark:bg-slate-700 text-white rounded-2xl shadow-2xl px-4 py-3 flex flex-wrap items-center gap-3 max-w-2xl w-[calc(100%-2rem)]">
+          <span className="text-sm font-bold text-blue-300 shrink-0">{selectedIds.size} seleccionada{selectedIds.size !== 1 ? "s" : ""}</span>
+          <div className="flex-1 flex flex-wrap gap-2 items-center">
+            <select value={bulkField} onChange={e => { setBulkField(e.target.value); setBulkValue(""); }}
+              className="bg-slate-700 dark:bg-slate-600 text-white text-sm rounded-xl px-3 py-1.5 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="">Cambiar campo…</option>
+              {BULK_FIELDS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+            </select>
+            {bulkField && (
+              <select value={bulkValue} onChange={e => setBulkValue(e.target.value)}
+                className="bg-slate-700 dark:bg-slate-600 text-white text-sm rounded-xl px-3 py-1.5 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">Valor…</option>
+                {currentBulkOptions.map(o => <option key={o} value={o}>{o || "(vacío)"}</option>)}
+              </select>
+            )}
+            {bulkField && bulkValue !== undefined && bulkValue !== "" && (
+              <button onClick={applyBulk} disabled={applyingBulk}
+                className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-bold px-4 py-1.5 rounded-xl transition-colors">
+                {applyingBulk ? "Aplicando…" : "Aplicar"}
+              </button>
+            )}
+          </div>
+          <button onClick={() => setSelectedIds(new Set())}
+            className="text-slate-400 hover:text-white text-xs shrink-0 flex items-center gap-1">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Cancelar
+          </button>
+        </div>
+      )}
+
       {editingLinea && (
         <EditModal
           linea={editingLinea}
@@ -880,6 +1016,7 @@ export default function PerfilesTab() {
           onSave={(updated) => upsertLocal(updated)}
           onDelete={(id) => removeLocal(id)}
           session={session}
+          upsertLocal={upsertLocal}
         />
       )}
 
@@ -895,9 +1032,19 @@ export default function PerfilesTab() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-slate-800 dark:text-white">Perfiles por Titular</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400">{gruposFiltrados.length} titulares · {all.length} líneas totales</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            {gruposFiltrados.length} titulares · {allActivas.length} líneas
+            {totalArchivadas > 0 && <span className="ml-2 text-amber-600 dark:text-amber-400">· {totalArchivadas} archivadas</span>}
+          </p>
         </div>
         <div className="flex gap-2">
+          {totalArchivadas > 0 && (
+            <button onClick={() => setShowArchivadas(v => !v)}
+              className={`text-sm px-4 py-2 rounded-xl font-semibold transition-colors flex items-center gap-1.5 border ${showArchivadas ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-700" : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600"}`}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l1 11a2 2 0 002 2h12a2 2 0 002-2L21 9"/><path d="M21 3H3v6h18V3z"/><path d="M10 14h4"/></svg>
+              {showArchivadas ? `Ocultar archivadas (${totalArchivadas})` : `Ver archivadas (${totalArchivadas})`}
+            </button>
+          )}
           <button onClick={exportarPerfiles}
             className="text-sm bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-xl font-semibold transition-colors flex items-center gap-1.5">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> Exportar Excel
@@ -1015,6 +1162,18 @@ export default function PerfilesTab() {
               className={`bg-white dark:bg-slate-800 rounded-2xl border transition-all ${tieneProblema ? "border-amber-300 dark:border-amber-700" : "border-slate-200 dark:border-slate-700"}`}>
 
               <div className="p-4 flex items-center gap-2">
+                {/* Checkbox de grupo */}
+                {(() => {
+                  const ids = g.lineas.map(l => l.id);
+                  const allSel = ids.every(id => selectedIds.has(id));
+                  const someSel = ids.some(id => selectedIds.has(id));
+                  return (
+                    <button onClick={e => { e.stopPropagation(); selectGroup(ids); }}
+                      className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${allSel ? "bg-blue-600 border-blue-600" : someSel ? "bg-blue-300 border-blue-400" : "border-slate-300 dark:border-slate-500 hover:border-blue-400"}`}>
+                      {(allSel || someSel) && <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5"><polyline points="20 6 9 17 4 12"/></svg>}
+                    </button>
+                  );
+                })()}
                 <button className="flex items-center gap-3 flex-1 text-left min-w-0"
                   onClick={() => setExpandedTitular(isOpen ? null : g.nombre)}>
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${tieneProblema ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"}`}>
@@ -1093,7 +1252,7 @@ export default function PerfilesTab() {
                     {g.lineas
                       .sort((a, b) => ACCIONES_ORDEN.indexOf(a.accion_2026) - ACCIONES_ORDEN.indexOf(b.accion_2026))
                       .map(linea => (
-                        <LineaRow key={linea.id} linea={linea} onEdit={() => setEditingLinea(linea)} />
+                        <LineaRow key={linea.id} linea={linea} onEdit={() => setEditingLinea(linea)} onMutate={mutate} selected={selectedIds.has(linea.id)} onToggleSelect={toggleSelect} />
                       ))}
                   </div>
 
@@ -1119,7 +1278,7 @@ export default function PerfilesTab() {
                         {lineasVinculadas
                           .sort((a, b) => ACCIONES_ORDEN.indexOf(a.accion_2026) - ACCIONES_ORDEN.indexOf(b.accion_2026))
                           .map(linea => (
-                            <LineaRow key={linea.id} linea={linea} onEdit={() => setEditingLinea(linea)} dimmed />
+                            <LineaRow key={linea.id} linea={linea} onEdit={() => setEditingLinea(linea)} dimmed onMutate={mutate} selected={selectedIds.has(linea.id)} onToggleSelect={toggleSelect} />
                           ))}
                       </div>
                     </div>

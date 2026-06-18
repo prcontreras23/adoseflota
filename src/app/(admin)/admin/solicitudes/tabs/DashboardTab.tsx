@@ -234,6 +234,193 @@ export default function DashboardTab() {
                 </div>
             </div>
 
+            {/* ── ADVERTENCIAS ────────────────────────────────────────── */}
+            {(() => {
+                const cotizar = lineas.filter(r => r.proxima_accion === "COTIZAR").length;
+                const cartas  = lineas.filter(r => r.proxima_accion === "CARTA").length;
+                const sinMonto = lineas.filter(r => parseMonto(r.monto_mensual) === 0).length;
+                const sinRespuesta = lineas.filter(r => r.estado === "SIN RESPUESTA" || r.estado === "PENDIENTE").length;
+                const s26 = lineas.filter(r => r.dispositivo_2026?.toLowerCase().includes("s26") || r.dispositivo_2026?.toLowerCase().includes("ultra")).length;
+                const sinPorta = lineas.filter(r => !r.portabilidad?.trim()).length;
+                const porcConf = lineas.length > 0 ? Math.round((lineas.filter(r => r.estado === "CONFIRMADA" || r.estado === "OK").length / lineas.length) * 100) : 0;
+
+                // Propuesta enviada a Altice el 9 abr vs levantamiento actual
+                const propuesta: Record<string, number> = {
+                    "iPhone 17 Pro Max": 4,
+                    "iPhone 17": 6,
+                    "Samsung A56 5G": 16,
+                    "Samsung A17 5G": 30,
+                    "Motorola G56 5G": 107,
+                };
+                const actual: Record<string, number> = {
+                    "iPhone 17 Pro Max": lineas.filter(r => r.dispositivo_2026?.toLowerCase().includes("iphone 17 pro max")).length,
+                    "iPhone 17": lineas.filter(r => r.dispositivo_2026?.toLowerCase().includes("iphone 17") && !r.dispositivo_2026?.toLowerCase().includes("pro")).length,
+                    "Samsung A56 5G": lineas.filter(r => r.dispositivo_2026?.toLowerCase().includes("a56")).length,
+                    "Samsung A17 5G": lineas.filter(r => r.dispositivo_2026?.toLowerCase().includes("a17")).length,
+                    "Motorola G56 5G": lineas.filter(r => r.dispositivo_2026?.toLowerCase().includes("g56") || r.dispositivo_2026?.toLowerCase().includes("motorola")).length,
+                };
+                const hasDiff = Object.keys(propuesta).some(k => (actual[k] ?? 0) !== propuesta[k]);
+
+                interface Advertencia { nivel: "rojo" | "naranja" | "azul"; titulo: string; desc: string; }
+                const advertencias: Advertencia[] = [];
+
+                // Email sin seguimiento — siempre crítico hasta que se resuelva
+                advertencias.push({
+                    nivel: "rojo",
+                    titulo: "Email de Anyelis Montero (Altice) sin respuesta — 15 mayo",
+                    desc: `Lleva más de 30 días esperando respuesta sobre formalizar la negociación y asegurar los equipos. Responder o llamar es urgente para no perder las condiciones acordadas.`,
+                });
+
+                if (hasDiff) advertencias.push({
+                    nivel: "rojo",
+                    titulo: "La propuesta enviada a Altice no refleja el levantamiento actual",
+                    desc: `Enviaste 4 iPhone Pro Max y 107 Motorola G56; el levantamiento real muestra ${actual["iPhone 17 Pro Max"]} Pro Max y ${actual["Motorola G56 5G"]} Motorola G56. Altice necesita los números actualizados antes de firmar.`,
+                });
+
+                if (cotizar > 0) advertencias.push({
+                    nivel: "rojo",
+                    titulo: `${cotizar} líneas pendientes de cotización bloquean el cierre`,
+                    desc: `Son equipos de alto costo (iPhone 17 Pro Max, S26 Ultra, A56) que Altice no puede comprometer sin cotización formal aprobada.`,
+                });
+
+                if (sinMonto > 0) advertencias.push({
+                    nivel: "naranja",
+                    titulo: `${sinMonto} líneas sin monto mensual registrado`,
+                    desc: `Sin montos no puedes calcular el costo total del contrato ni comparar con Claro. Agrega los precios una vez Altice envíe la propuesta formal.`,
+                });
+
+                if (s26 > 0) advertencias.push({
+                    nivel: "naranja",
+                    titulo: `${s26} Samsung S26 Ultra no estaban en la propuesta original`,
+                    desc: `Este equipo no fue incluido en la solicitud de abril. Altice no tiene precio reservado para él y requiere cotización especial con aprobación directiva.`,
+                });
+
+                if (sinRespuesta > 0) advertencias.push({
+                    nivel: "naranja",
+                    titulo: `${sinRespuesta} titulares sin respuesta o pendientes`,
+                    desc: `Confirmar estas personas antes de formalizar el contrato evita comprometerte con solicitudes que aún pueden cambiar.`,
+                });
+
+                if (cartas > 0) advertencias.push({
+                    nivel: "naranja",
+                    titulo: `${cartas} cartas de suspensión/notificación pendientes de enviar`,
+                    desc: `Sin carta formal, las bajas pueden ser impugnadas. Filtra por "CARTA" en la pestaña Acciones para verlas.`,
+                });
+
+                if (sinPorta > 5) advertencias.push({
+                    nivel: "azul",
+                    titulo: `${sinPorta} líneas sin portabilidad marcada`,
+                    desc: `El campo portabilidad (Altice / Claro / Nuevo / Baja) acaba de agregarse. Las 35 altas y los casos de portabilidad desde Claro necesitan marcarse.`,
+                });
+
+                const clsBorder: Record<string, string> = {
+                    rojo: "border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/20",
+                    naranja: "border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20",
+                    azul: "border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/20",
+                };
+                const clsTitle: Record<string, string> = {
+                    rojo: "text-rose-800 dark:text-rose-300",
+                    naranja: "text-amber-800 dark:text-amber-300",
+                    azul: "text-blue-800 dark:text-blue-300",
+                };
+                const clsDesc: Record<string, string> = {
+                    rojo: "text-rose-700 dark:text-rose-400",
+                    naranja: "text-amber-700 dark:text-amber-400",
+                    azul: "text-blue-700 dark:text-blue-400",
+                };
+                const icon: Record<string, React.ReactNode> = {
+                    rojo: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
+                    naranja: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>,
+                    azul: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>,
+                };
+
+                return (
+                    <div>
+                        <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                            Advertencias — cosas que pueden escaparse
+                        </h3>
+                        <div className="space-y-2.5">
+                            {advertencias.map((a, i) => (
+                                <div key={i} className={`border rounded-2xl p-4 flex gap-3 ${clsBorder[a.nivel]}`}>
+                                    <span className={clsTitle[a.nivel]}>{icon[a.nivel]}</span>
+                                    <div>
+                                        <p className={`text-sm font-bold mb-0.5 ${clsTitle[a.nivel]}`}>{a.titulo}</p>
+                                        <p className={`text-xs leading-relaxed ${clsDesc[a.nivel]}`}>{a.desc}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Tabla propuesta vs levantamiento */}
+                        <div className="mt-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
+                            <div className="px-5 py-3 border-b border-slate-100 dark:border-slate-700">
+                                <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Propuesta enviada a Altice (9 abr) vs levantamiento actual</p>
+                            </div>
+                            <table className="w-full text-sm">
+                                <thead className="bg-slate-50 dark:bg-slate-700/50 text-xs text-slate-500 dark:text-slate-400">
+                                    <tr>
+                                        <th className="px-5 py-2 text-left font-semibold">Equipo</th>
+                                        <th className="px-4 py-2 text-center font-semibold">Propuesto</th>
+                                        <th className="px-4 py-2 text-center font-semibold">Levantamiento</th>
+                                        <th className="px-4 py-2 text-center font-semibold">Dif.</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                                    {Object.entries(propuesta).map(([k, prop]) => {
+                                        const act = actual[k] ?? 0;
+                                        const diff = act - prop;
+                                        return (
+                                            <tr key={k}>
+                                                <td className="px-5 py-2.5 text-slate-700 dark:text-slate-200">{k}</td>
+                                                <td className="px-4 py-2.5 text-center text-slate-500 dark:text-slate-400">{prop}</td>
+                                                <td className="px-4 py-2.5 text-center font-medium text-slate-700 dark:text-slate-200">{act}</td>
+                                                <td className={`px-4 py-2.5 text-center font-bold ${diff > 0 ? "text-rose-600 dark:text-rose-400" : diff < 0 ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"}`}>
+                                                    {diff > 0 ? `+${diff}` : diff === 0 ? "=" : diff}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                    {s26 > 0 && (
+                                        <tr className="bg-rose-50/50 dark:bg-rose-950/10">
+                                            <td className="px-5 py-2.5 text-slate-700 dark:text-slate-200">Samsung S26 Ultra</td>
+                                            <td className="px-4 py-2.5 text-center text-slate-400">—</td>
+                                            <td className="px-4 py-2.5 text-center font-medium text-rose-600 dark:text-rose-400">{s26}</td>
+                                            <td className="px-4 py-2.5 text-center font-bold text-rose-600 dark:text-rose-400">+{s26} nuevo</td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                );
+            })()}
+
+            {/* ── PRÓXIMAS ACCIONES PENDIENTES ────────────────────────── */}
+            {(() => {
+                const accionesPendientes = [
+                    { label: "COTIZAR", count: lineas.filter(r => r.proxima_accion === "COTIZAR").length, color: "bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-300" },
+                    { label: "CARTA",   count: lineas.filter(r => r.proxima_accion === "CARTA").length,   color: "bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300" },
+                    { label: "LLAMAR",  count: lineas.filter(r => r.proxima_accion === "LLAMAR").length,  color: "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300" },
+                    { label: "CANCELAR",count: lineas.filter(r => r.proxima_accion === "CANCELAR").length,color: "bg-rose-100 text-rose-800 dark:bg-rose-900/20 dark:text-rose-300" },
+                ];
+                const total = accionesPendientes.reduce((a, b) => a + b.count, 0);
+                if (total === 0) return null;
+                return (
+                    <div>
+                        <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3">Próximas acciones pendientes</h3>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            {accionesPendientes.map(a => (
+                                <div key={a.label} className={`rounded-2xl p-4 text-center ${a.color}`}>
+                                    <p className="text-3xl font-black leading-none">{a.count}</p>
+                                    <p className="text-xs font-semibold mt-1 opacity-80">{a.label}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            })()}
+
             {/* ── DISTRIBUCIÓN POR TIPO ───────────────────────────────── */}
             <div>
                 <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3">Distribución por tipo</h3>

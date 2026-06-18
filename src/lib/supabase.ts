@@ -186,6 +186,7 @@ export interface LineaAltice {
     seguimiento: string;
     nota_resolucion: string;
     portabilidad: string;
+    archivada: boolean;
     updated_at?: string;
     monto_mensual: string;
     cotizacion: string;
