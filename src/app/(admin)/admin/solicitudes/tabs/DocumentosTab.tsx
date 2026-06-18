@@ -230,6 +230,75 @@ function SubirModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
     );
 }
 
+// ── Modal visor PDF ────────────────────────────────────────────────────────────
+function VisorPDF({ doc, onClose }: { doc: Documento; onClose: () => void }) {
+    const [url, setUrl] = useState<string | null>(null);
+    const [error, setError] = useState(false);
+
+    useEffect(() => {
+        supabase.storage
+            .from("documentos-flota")
+            .createSignedUrl(doc.storage_path, 3600)
+            .then(({ data, error }) => {
+                if (error || !data?.signedUrl) setError(true);
+                else setUrl(data.signedUrl);
+            });
+    }, [doc.storage_path]);
+
+    return (
+        <div className="fixed inset-0 z-50 flex flex-col bg-black/80 backdrop-blur-sm">
+            {/* Barra superior */}
+            <div className="flex items-center justify-between px-4 py-3 bg-slate-900 border-b border-slate-700 shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-400 shrink-0">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                    </svg>
+                    <span className="text-white font-semibold text-sm truncate">{doc.nombre}</span>
+                    <span className="text-slate-400 text-xs shrink-0">{formatBytes(doc.tamano_bytes)}</span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                    {url && (
+                        <a
+                            href={url}
+                            download={doc.nombre}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 bg-slate-700 hover:bg-slate-600 transition-colors">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            Descargar
+                        </a>
+                    )}
+                    <button
+                        onClick={onClose}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-700 hover:text-white transition-colors">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            {/* Visor */}
+            <div className="flex-1 min-h-0">
+                {error ? (
+                    <div className="flex items-center justify-center h-full text-slate-400">
+                        <p>No se pudo cargar el documento.</p>
+                    </div>
+                ) : !url ? (
+                    <div className="flex items-center justify-center h-full">
+                        <svg className="animate-spin h-8 w-8 text-blue-400" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                        </svg>
+                    </div>
+                ) : (
+                    <iframe
+                        src={url}
+                        title={doc.nombre}
+                        className="w-full h-full border-0"
+                    />
+                )}
+            </div>
+        </div>
+    );
+}
+
 // ── Componente principal ───────────────────────────────────────────────────────
 export default function DocumentosTab() {
     const [docs, setDocs] = useState<Documento[]>([]);
@@ -238,6 +307,7 @@ export default function DocumentosTab() {
     const [search, setSearch] = useState("");
     const [catFiltro, setCatFiltro] = useState("Todos");
     const [eliminando, setEliminando] = useState<string | null>(null);
+    const [visor, setVisor] = useState<Documento | null>(null);
 
     const cargar = useCallback(async () => {
         setLoading(true);
@@ -369,6 +439,14 @@ export default function DocumentosTab() {
 
                             {/* Acciones */}
                             <div className="flex items-center gap-1 shrink-0">
+                                {doc.mime_type.includes("pdf") && (
+                                    <button
+                                        onClick={() => setVisor(doc)}
+                                        title="Ver en línea"
+                                        className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-purple-50 dark:hover:bg-purple-950/30 hover:text-purple-600 transition-all">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                    </button>
+                                )}
                                 <button
                                     onClick={() => descargar(doc)}
                                     title="Descargar"
@@ -392,6 +470,7 @@ export default function DocumentosTab() {
             )}
 
             {showModal && <SubirModal onClose={() => setShowModal(false)} onSuccess={cargar} />}
+            {visor && <VisorPDF doc={visor} onClose={() => setVisor(null)} />}
         </div>
     );
 }
