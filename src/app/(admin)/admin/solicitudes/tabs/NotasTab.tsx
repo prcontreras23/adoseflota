@@ -298,13 +298,19 @@ export default function NotasTab() {
         return () => { supabase.removeChannel(channel); };
     }, []);
 
-    // Listas únicas — titulares vienen de lineas_altice para que el dropdown esté siempre completo
+    // Dropdown de titulares: todos los de lineas_altice + los que ya tienen notas
     const titulares = useMemo(() => {
         const fromLineas = lineas.map(l => l.titular_responsable).filter(Boolean);
         const fromNotas = notas.map(n => n.titular_responsable).filter(Boolean);
         const set = new Set([...fromLineas, ...fromNotas]);
         return Array.from(set).sort() as string[];
     }, [lineas, notas]);
+
+    // KPI: solo titulares que tienen al menos una nota real
+    const titularesConNotas = useMemo(() => {
+        const set = new Set(notas.map(n => n.titular_responsable).filter(Boolean));
+        return set.size;
+    }, [notas]);
 
     const autores = useMemo(() => {
         const set = new Set(notas.map(n => n.autor).filter(Boolean));
@@ -362,7 +368,6 @@ export default function NotasTab() {
 
     // KPIs rápidos
     const totalNotas = notas.length;
-    const totalTitulares = titulares.length;
     const hoy = new Date().toDateString();
     const notasHoy = notas.filter(n => new Date(n.created_at).toDateString() === hoy).length;
 
@@ -388,7 +393,7 @@ export default function NotasTab() {
             <div className="grid grid-cols-3 gap-3">
                 {[
                     { label: "Total notas", value: totalNotas, color: "text-blue-600 dark:text-blue-400" },
-                    { label: "Perfiles con notas", value: totalTitulares, color: "text-violet-600 dark:text-violet-400" },
+                    { label: "Perfiles con notas", value: titularesConNotas, color: "text-violet-600 dark:text-violet-400" },
                     { label: "Notas hoy", value: notasHoy, color: "text-emerald-600 dark:text-emerald-400" },
                 ].map(k => (
                     <div key={k.label} className="bg-white dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 px-4 py-3.5">

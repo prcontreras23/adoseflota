@@ -69,12 +69,37 @@ function formatRD(amount: number): string {
     }).format(amount);
 }
 
+// Colores dinámicos para acciones no predefinidas
+const ACCION_COLORS_EXTRA: Record<string, string> = {
+    "NO REQUIERE FLOTA": "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300",
+    "SE MANTIENE":       "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300",
+};
+
 export default function DashboardTab() {
     const { lineas: todasLineas, loading, reload } = useLineas();
     const { goToPerfiles } = useNav();
     // Excluir archivadas de todos los conteos del dashboard
     const lineas = useMemo(() => todasLineas.filter(r => !r.archivada), [todasLineas]);
     const stats = useMemo(() => calcStats(lineas), [lineas]);
+
+    // Conteo dinámico de acciones — incluye cualquier valor que exista en la BD
+    const accionesDinamicas = useMemo(() => {
+        const map = new Map<string, number>();
+        for (const l of lineas) {
+            const a = l.accion_2026?.trim() || "(sin acción)";
+            map.set(a, (map.get(a) ?? 0) + 1);
+        }
+        // Orden fijo preferido, luego el resto
+        const orden = ["BAJA","ALTA","CAMBIO SOLICITADO","REVISAR","SE MANTIENE","NO REQUIERE FLOTA"];
+        const sorted: { accion: string; count: number }[] = [];
+        for (const a of orden) {
+            if (map.has(a)) sorted.push({ accion: a, count: map.get(a)! });
+        }
+        for (const [a, count] of map) {
+            if (!orden.includes(a)) sorted.push({ accion: a, count });
+        }
+        return sorted;
+    }, [lineas]);
 
     const StatCard = ({ label, value, color, icon, onClick }: { label: string; value: number; color: string; icon: React.ReactNode; onClick?: () => void }) => (
         <div
@@ -214,12 +239,49 @@ export default function DashboardTab() {
             {/* ── ACCIONES 2026 ───────────────────────────────────────── */}
             <div>
                 <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3">Acciones 2026</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-                    <StatCard label="Total registros" value={stats.total} icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>} color="bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-white" onClick={() => goToPerfiles()} />
-                    <StatCard label="Bajas" value={stats.bajas} icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>} color="bg-rose-50 text-rose-800 dark:bg-rose-900/20 dark:text-rose-300" onClick={() => goToPerfiles({ accion: "BAJA" })} />
-                    <StatCard label="Altas solicitadas" value={stats.altas} icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>} color="bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-300" onClick={() => goToPerfiles({ accion: "ALTA" })} />
-                    <StatCard label="Cambios" value={stats.cambios} icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>} color="bg-blue-50 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300" onClick={() => goToPerfiles({ accion: "CAMBIO SOLICITADO" })} />
-                    <StatCard label="A revisar" value={stats.revisar} icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>} color="bg-orange-50 text-orange-800 dark:bg-orange-900/20 dark:text-orange-300" onClick={() => goToPerfiles({ accion: "REVISAR" })} />
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                    <StatCard
+                        label="Total registros"
+                        value={stats.total}
+                        icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>}
+                        color="bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-white"
+                        onClick={() => goToPerfiles()}
+                    />
+                    {accionesDinamicas.map(({ accion, count }) => {
+                        const colorMap: Record<string, string> = {
+                            "BAJA":              "bg-rose-50 text-rose-800 dark:bg-rose-900/20 dark:text-rose-300",
+                            "ALTA":              "bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-300",
+                            "CAMBIO SOLICITADO": "bg-blue-50 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300",
+                            "REVISAR":           "bg-orange-50 text-orange-800 dark:bg-orange-900/20 dark:text-orange-300",
+                            "SE MANTIENE":       "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300",
+                            "NO REQUIERE FLOTA": "bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400",
+                        };
+                        const iconMap: Record<string, React.ReactNode> = {
+                            "BAJA": <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>,
+                            "ALTA": <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+                            "CAMBIO SOLICITADO": <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>,
+                            "REVISAR": <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
+                        };
+                        const defaultIcon = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/></svg>;
+                        const labelMap: Record<string, string> = {
+                            "BAJA": "Bajas",
+                            "ALTA": "Altas solicitadas",
+                            "CAMBIO SOLICITADO": "Cambios",
+                            "REVISAR": "A revisar",
+                            "SE MANTIENE": "Se mantiene",
+                            "NO REQUIERE FLOTA": "No requiere flota",
+                        };
+                        return (
+                            <StatCard
+                                key={accion}
+                                label={labelMap[accion] ?? accion}
+                                value={count}
+                                icon={iconMap[accion] ?? defaultIcon}
+                                color={colorMap[accion] ?? "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300"}
+                                onClick={() => goToPerfiles({ accion })}
+                            />
+                        );
+                    })}
                 </div>
             </div>
 
