@@ -51,6 +51,7 @@ interface ResumenSnapshot {
 
 interface ReglaRow extends SimRegla {
     cantidad_calc: number;
+    cantidad_real: number;  // conteo vivo del portal, siempre
     subsidio_unit: number;
     inst_unit: number;
     usuario_unit: number;
@@ -142,13 +143,15 @@ function calcularResumen(
     lineas: LineaAltice[]
 ): { reglaRows: ReglaRow[]; especialRows: EspecialRow[]; totales: ResumenSnapshot } {
     const reglaRows: ReglaRow[] = reglas.map(r => {
-        const cantidad_calc = r.cantidad_override ?? countLineas(lineas, r.equipo, r.plan);
+        const cantidad_real = countLineas(lineas, r.equipo, r.plan);
+        const cantidad_calc = r.cantidad_override ?? cantidad_real;
         const subsidio_unit = r.precio_base * r.pct_subsidio;
         const inst_unit = r.inst_paga;
         const usuario_unit = Math.max(0, r.precio_base - subsidio_unit - inst_unit);
         return {
             ...r,
             cantidad_calc,
+            cantidad_real,
             subsidio_unit,
             inst_unit,
             usuario_unit,
@@ -759,8 +762,20 @@ export default function SimuladorTab() {
                                                         <td className="px-3 py-2 text-amber-600 dark:text-amber-400">{formatRD(r.inst_unit)}</td>
                                                         <td className="px-3 py-2 text-slate-500 dark:text-slate-400">{formatRD(r.usuario_unit)}</td>
                                                         <td className="px-3 py-2">
-                                                            <span className="font-semibold text-slate-700 dark:text-slate-200">{r.cantidad_calc}</span>
-                                                            {r.cantidad_override !== null && <span className="ml-1 text-[10px] text-blue-500">(manual)</span>}
+                                                            <div className="flex flex-col gap-0.5">
+                                                                <span className={`font-bold ${r.cantidad_override !== null && r.cantidad_override > r.cantidad_real ? "text-rose-600 dark:text-rose-400" : r.cantidad_override !== null && r.cantidad_override < r.cantidad_real ? "text-amber-600 dark:text-amber-400" : "text-slate-700 dark:text-slate-200"}`}>
+                                                                    {r.cantidad_calc}
+                                                                    {r.cantidad_override !== null && r.cantidad_override > r.cantidad_real && (
+                                                                        <span className="ml-1 text-[10px]">▲+{r.cantidad_override - r.cantidad_real}</span>
+                                                                    )}
+                                                                    {r.cantidad_override !== null && r.cantidad_override < r.cantidad_real && (
+                                                                        <span className="ml-1 text-[10px]">▼{r.cantidad_override - r.cantidad_real}</span>
+                                                                    )}
+                                                                </span>
+                                                                {r.cantidad_override !== null && r.cantidad_override !== r.cantidad_real && (
+                                                                    <span className="text-[10px] text-slate-400">portal: {r.cantidad_real}</span>
+                                                                )}
+                                                            </div>
                                                         </td>
                                                         <td className="px-3 py-2 text-blue-700 dark:text-blue-400 font-bold">{formatRD(r.total_subsidio)}</td>
                                                                         <td className="px-3 py-2 font-semibold text-rose-600 dark:text-rose-400">{r.total_usuario > 0 ? formatRD(r.total_usuario) : <span className="text-slate-300">—</span>}</td>
@@ -783,6 +798,33 @@ export default function SimuladorTab() {
                                     </tr>,
                                 ];
                             })}
+                            {(() => {
+                                const totalConfig = reglaRows.reduce((s, r) => s + r.cantidad_calc, 0);
+                                const totalReal   = reglaRows.reduce((s, r) => s + r.cantidad_real, 0);
+                                const diff = totalConfig - totalReal;
+                                return (
+                                    <tr className="bg-slate-100 dark:bg-slate-700/50 border-t-2 border-slate-300 dark:border-slate-600">
+                                        <td colSpan={6} className="px-3 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                                            Dispositivos totales
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            <div className="flex flex-col gap-0.5">
+                                                <span className={`font-bold text-sm ${diff > 0 ? "text-rose-600 dark:text-rose-400" : diff < 0 ? "text-amber-600 dark:text-amber-400" : "text-green-600 dark:text-green-400"}`}>
+                                                    {totalConfig} configurados
+                                                    {diff !== 0 && <span className="ml-1 text-xs">({diff > 0 ? "+" : ""}{diff} vs portal)</span>}
+                                                </span>
+                                                <span className="text-[11px] text-slate-500 dark:text-slate-400">{totalReal} en portal</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            {diff > 0 && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 text-[10px] font-bold">+{diff} extra</span>}
+                                            {diff < 0 && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[10px] font-bold">{diff} faltan</span>}
+                                            {diff === 0 && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-[10px] font-bold">✓ exacto</span>}
+                                        </td>
+                                        <td colSpan={2} />
+                                    </tr>
+                                );
+                            })()}
                             <tr className="bg-blue-600 text-white">
                                 <td colSpan={8} className="px-3 py-2 font-bold text-sm">Total — Reglas estándar</td>
                                 <td className="px-3 py-2 font-bold text-sm">{formatRD(reglaRows.reduce((s, r) => s + r.total_subsidio, 0))}</td>
