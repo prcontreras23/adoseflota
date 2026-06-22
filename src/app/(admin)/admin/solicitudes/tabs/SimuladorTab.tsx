@@ -238,6 +238,10 @@ export default function SimuladorTab() {
     // Ver detalle snapshot
     const [viewingSnapshot, setViewingSnapshot] = useState<SimSnapshot | null>(null);
 
+    // Consulta rápida por empleado
+    const [consultaEquipo, setConsultaEquipo] = useState(EQUIPOS_CONOCIDOS[0]);
+    const [consultaPlan, setConsultaPlan] = useState("*");
+
     const load = useCallback(async () => {
         setLoading(true);
         const [r1, r2, r3, r4] = await Promise.all([
@@ -259,6 +263,21 @@ export default function SimuladorTab() {
         () => calcularResumen(reglas, especiales, subsidioDisponible, lineas),
         [reglas, especiales, subsidioDisponible, lineas]
     );
+
+    const consultaResult = useMemo(() => {
+        const regla = reglas.find(r => r.equipo === consultaEquipo && r.plan === consultaPlan)
+            ?? reglas.find(r => r.equipo === consultaEquipo && r.plan === "*");
+        if (!regla) return null;
+        const subsidio = regla.precio_base * regla.pct_subsidio;
+        const adose = regla.inst_paga;
+        const empleado = Math.max(0, regla.precio_base - subsidio - adose);
+        return { regla, subsidio, adose, empleado };
+    }, [reglas, consultaEquipo, consultaPlan]);
+
+    const planesDelEquipo = useMemo(() => {
+        const planes = reglas.filter(r => r.equipo === consultaEquipo).map(r => r.plan);
+        return PLANES_OPCIONES.filter(p => planes.includes(p));
+    }, [reglas, consultaEquipo]);
 
     // ── Subsidio disponible ───────────────────────────────────────────────────
     async function saveSubsidio() {
@@ -438,27 +457,6 @@ export default function SimuladorTab() {
     const pct = Math.min(100, (totales.totalSubsidioAltice / totales.subsidio_disponible) * 100);
     const overBudget = totales.diferencia < 0;
     const equipos = [...new Set(reglaRows.map(r => r.equipo))];
-
-    // ── Consulta rápida por empleado ──────────────────────────────────────────
-    const [consultaEquipo, setConsultaEquipo] = useState(EQUIPOS_CONOCIDOS[0]);
-    const [consultaPlan, setConsultaPlan] = useState("*");
-
-    const consultaResult = useMemo(() => {
-        // Primero buscar en reglas con plan exacto, luego con "*"
-        const regla = reglas.find(r => r.equipo === consultaEquipo && r.plan === consultaPlan)
-            ?? reglas.find(r => r.equipo === consultaEquipo && r.plan === "*");
-        if (!regla) return null;
-        const subsidio = regla.precio_base * regla.pct_subsidio;
-        const adose = regla.inst_paga;
-        const empleado = Math.max(0, regla.precio_base - subsidio - adose);
-        return { regla, subsidio, adose, empleado };
-    }, [reglas, consultaEquipo, consultaPlan]);
-
-    // planes disponibles para el equipo seleccionado
-    const planesDelEquipo = useMemo(() => {
-        const planes = reglas.filter(r => r.equipo === consultaEquipo).map(r => r.plan);
-        return PLANES_OPCIONES.filter(p => planes.includes(p));
-    }, [reglas, consultaEquipo]);
 
     return (
         <div className="space-y-6">
