@@ -137,12 +137,14 @@ function countLineas(lineas: LineaAltice[], equipo: string, plan: string): numbe
     }).length;
 }
 
+interface PortalGap { equipo: string; plan: string; count: number; }
+
 function calcularResumen(
     reglas: SimRegla[],
     especiales: SimEspecial[],
     subsidioDisponible: number,
     lineas: LineaAltice[]
-): { reglaRows: ReglaRow[]; especialRows: EspecialRow[]; totales: ResumenSnapshot } {
+): { reglaRows: ReglaRow[]; especialRows: EspecialRow[]; totales: ResumenSnapshot; gaps: PortalGap[] } {
     const reglaRows: ReglaRow[] = reglas.map(r => {
         const cantidad_real = countLineas(lineas, r.equipo, r.plan);
         const cantidad_calc = r.cantidad_override ?? cantidad_real;
@@ -183,9 +185,30 @@ function calcularResumen(
         totalEquipos += e.precio_base * e.cantidad;
     });
 
+    // Detectar combinaciones dispositivo+plan del portal sin regla configurada
+    const portalByDevicePlan = new Map<string, number>();
+    for (const l of lineas) {
+        if (!l.dispositivo_2026) continue;
+        const dev = normalizeDevice(l.dispositivo_2026);
+        const pl = extractPlan(l.gb_solicitado ?? "");
+        const key = `${dev}|||${pl}`;
+        portalByDevicePlan.set(key, (portalByDevicePlan.get(key) ?? 0) + 1);
+    }
+    const gaps: PortalGap[] = [];
+    for (const [key, count] of portalByDevicePlan) {
+        const sep = key.indexOf("|||");
+        const equipo = key.slice(0, sep);
+        const plan = key.slice(sep + 3);
+        const covered = reglas.some(r =>
+            r.equipo === equipo && (r.plan === plan || (r.plan === "*" && plan === "sin_datos"))
+        );
+        if (!covered) gaps.push({ equipo, plan, count });
+    }
+
     return {
         reglaRows,
         especialRows,
+        gaps,
         totales: {
             totalSubsidioAltice,
             totalInstPaga,
@@ -270,7 +293,7 @@ export default function SimuladorTab() {
 
     useEffect(() => { load(); }, [load]);
 
-    const { reglaRows, especialRows, totales } = useMemo(
+    const { reglaRows, especialRows, totales, gaps } = useMemo(
         () => calcularResumen(reglas, especiales, subsidioDisponible, lineas),
         [reglas, especiales, subsidioDisponible, lineas]
     );
@@ -625,11 +648,16 @@ export default function SimuladorTab() {
             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
                 <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between gap-3 flex-wrap">
                     <div>
-                        <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2 flex-wrap">
                             Reglas estándar por equipo y plan
                             <span className="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-[11px] font-semibold">
                                 {reglaRows.reduce((s, r) => s + r.cantidad_calc, 0)} dispositivos
                             </span>
+                            {gaps.length > 0 && (
+                                <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 text-[11px] font-semibold">
+                                    ⚠ {gaps.reduce((s, g) => s + g.count, 0)} sin regla
+                                </span>
+                            )}
                         </h3>
                         <p className="text-xs text-slate-400 mt-0.5">
                             Usa el botón <strong>Editar</strong> en cada fila para modificar precio, porcentaje o cantidad.
@@ -837,6 +865,21 @@ export default function SimuladorTab() {
                                     </tr>
                                 );
                             })()}
+                            {gaps.length > 0 && gaps.map(g => (
+                                <tr key={`gap-${g.equipo}-${g.plan}`} className="bg-amber-50 dark:bg-amber-900/20 border-t border-amber-200 dark:border-amber-800/40">
+                                    <td className="px-3 py-2 text-amber-700 dark:text-amber-400 font-semibold text-xs whitespace-nowrap">
+                                        <span className="mr-1.5">⚠</span>{g.equipo}
+                                    </td>
+                                    <td className="px-3 py-2">
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-200 dark:bg-amber-800/50 text-amber-800 dark:text-amber-300 font-medium text-[10px]">
+                                            {g.plan === "sin_datos" ? "Sin internet" : g.plan}
+                                        </span>
+                                    </td>
+                                    <td colSpan={5} className="px-3 py-2 text-amber-600 dark:text-amber-400 text-xs italic">sin regla configurada</td>
+                                    <td className="px-3 py-2 font-bold text-amber-700 dark:text-amber-400 text-xs">{g.count}</td>
+                                    <td colSpan={3} className="px-3 py-2 text-amber-500 text-[10px]">— agrega una regla para cubrir estos {g.count} empleado{g.count !== 1 ? "s" : ""}</td>
+                                </tr>
+                            ))}
                             <tr className="bg-blue-600 text-white">
                                 <td colSpan={8} className="px-3 py-2 font-bold text-sm">Total — Reglas estándar</td>
                                 <td className="px-3 py-2 font-bold text-sm">{formatRD(reglaRows.reduce((s, r) => s + r.total_subsidio, 0))}</td>
