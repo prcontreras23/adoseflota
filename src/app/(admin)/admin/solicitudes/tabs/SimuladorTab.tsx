@@ -65,6 +65,39 @@ interface EspecialRow extends SimEspecial {
     total_usuario: number;
 }
 
+// ─── Constantes ───────────────────────────────────────────────────────────────
+
+const PLANES_OPCIONES = ["*", "5GB", "10GB", "15GB", "25GB", "50GB"];
+const EQUIPOS_CONOCIDOS = [
+    "Motorola G56 5G 256GB",
+    "Samsung A17 5G 256GB",
+    "Samsung A56 5G 256GB",
+    "iPhone 17 256GB",
+    "iPhone 17 Pro Max 256GB",
+    "iPhone 17 Pro Max 512GB",
+    "Samsung S26 Ultra",
+];
+
+const REGLA_NUEVA_INIT = {
+    equipo: "Motorola G56 5G 256GB",
+    equipoPersonalizado: "",
+    plan: "*",
+    precio_base: 0,
+    pct_subsidio: 0,
+    inst_paga: 0,
+};
+
+const ESPECIAL_NUEVA_INIT = {
+    nombre: "",
+    equipo: "iPhone 17 256GB",
+    equipoPersonalizado: "",
+    cantidad: 1,
+    precio_base: 0,
+    subsidio_altice: 0,
+    inst_paga: 0,
+    usuario_paga: 0,
+};
+
 // ─── Helpers de normalización ─────────────────────────────────────────────────
 
 function normalizeDevice(d: string): string {
@@ -174,13 +207,23 @@ export default function SimuladorTab() {
     const [snapshots, setSnapshots] = useState<SimSnapshot[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Inline edición regla
+    // Edición inline regla
     const [editingReglaId, setEditingReglaId] = useState<string | null>(null);
     const [reglaEdit, setReglaEdit] = useState<Partial<SimRegla>>({});
 
-    // Inline edición especial
+    // Edición inline especial
     const [editingEspecialId, setEditingEspecialId] = useState<string | null>(null);
     const [especialEdit, setEspecialEdit] = useState<Partial<SimEspecial>>({});
+
+    // Formulario nueva regla
+    const [showNewRegla, setShowNewRegla] = useState(false);
+    const [newRegla, setNewRegla] = useState(REGLA_NUEVA_INIT);
+    const [savingNewRegla, setSavingNewRegla] = useState(false);
+
+    // Formulario nueva regla especial
+    const [showNewEspecial, setShowNewEspecial] = useState(false);
+    const [newEspecial, setNewEspecial] = useState(ESPECIAL_NUEVA_INIT);
+    const [savingNewEspecial, setSavingNewEspecial] = useState(false);
 
     // Editar subsidio disponible
     const [editSubsidio, setEditSubsidio] = useState(false);
@@ -217,7 +260,7 @@ export default function SimuladorTab() {
         [reglas, especiales, subsidioDisponible, lineas]
     );
 
-    // ── Guardar cambio de subsidio disponible ─────────────────────────────────
+    // ── Subsidio disponible ───────────────────────────────────────────────────
     async function saveSubsidio() {
         const v = parseFloat(subsidioEditVal.replace(/[^0-9.]/g, ""));
         if (isNaN(v) || v <= 0) { toast.error("Monto inválido"); return; }
@@ -230,13 +273,9 @@ export default function SimuladorTab() {
     // ── Edición inline — reglas ───────────────────────────────────────────────
     function startEditRegla(r: SimRegla) {
         setEditingReglaId(r.id);
-        setReglaEdit({
-            precio_base: r.precio_base,
-            pct_subsidio: r.pct_subsidio,
-            inst_paga: r.inst_paga,
-            cantidad_override: r.cantidad_override,
-        });
+        setReglaEdit({ precio_base: r.precio_base, pct_subsidio: r.pct_subsidio, inst_paga: r.inst_paga, cantidad_override: r.cantidad_override });
         setEditingEspecialId(null);
+        setShowNewRegla(false);
     }
 
     async function saveRegla(id: string) {
@@ -244,8 +283,8 @@ export default function SimuladorTab() {
             precio_base: Number(reglaEdit.precio_base) || 0,
             pct_subsidio: Math.min(1, Math.max(0, Number(reglaEdit.pct_subsidio) || 0)),
             inst_paga: Number(reglaEdit.inst_paga) || 0,
-            cantidad_override: reglaEdit.cantidad_override === null || reglaEdit.cantidad_override === undefined
-                ? null : Number(reglaEdit.cantidad_override) || null,
+            cantidad_override: (reglaEdit.cantidad_override === null || reglaEdit.cantidad_override === undefined)
+                ? null : (Number(reglaEdit.cantidad_override) || null),
         };
         const { error } = await supabase.from("sim_reglas").update(patch).eq("id", id);
         if (error) { toast.error("Error al guardar"); return; }
@@ -254,17 +293,44 @@ export default function SimuladorTab() {
         toast.success("Regla actualizada");
     }
 
+    async function deleteRegla(id: string, equipo: string, plan: string) {
+        if (!confirm(`¿Eliminar la regla "${equipo} / ${planLabel(plan)}"?`)) return;
+        const { error } = await supabase.from("sim_reglas").delete().eq("id", id);
+        if (error) { toast.error("Error al eliminar"); return; }
+        setReglas(prev => prev.filter(r => r.id !== id));
+        toast.success("Regla eliminada");
+    }
+
+    // ── Agregar nueva regla ───────────────────────────────────────────────────
+    async function addRegla() {
+        const equipoFinal = newRegla.equipo === "otro" ? newRegla.equipoPersonalizado.trim() : newRegla.equipo;
+        if (!equipoFinal) { toast.error("Ingresa el nombre del equipo"); return; }
+        if (newRegla.precio_base <= 0) { toast.error("Ingresa el precio base"); return; }
+        setSavingNewRegla(true);
+        const maxOrden = reglas.length > 0 ? Math.max(...reglas.map(r => r.orden)) : 0;
+        const { data, error } = await supabase.from("sim_reglas").insert({
+            equipo: equipoFinal,
+            plan: newRegla.plan,
+            precio_base: Number(newRegla.precio_base),
+            pct_subsidio: Math.min(1, Math.max(0, Number(newRegla.pct_subsidio))),
+            inst_paga: Number(newRegla.inst_paga) || 0,
+            cantidad_override: null,
+            orden: maxOrden + 1,
+        }).select().single();
+        if (error || !data) { toast.error("Error al agregar"); setSavingNewRegla(false); return; }
+        setReglas(prev => [...prev, data as SimRegla]);
+        setNewRegla(REGLA_NUEVA_INIT);
+        setShowNewRegla(false);
+        setSavingNewRegla(false);
+        toast.success("Regla agregada");
+    }
+
     // ── Edición inline — especiales ───────────────────────────────────────────
     function startEditEspecial(e: SimEspecial) {
         setEditingEspecialId(e.id);
-        setEspecialEdit({
-            cantidad: e.cantidad,
-            precio_base: e.precio_base,
-            subsidio_altice: e.subsidio_altice,
-            inst_paga: e.inst_paga,
-            usuario_paga: e.usuario_paga,
-        });
+        setEspecialEdit({ cantidad: e.cantidad, precio_base: e.precio_base, subsidio_altice: e.subsidio_altice, inst_paga: e.inst_paga, usuario_paga: e.usuario_paga });
         setEditingReglaId(null);
+        setShowNewEspecial(false);
     }
 
     async function saveEspecial(id: string) {
@@ -282,6 +348,40 @@ export default function SimuladorTab() {
         toast.success("Regla especial actualizada");
     }
 
+    async function deleteEspecial(id: string, nombre: string) {
+        if (!confirm(`¿Eliminar la regla especial "${nombre}"?`)) return;
+        const { error } = await supabase.from("sim_especiales").delete().eq("id", id);
+        if (error) { toast.error("Error al eliminar"); return; }
+        setEspeciales(prev => prev.filter(e => e.id !== id));
+        toast.success("Regla especial eliminada");
+    }
+
+    // ── Agregar nueva regla especial ──────────────────────────────────────────
+    async function addEspecial() {
+        if (!newEspecial.nombre.trim()) { toast.error("Ingresa una descripción"); return; }
+        const equipoFinal = newEspecial.equipo === "otro" ? newEspecial.equipoPersonalizado.trim() : newEspecial.equipo;
+        if (!equipoFinal) { toast.error("Ingresa el nombre del equipo"); return; }
+        if (newEspecial.precio_base <= 0) { toast.error("Ingresa el precio base"); return; }
+        setSavingNewEspecial(true);
+        const maxOrden = especiales.length > 0 ? Math.max(...especiales.map(e => e.orden)) : 0;
+        const { data, error } = await supabase.from("sim_especiales").insert({
+            nombre: newEspecial.nombre.trim(),
+            equipo: equipoFinal,
+            cantidad: Number(newEspecial.cantidad) || 1,
+            precio_base: Number(newEspecial.precio_base),
+            subsidio_altice: Number(newEspecial.subsidio_altice) || 0,
+            inst_paga: Number(newEspecial.inst_paga) || 0,
+            usuario_paga: Number(newEspecial.usuario_paga) || 0,
+            orden: maxOrden + 1,
+        }).select().single();
+        if (error || !data) { toast.error("Error al agregar"); setSavingNewEspecial(false); return; }
+        setEspeciales(prev => [...prev, data as SimEspecial]);
+        setNewEspecial(ESPECIAL_NUEVA_INIT);
+        setShowNewEspecial(false);
+        setSavingNewEspecial(false);
+        toast.success("Regla especial agregada");
+    }
+
     // ── Guardar snapshot ──────────────────────────────────────────────────────
     async function guardarSnapshot() {
         if (!snapNombre.trim()) { toast.error("Ingresa un nombre"); return; }
@@ -297,8 +397,7 @@ export default function SimuladorTab() {
         if (error) { toast.error("Error al guardar"); setSaving(false); return; }
         toast.success("Escenario guardado");
         setShowSaveModal(false);
-        setSnapNombre("");
-        setSnapDesc("");
+        setSnapNombre(""); setSnapDesc("");
         await load();
         setSaving(false);
     }
@@ -307,25 +406,19 @@ export default function SimuladorTab() {
     async function restaurarSnapshot(snap: SimSnapshot) {
         if (!confirm(`¿Restaurar el escenario "${snap.nombre}"? Esto reemplazará las reglas actuales.`)) return;
         setSaving(true);
-
-        // Borrar y reinsertar reglas
         await supabase.from("sim_reglas").delete().neq("id", "00000000-0000-0000-0000-000000000000");
         await supabase.from("sim_especiales").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-
         const reglasSinId = snap.reglas_json.map(({ id: _id, ...r }) => r);
         const especialesSinId = snap.especiales_json.map(({ id: _id, ...e }) => e);
-
         await supabase.from("sim_reglas").insert(reglasSinId);
         await supabase.from("sim_especiales").insert(especialesSinId);
         await supabase.from("sim_config").update({ subsidio_disponible: snap.subsidio_disponible }).eq("id", 1);
-
         toast.success(`Escenario "${snap.nombre}" restaurado`);
         await load();
         setSaving(false);
         setViewingSnapshot(null);
     }
 
-    // ── Eliminar snapshot ─────────────────────────────────────────────────────
     async function eliminarSnapshot(id: string, nombre: string) {
         if (!confirm(`¿Eliminar el escenario "${nombre}"?`)) return;
         await supabase.from("sim_snapshots").delete().eq("id", id);
@@ -344,8 +437,6 @@ export default function SimuladorTab() {
 
     const pct = Math.min(100, (totales.totalSubsidioAltice / totales.subsidio_disponible) * 100);
     const overBudget = totales.diferencia < 0;
-
-    // Agrupar reglas por equipo
     const equipos = [...new Set(reglaRows.map(r => r.equipo))];
 
     return (
@@ -359,23 +450,21 @@ export default function SimuladorTab() {
                         Modifica precios, porcentajes y cantidades — los totales se actualizan en tiempo real.
                     </p>
                 </div>
-                <div className="flex items-center gap-2">
-                    <button
-                        onClick={() => { setSnapNombre(""); setSnapDesc(""); setShowSaveModal(true); }}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                        Guardar escenario
-                    </button>
-                </div>
+                <button
+                    onClick={() => { setSnapNombre(""); setSnapDesc(""); setShowSaveModal(true); }}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                    Guardar escenario
+                </button>
             </div>
 
             {/* ── Cards resumen ───────────────────────────────────────────── */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {[
-                    { label: "Subsidio Altice", value: totales.totalSubsidioAltice, color: "blue", icon: "📱" },
-                    { label: "Total equipos", value: totales.totalEquipos, color: "slate", icon: "📦" },
-                    { label: "ADOSE aporta", value: totales.totalInstPaga, color: "amber", icon: "🏢" },
-                    { label: "Empleados pagan", value: totales.totalUsuarioPaga, color: "green", icon: "👤" },
+                    { label: "Subsidio Altice", value: totales.totalSubsidioAltice },
+                    { label: "Total equipos", value: totales.totalEquipos },
+                    { label: "ADOSE aporta", value: totales.totalInstPaga },
+                    { label: "Empleados pagan", value: totales.totalUsuarioPaga },
                 ].map(c => (
                     <div key={c.label} className="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-slate-200 dark:border-slate-700 shadow-sm">
                         <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">{c.label}</p>
@@ -387,41 +476,31 @@ export default function SimuladorTab() {
             {/* ── Barra de presupuesto ────────────────────────────────────── */}
             <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-slate-200 dark:border-slate-700 shadow-sm">
                 <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Subsidio disponible Altice</span>
                         {!editSubsidio ? (
-                            <span
-                                onClick={() => { setSubsidioEditVal(String(subsidioDisponible)); setEditSubsidio(true); }}
+                            <span onClick={() => { setSubsidioEditVal(String(subsidioDisponible)); setEditSubsidio(true); }}
                                 className="text-sm font-bold text-blue-600 dark:text-blue-400 cursor-pointer hover:underline">
                                 {formatRD(subsidioDisponible)}
                             </span>
                         ) : (
                             <div className="flex items-center gap-1">
-                                <input
-                                    autoFocus
-                                    type="number"
-                                    value={subsidioEditVal}
-                                    onChange={e => setSubsidioEditVal(e.target.value)}
+                                <input autoFocus type="number" value={subsidioEditVal} onChange={e => setSubsidioEditVal(e.target.value)}
                                     onKeyDown={e => { if (e.key === "Enter") saveSubsidio(); if (e.key === "Escape") setEditSubsidio(false); }}
                                     className="w-36 text-sm font-bold border border-blue-400 rounded-lg px-2 py-0.5 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none" />
-                                <button onClick={saveSubsidio} className="text-green-600 hover:text-green-500">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                                </button>
-                                <button onClick={() => setEditSubsidio(false)} className="text-slate-400 hover:text-slate-600">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                                </button>
+                                <button onClick={saveSubsidio} className="text-green-600 hover:text-green-500"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>
+                                <button onClick={() => setEditSubsidio(false)} className="text-slate-400 hover:text-slate-600"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                             </div>
                         )}
-                        <span className="text-xs text-slate-400">(haz clic para editar)</span>
+                        <span className="text-xs text-slate-400">(clic para editar)</span>
                     </div>
                     <span className={`text-sm font-bold ${overBudget ? "text-rose-600" : "text-green-600"}`}>
                         {overBudget ? "−" : "+"}{formatRD(Math.abs(totales.diferencia))}
-                        <span className="font-normal text-slate-400 ml-1">{overBudget ? "excede" : "disponible"}</span>
+                        <span className="font-normal text-slate-400 ml-1">{overBudget ? "excede" : "sobrante"}</span>
                     </span>
                 </div>
                 <div className="h-3 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                    <div
-                        className={`h-full rounded-full transition-all duration-500 ${overBudget ? "bg-rose-500" : pct > 85 ? "bg-amber-500" : "bg-blue-500"}`}
+                    <div className={`h-full rounded-full transition-all duration-500 ${overBudget ? "bg-rose-500" : pct > 85 ? "bg-amber-500" : "bg-blue-500"}`}
                         style={{ width: `${Math.min(100, pct)}%` }} />
                 </div>
                 <div className="flex justify-between mt-1">
@@ -435,17 +514,79 @@ export default function SimuladorTab() {
                 <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
                     <div>
                         <h3 className="text-sm font-bold text-slate-900 dark:text-white">Reglas estándar por equipo y plan</h3>
-                        <p className="text-xs text-slate-400 mt-0.5">Haz clic en una fila para editar. La cantidad se calcula desde los datos de líneas activas si no se especifica.</p>
+                        <p className="text-xs text-slate-400 mt-0.5">Clic en una fila para editar. La cantidad se calcula desde líneas activas si no se especifica.</p>
                     </div>
+                    <button onClick={() => { setShowNewRegla(v => !v); setEditingReglaId(null); }}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${showNewRegla ? "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200" : "bg-blue-600 hover:bg-blue-500 text-white"}`}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            {showNewRegla ? <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></> : <><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>}
+                        </svg>
+                        {showNewRegla ? "Cancelar" : "Agregar regla"}
+                    </button>
                 </div>
+
+                {/* Formulario nueva regla */}
+                {showNewRegla && (
+                    <div className="px-5 py-4 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-800">
+                        <p className="text-xs font-bold text-blue-700 dark:text-blue-300 mb-3">Nueva regla estándar</p>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                            <div>
+                                <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Equipo</label>
+                                <select value={newRegla.equipo} onChange={e => setNewRegla(p => ({ ...p, equipo: e.target.value }))}
+                                    className="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    {EQUIPOS_CONOCIDOS.map(eq => <option key={eq} value={eq}>{eq}</option>)}
+                                    <option value="otro">Otro (escribir)...</option>
+                                </select>
+                                {newRegla.equipo === "otro" && (
+                                    <input type="text" placeholder="Nombre del equipo" value={newRegla.equipoPersonalizado}
+                                        onChange={e => setNewRegla(p => ({ ...p, equipoPersonalizado: e.target.value }))}
+                                        className="mt-1 w-full border border-blue-400 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none" />
+                                )}
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Plan de datos</label>
+                                <select value={newRegla.plan} onChange={e => setNewRegla(p => ({ ...p, plan: e.target.value }))}
+                                    className="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    {PLANES_OPCIONES.map(pl => <option key={pl} value={pl}>{pl === "*" ? "* Cualquier plan" : pl}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Precio base (RD$)</label>
+                                <input type="number" placeholder="0" value={newRegla.precio_base || ""}
+                                    onChange={e => setNewRegla(p => ({ ...p, precio_base: parseFloat(e.target.value) || 0 }))}
+                                    className="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">% Subsidio Altice (0–1)</label>
+                                <input type="number" placeholder="0.00" step="0.01" min="0" max="1" value={newRegla.pct_subsidio || ""}
+                                    onChange={e => setNewRegla(p => ({ ...p, pct_subsidio: parseFloat(e.target.value) || 0 }))}
+                                    className="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                <p className="text-[10px] text-blue-600 mt-0.5">{((newRegla.pct_subsidio || 0) * 100).toFixed(0)}% = {formatRD((newRegla.precio_base || 0) * (newRegla.pct_subsidio || 0))}</p>
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">ADOSE aporta (RD$)</label>
+                                <input type="number" placeholder="0" value={newRegla.inst_paga || ""}
+                                    onChange={e => setNewRegla(p => ({ ...p, inst_paga: parseFloat(e.target.value) || 0 }))}
+                                    className="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                            </div>
+                            <div className="flex items-end">
+                                <button onClick={addRegla} disabled={savingNewRegla}
+                                    className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-50">
+                                    {savingNewRegla ? <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> : <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                                    Guardar regla
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 <div className="overflow-x-auto">
                     <table className="w-full text-xs">
                         <thead>
                             <tr className="bg-slate-50 dark:bg-slate-900/50">
-                                {["Equipo", "Plan", "Precio base", "% Subsidio", "Subsidio Altice/u.", "ADOSE/u.", "Empleado/u.", "Cantidad", "Total subsidio"].map(h => (
+                                {["Equipo", "Plan", "Precio base", "% Subsidio", "Subsidio/u.", "ADOSE/u.", "Empleado/u.", "Cantidad", "Total subsidio", ""].map(h => (
                                     <th key={h} className="text-left px-3 py-2.5 font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">{h}</th>
                                 ))}
-                                <th className="px-3 py-2.5" />
                             </tr>
                         </thead>
                         <tbody>
@@ -456,58 +597,32 @@ export default function SimuladorTab() {
                                     ...rows.map((r, ri) => {
                                         const isEditing = editingReglaId === r.id;
                                         return (
-                                            <tr
-                                                key={r.id}
+                                            <tr key={r.id}
                                                 onClick={() => !isEditing && startEditRegla(r)}
-                                                className={`border-t border-slate-100 dark:border-slate-700/50 transition-colors cursor-pointer ${isEditing ? "bg-blue-50 dark:bg-blue-900/20" : "hover:bg-slate-50 dark:hover:bg-slate-700/30"} ${ri === 0 ? "border-t-2 border-slate-200 dark:border-slate-600" : ""}`}>
-                                                <td className="px-3 py-2 font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                                                    {ri === 0 ? equipo : ""}
-                                                </td>
+                                                className={`border-t border-slate-100 dark:border-slate-700/50 cursor-pointer transition-colors ${isEditing ? "bg-blue-50 dark:bg-blue-900/20" : "hover:bg-slate-50 dark:hover:bg-slate-700/30"} ${ri === 0 ? "border-t-2 border-slate-200 dark:border-slate-600" : ""}`}>
+                                                <td className="px-3 py-2 font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">{ri === 0 ? equipo : ""}</td>
                                                 <td className="px-3 py-2">
-                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-medium text-[10px]">
-                                                        {planLabel(r.plan)}
-                                                    </span>
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-medium text-[10px]">{planLabel(r.plan)}</span>
                                                 </td>
                                                 {isEditing ? (
                                                     <>
-                                                        <td className="px-2 py-1.5">
-                                                            <input type="number" value={reglaEdit.precio_base ?? ""} onChange={e => setReglaEdit(p => ({ ...p, precio_base: parseFloat(e.target.value) }))}
-                                                                onClick={e => e.stopPropagation()}
-                                                                className="w-24 border border-blue-400 rounded px-1.5 py-0.5 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none" />
-                                                        </td>
+                                                        <td className="px-2 py-1.5"><input type="number" value={reglaEdit.precio_base ?? ""} onChange={e => setReglaEdit(p => ({ ...p, precio_base: parseFloat(e.target.value) }))} onClick={e => e.stopPropagation()} className="w-24 border border-blue-400 rounded px-1.5 py-0.5 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none" /></td>
                                                         <td className="px-2 py-1.5">
                                                             <div className="flex items-center gap-1">
-                                                                <input type="number" step="0.01" min="0" max="1" value={reglaEdit.pct_subsidio ?? ""} onChange={e => setReglaEdit(p => ({ ...p, pct_subsidio: parseFloat(e.target.value) }))}
-                                                                    onClick={e => e.stopPropagation()}
-                                                                    className="w-16 border border-blue-400 rounded px-1.5 py-0.5 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none" />
-                                                                <span className="text-slate-400">({((reglaEdit.pct_subsidio ?? 0) * 100).toFixed(0)}%)</span>
+                                                                <input type="number" step="0.01" min="0" max="1" value={reglaEdit.pct_subsidio ?? ""} onChange={e => setReglaEdit(p => ({ ...p, pct_subsidio: parseFloat(e.target.value) }))} onClick={e => e.stopPropagation()} className="w-16 border border-blue-400 rounded px-1.5 py-0.5 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none" />
+                                                                <span className="text-slate-400">{((reglaEdit.pct_subsidio ?? 0) * 100).toFixed(0)}%</span>
                                                             </div>
                                                         </td>
-                                                        <td className="px-3 py-2 text-blue-700 dark:text-blue-400 font-semibold">
-                                                            {formatRD((reglaEdit.precio_base ?? 0) * (reglaEdit.pct_subsidio ?? 0))}
-                                                        </td>
-                                                        <td className="px-2 py-1.5">
-                                                            <input type="number" value={reglaEdit.inst_paga ?? ""} onChange={e => setReglaEdit(p => ({ ...p, inst_paga: parseFloat(e.target.value) }))}
-                                                                onClick={e => e.stopPropagation()}
-                                                                className="w-24 border border-blue-400 rounded px-1.5 py-0.5 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none" />
-                                                        </td>
-                                                        <td className="px-3 py-2 text-slate-500 dark:text-slate-400">
-                                                            {formatRD(Math.max(0, (reglaEdit.precio_base ?? 0) - (reglaEdit.precio_base ?? 0) * (reglaEdit.pct_subsidio ?? 0) - (reglaEdit.inst_paga ?? 0)))}
-                                                        </td>
-                                                        <td className="px-2 py-1.5">
-                                                            <input type="number" placeholder="auto" value={reglaEdit.cantidad_override ?? ""} onChange={e => setReglaEdit(p => ({ ...p, cantidad_override: e.target.value === "" ? null : parseInt(e.target.value) }))}
-                                                                onClick={e => e.stopPropagation()}
-                                                                className="w-16 border border-blue-400 rounded px-1.5 py-0.5 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none placeholder-slate-300" />
-                                                        </td>
+                                                        <td className="px-3 py-2 text-blue-700 dark:text-blue-400 font-semibold">{formatRD((reglaEdit.precio_base ?? 0) * (reglaEdit.pct_subsidio ?? 0))}</td>
+                                                        <td className="px-2 py-1.5"><input type="number" value={reglaEdit.inst_paga ?? ""} onChange={e => setReglaEdit(p => ({ ...p, inst_paga: parseFloat(e.target.value) }))} onClick={e => e.stopPropagation()} className="w-24 border border-blue-400 rounded px-1.5 py-0.5 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none" /></td>
+                                                        <td className="px-3 py-2 text-slate-500">{formatRD(Math.max(0, (reglaEdit.precio_base ?? 0) - (reglaEdit.precio_base ?? 0) * (reglaEdit.pct_subsidio ?? 0) - (reglaEdit.inst_paga ?? 0)))}</td>
+                                                        <td className="px-2 py-1.5"><input type="number" placeholder="auto" value={reglaEdit.cantidad_override ?? ""} onChange={e => setReglaEdit(p => ({ ...p, cantidad_override: e.target.value === "" ? null : parseInt(e.target.value) }))} onClick={e => e.stopPropagation()} className="w-16 border border-blue-400 rounded px-1.5 py-0.5 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none placeholder-slate-300" /></td>
                                                         <td className="px-3 py-2 text-blue-700 dark:text-blue-400 font-bold">—</td>
                                                         <td className="px-3 py-2">
                                                             <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
-                                                                <button onClick={() => saveRegla(r.id)} className="text-green-600 hover:text-green-500">
-                                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                                                                </button>
-                                                                <button onClick={() => setEditingReglaId(null)} className="text-slate-400 hover:text-slate-600">
-                                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                                                                </button>
+                                                                <button onClick={() => saveRegla(r.id)} className="text-green-600 hover:text-green-500"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>
+                                                                <button onClick={() => setEditingReglaId(null)} className="text-slate-400 hover:text-slate-600"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                                                                <button onClick={() => deleteRegla(r.id, r.equipo, r.plan)} className="text-rose-400 hover:text-rose-600"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
                                                             </div>
                                                         </td>
                                                     </>
@@ -515,24 +630,18 @@ export default function SimuladorTab() {
                                                     <>
                                                         <td className="px-3 py-2 text-slate-600 dark:text-slate-300">{formatRD(r.precio_base)}</td>
                                                         <td className="px-3 py-2">
-                                                            <span className={`font-semibold ${r.pct_subsidio >= 1 ? "text-green-600 dark:text-green-400" : r.pct_subsidio === 0 ? "text-slate-400" : "text-amber-600 dark:text-amber-400"}`}>
-                                                                {(r.pct_subsidio * 100).toFixed(0)}%
-                                                            </span>
+                                                            <span className={`font-semibold ${r.pct_subsidio >= 1 ? "text-green-600 dark:text-green-400" : r.pct_subsidio === 0 ? "text-slate-400" : "text-amber-600 dark:text-amber-400"}`}>{(r.pct_subsidio * 100).toFixed(0)}%</span>
                                                         </td>
                                                         <td className="px-3 py-2 text-blue-700 dark:text-blue-400 font-semibold">{formatRD(r.subsidio_unit)}</td>
                                                         <td className="px-3 py-2 text-amber-600 dark:text-amber-400">{formatRD(r.inst_unit)}</td>
                                                         <td className="px-3 py-2 text-slate-500 dark:text-slate-400">{formatRD(r.usuario_unit)}</td>
                                                         <td className="px-3 py-2">
                                                             <span className="font-semibold text-slate-700 dark:text-slate-200">{r.cantidad_calc}</span>
-                                                            {r.cantidad_override !== null && (
-                                                                <span className="ml-1 text-[10px] text-blue-500 font-medium">(manual)</span>
-                                                            )}
+                                                            {r.cantidad_override !== null && <span className="ml-1 text-[10px] text-blue-500">(manual)</span>}
                                                         </td>
                                                         <td className="px-3 py-2 text-blue-700 dark:text-blue-400 font-bold">{formatRD(r.total_subsidio)}</td>
                                                         <td className="px-3 py-2">
-                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300">
-                                                                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                                                            </svg>
+                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                                                         </td>
                                                     </>
                                                 )}
@@ -540,7 +649,7 @@ export default function SimuladorTab() {
                                         );
                                     }),
                                     <tr key={`sub-${equipo}`} className="bg-blue-50/60 dark:bg-blue-900/10 border-t border-slate-100 dark:border-slate-700/50">
-                                        <td className="px-3 py-1.5 text-[10px] font-semibold text-slate-500 dark:text-slate-400 italic" colSpan={8}>Subtotal {equipo}</td>
+                                        <td className="px-3 py-1.5 text-[10px] font-semibold text-slate-500 italic" colSpan={8}>Subtotal {equipo}</td>
                                         <td className="px-3 py-1.5 text-blue-700 dark:text-blue-400 font-bold text-xs">{formatRD(equipoTotal)}</td>
                                         <td />
                                     </tr>,
@@ -558,70 +667,111 @@ export default function SimuladorTab() {
 
             {/* ── Reglas especiales ───────────────────────────────────────── */}
             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-                <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700">
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">Reglas especiales (acuerdos particulares)</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Montos fijos acordados individualmente. Haz clic en una fila para editar.</p>
+                <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                    <div>
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white">Reglas especiales (acuerdos particulares)</h3>
+                        <p className="text-xs text-slate-400 mt-0.5">Montos fijos acordados individualmente. Clic en una fila para editar.</p>
+                    </div>
+                    <button onClick={() => { setShowNewEspecial(v => !v); setEditingEspecialId(null); }}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${showNewEspecial ? "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200" : "bg-indigo-600 hover:bg-indigo-500 text-white"}`}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            {showNewEspecial ? <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></> : <><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>}
+                        </svg>
+                        {showNewEspecial ? "Cancelar" : "Agregar especial"}
+                    </button>
                 </div>
+
+                {/* Formulario nueva regla especial */}
+                {showNewEspecial && (
+                    <div className="px-5 py-4 bg-indigo-50 dark:bg-indigo-900/20 border-b border-indigo-200 dark:border-indigo-800">
+                        <p className="text-xs font-bold text-indigo-700 dark:text-indigo-300 mb-3">Nueva regla especial (monto fijo)</p>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                            <div className="md:col-span-2">
+                                <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Descripción *</label>
+                                <input type="text" placeholder="Ej. iPhone Pro Max — Director regional" value={newEspecial.nombre}
+                                    onChange={e => setNewEspecial(p => ({ ...p, nombre: e.target.value }))}
+                                    className="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Equipo</label>
+                                <select value={newEspecial.equipo} onChange={e => setNewEspecial(p => ({ ...p, equipo: e.target.value }))}
+                                    className="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                    {EQUIPOS_CONOCIDOS.map(eq => <option key={eq} value={eq}>{eq}</option>)}
+                                    <option value="otro">Otro (escribir)...</option>
+                                </select>
+                                {newEspecial.equipo === "otro" && (
+                                    <input type="text" placeholder="Nombre del equipo" value={newEspecial.equipoPersonalizado}
+                                        onChange={e => setNewEspecial(p => ({ ...p, equipoPersonalizado: e.target.value }))}
+                                        className="mt-1 w-full border border-indigo-400 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none" />
+                                )}
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Cantidad</label>
+                                <input type="number" min="1" value={newEspecial.cantidad}
+                                    onChange={e => setNewEspecial(p => ({ ...p, cantidad: parseInt(e.target.value) || 1 }))}
+                                    className="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            {[
+                                { key: "precio_base", label: "Precio base (RD$)", placeholder: "0" },
+                                { key: "subsidio_altice", label: "Subsidio Altice (RD$)", placeholder: "0" },
+                                { key: "inst_paga", label: "ADOSE aporta (RD$)", placeholder: "0" },
+                                { key: "usuario_paga", label: "Empleado paga (RD$)", placeholder: "0" },
+                            ].map(f => (
+                                <div key={f.key}>
+                                    <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">{f.label}</label>
+                                    <input type="number" placeholder={f.placeholder}
+                                        value={(newEspecial as Record<string, number | string>)[f.key] || ""}
+                                        onChange={e => setNewEspecial(p => ({ ...p, [f.key]: parseFloat(e.target.value) || 0 }))}
+                                        className="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                                </div>
+                            ))}
+                        </div>
+                        <div className="mt-3 flex items-center justify-between">
+                            <p className="text-xs text-indigo-600 dark:text-indigo-400">
+                                Total subsidio: <strong>{formatRD((newEspecial.subsidio_altice || 0) * (newEspecial.cantidad || 1))}</strong>
+                                {" · "}Total ADOSE: <strong>{formatRD((newEspecial.inst_paga || 0) * (newEspecial.cantidad || 1))}</strong>
+                            </p>
+                            <button onClick={addEspecial} disabled={savingNewEspecial}
+                                className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-50">
+                                {savingNewEspecial ? <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> : null}
+                                Guardar regla especial
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 <div className="overflow-x-auto">
                     <table className="w-full text-xs">
                         <thead>
                             <tr className="bg-slate-50 dark:bg-slate-900/50">
-                                {["Descripción", "Equipo", "Cant.", "Precio base", "Subsidio Altice/u.", "ADOSE/u.", "Empleado/u.", "Total subsidio"].map(h => (
+                                {["Descripción", "Equipo", "Cant.", "Precio base", "Subsidio Altice/u.", "ADOSE/u.", "Empleado/u.", "Total subsidio", ""].map(h => (
                                     <th key={h} className="text-left px-3 py-2.5 font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">{h}</th>
                                 ))}
-                                <th className="px-3 py-2.5" />
                             </tr>
                         </thead>
                         <tbody>
                             {especialRows.map(e => {
                                 const isEditing = editingEspecialId === e.id;
                                 return (
-                                    <tr
-                                        key={e.id}
-                                        onClick={() => !isEditing && startEditEspecial(e)}
-                                        className={`border-t border-slate-100 dark:border-slate-700/50 cursor-pointer transition-colors ${isEditing ? "bg-blue-50 dark:bg-blue-900/20" : "hover:bg-slate-50 dark:hover:bg-slate-700/30"}`}>
-                                        <td className="px-3 py-2 font-medium text-slate-700 dark:text-slate-300 max-w-[220px]">
-                                            <span className="block truncate" title={e.nombre}>{e.nombre}</span>
-                                        </td>
+                                    <tr key={e.id} onClick={() => !isEditing && startEditEspecial(e)}
+                                        className={`border-t border-slate-100 dark:border-slate-700/50 cursor-pointer transition-colors ${isEditing ? "bg-indigo-50 dark:bg-indigo-900/20" : "hover:bg-slate-50 dark:hover:bg-slate-700/30"}`}>
+                                        <td className="px-3 py-2 font-medium text-slate-700 dark:text-slate-300 max-w-[220px]"><span className="block truncate" title={e.nombre}>{e.nombre}</span></td>
                                         <td className="px-3 py-2 text-slate-500 dark:text-slate-400 whitespace-nowrap">{e.equipo}</td>
                                         {isEditing ? (
                                             <>
-                                                <td className="px-2 py-1.5">
-                                                    <input type="number" value={especialEdit.cantidad ?? ""} onChange={ev => setEspecialEdit(p => ({ ...p, cantidad: parseInt(ev.target.value) }))}
-                                                        onClick={ev => ev.stopPropagation()}
-                                                        className="w-14 border border-blue-400 rounded px-1.5 py-0.5 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none" />
-                                                </td>
-                                                <td className="px-2 py-1.5">
-                                                    <input type="number" value={especialEdit.precio_base ?? ""} onChange={ev => setEspecialEdit(p => ({ ...p, precio_base: parseFloat(ev.target.value) }))}
-                                                        onClick={ev => ev.stopPropagation()}
-                                                        className="w-24 border border-blue-400 rounded px-1.5 py-0.5 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none" />
-                                                </td>
-                                                <td className="px-2 py-1.5">
-                                                    <input type="number" value={especialEdit.subsidio_altice ?? ""} onChange={ev => setEspecialEdit(p => ({ ...p, subsidio_altice: parseFloat(ev.target.value) }))}
-                                                        onClick={ev => ev.stopPropagation()}
-                                                        className="w-24 border border-blue-400 rounded px-1.5 py-0.5 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none" />
-                                                </td>
-                                                <td className="px-2 py-1.5">
-                                                    <input type="number" value={especialEdit.inst_paga ?? ""} onChange={ev => setEspecialEdit(p => ({ ...p, inst_paga: parseFloat(ev.target.value) }))}
-                                                        onClick={ev => ev.stopPropagation()}
-                                                        className="w-24 border border-blue-400 rounded px-1.5 py-0.5 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none" />
-                                                </td>
-                                                <td className="px-2 py-1.5">
-                                                    <input type="number" value={especialEdit.usuario_paga ?? ""} onChange={ev => setEspecialEdit(p => ({ ...p, usuario_paga: parseFloat(ev.target.value) }))}
-                                                        onClick={ev => ev.stopPropagation()}
-                                                        className="w-24 border border-blue-400 rounded px-1.5 py-0.5 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none" />
-                                                </td>
-                                                <td className="px-3 py-2 text-blue-700 dark:text-blue-400 font-bold">
-                                                    {formatRD((especialEdit.subsidio_altice ?? 0) * (especialEdit.cantidad ?? 1))}
-                                                </td>
+                                                <td className="px-2 py-1.5"><input type="number" value={especialEdit.cantidad ?? ""} onChange={ev => setEspecialEdit(p => ({ ...p, cantidad: parseInt(ev.target.value) }))} onClick={ev => ev.stopPropagation()} className="w-14 border border-indigo-400 rounded px-1.5 py-0.5 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none" /></td>
+                                                <td className="px-2 py-1.5"><input type="number" value={especialEdit.precio_base ?? ""} onChange={ev => setEspecialEdit(p => ({ ...p, precio_base: parseFloat(ev.target.value) }))} onClick={ev => ev.stopPropagation()} className="w-24 border border-indigo-400 rounded px-1.5 py-0.5 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none" /></td>
+                                                <td className="px-2 py-1.5"><input type="number" value={especialEdit.subsidio_altice ?? ""} onChange={ev => setEspecialEdit(p => ({ ...p, subsidio_altice: parseFloat(ev.target.value) }))} onClick={ev => ev.stopPropagation()} className="w-24 border border-indigo-400 rounded px-1.5 py-0.5 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none" /></td>
+                                                <td className="px-2 py-1.5"><input type="number" value={especialEdit.inst_paga ?? ""} onChange={ev => setEspecialEdit(p => ({ ...p, inst_paga: parseFloat(ev.target.value) }))} onClick={ev => ev.stopPropagation()} className="w-24 border border-indigo-400 rounded px-1.5 py-0.5 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none" /></td>
+                                                <td className="px-2 py-1.5"><input type="number" value={especialEdit.usuario_paga ?? ""} onChange={ev => setEspecialEdit(p => ({ ...p, usuario_paga: parseFloat(ev.target.value) }))} onClick={ev => ev.stopPropagation()} className="w-24 border border-indigo-400 rounded px-1.5 py-0.5 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none" /></td>
+                                                <td className="px-3 py-2 text-indigo-700 dark:text-indigo-400 font-bold">{formatRD((especialEdit.subsidio_altice ?? 0) * (especialEdit.cantidad ?? 1))}</td>
                                                 <td className="px-3 py-2">
                                                     <div className="flex items-center gap-1.5" onClick={ev => ev.stopPropagation()}>
-                                                        <button onClick={() => saveEspecial(e.id)} className="text-green-600 hover:text-green-500">
-                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                                                        </button>
-                                                        <button onClick={() => setEditingEspecialId(null)} className="text-slate-400 hover:text-slate-600">
-                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                                                        </button>
+                                                        <button onClick={() => saveEspecial(e.id)} className="text-green-600 hover:text-green-500"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>
+                                                        <button onClick={() => setEditingEspecialId(null)} className="text-slate-400 hover:text-slate-600"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                                                        <button onClick={() => deleteEspecial(e.id, e.nombre)} className="text-rose-400 hover:text-rose-600"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
                                                     </div>
                                                 </td>
                                             </>
@@ -629,15 +779,11 @@ export default function SimuladorTab() {
                                             <>
                                                 <td className="px-3 py-2 font-semibold text-slate-700 dark:text-slate-200">{e.cantidad}</td>
                                                 <td className="px-3 py-2 text-slate-600 dark:text-slate-300">{formatRD(e.precio_base)}</td>
-                                                <td className="px-3 py-2 text-blue-700 dark:text-blue-400 font-semibold">{formatRD(e.subsidio_altice)}</td>
+                                                <td className="px-3 py-2 text-indigo-700 dark:text-indigo-400 font-semibold">{formatRD(e.subsidio_altice)}</td>
                                                 <td className="px-3 py-2 text-amber-600 dark:text-amber-400">{formatRD(e.inst_paga)}</td>
                                                 <td className="px-3 py-2 text-slate-500 dark:text-slate-400">{formatRD(e.usuario_paga)}</td>
-                                                <td className="px-3 py-2 text-blue-700 dark:text-blue-400 font-bold">{formatRD(e.total_subsidio)}</td>
-                                                <td className="px-3 py-2">
-                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300">
-                                                        <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                                                    </svg>
-                                                </td>
+                                                <td className="px-3 py-2 text-indigo-700 dark:text-indigo-400 font-bold">{formatRD(e.total_subsidio)}</td>
+                                                <td className="px-3 py-2"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></td>
                                             </>
                                         )}
                                     </tr>
@@ -667,9 +813,7 @@ export default function SimuladorTab() {
                     ].map(c => (
                         <div key={c.label} className="bg-white/70 dark:bg-slate-800/70 rounded-xl p-3">
                             <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mb-0.5">{c.label}</p>
-                            <p className={`text-sm font-bold ${c.highlight ? (overBudget ? "text-rose-600" : "text-green-600") : "text-slate-900 dark:text-white"}`}>
-                                {formatRD(c.value)}
-                            </p>
+                            <p className={`text-sm font-bold ${c.highlight ? (overBudget ? "text-rose-600" : "text-green-600") : "text-slate-900 dark:text-white"}`}>{formatRD(c.value)}</p>
                         </div>
                     ))}
                 </div>
@@ -679,11 +823,11 @@ export default function SimuladorTab() {
             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
                 <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700">
                     <h3 className="text-sm font-bold text-slate-900 dark:text-white">Historial de escenarios</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">{snapshots.length} escenario{snapshots.length !== 1 ? "s" : ""} guardado{snapshots.length !== 1 ? "s" : ""}. Haz clic en uno para ver el detalle o restaurarlo.</p>
+                    <p className="text-xs text-slate-400 mt-0.5">{snapshots.length} escenario{snapshots.length !== 1 ? "s" : ""} guardado{snapshots.length !== 1 ? "s" : ""}.</p>
                 </div>
                 {snapshots.length === 0 ? (
                     <div className="px-5 py-8 text-center text-sm text-slate-400">
-                        Aún no hay escenarios guardados. Usa el botón <strong>Guardar escenario</strong> para crear el primero.
+                        Aún no hay escenarios guardados. Usa <strong>Guardar escenario</strong> para crear el primero.
                     </div>
                 ) : (
                     <div className="divide-y divide-slate-100 dark:divide-slate-700/50">
@@ -695,54 +839,29 @@ export default function SimuladorTab() {
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2">
                                             <p className="text-sm font-semibold text-slate-800 dark:text-white truncate">{snap.nombre}</p>
-                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${overB ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400" : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"}`}>
-                                                {overB ? "Excede" : "OK"}
-                                            </span>
+                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${overB ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400" : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"}`}>{overB ? "Excede" : "OK"}</span>
                                         </div>
-                                        {snap.descripcion && (
-                                            <p className="text-xs text-slate-400 mt-0.5">{snap.descripcion}</p>
-                                        )}
+                                        {snap.descripcion && <p className="text-xs text-slate-400 mt-0.5">{snap.descripcion}</p>}
                                         <div className="flex flex-wrap items-center gap-3 mt-1">
                                             <span className="text-xs text-slate-500">Subsidio: <strong className="text-blue-600">{formatRD(r.totalSubsidioAltice)}</strong></span>
                                             <span className="text-xs text-slate-500">Disponible: {formatRD(r.subsidio_disponible)}</span>
-                                            <span className={`text-xs font-semibold ${overB ? "text-rose-600" : "text-green-600"}`}>
-                                                {overB ? "−" : "+"}{formatRD(Math.abs(r.diferencia))}
-                                            </span>
-                                            <span className="text-[10px] text-slate-400">
-                                                {new Date(snap.created_at).toLocaleDateString("es-DO", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                                            </span>
+                                            <span className={`text-xs font-semibold ${overB ? "text-rose-600" : "text-green-600"}`}>{overB ? "−" : "+"}{formatRD(Math.abs(r.diferencia))}</span>
+                                            <span className="text-[10px] text-slate-400">{new Date(snap.created_at).toLocaleDateString("es-DO", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2 shrink-0">
-                                        <button
-                                            onClick={() => setViewingSnapshot(viewingSnapshot?.id === snap.id ? null : snap)}
-                                            className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline px-2 py-1 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
-                                            {viewingSnapshot?.id === snap.id ? "Ocultar" : "Ver"}
-                                        </button>
-                                        <button
-                                            onClick={() => restaurarSnapshot(snap)}
-                                            disabled={saving}
-                                            className="text-xs font-medium text-amber-600 dark:text-amber-400 hover:underline px-2 py-1 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors disabled:opacity-40">
-                                            Restaurar
-                                        </button>
-                                        <button
-                                            onClick={() => eliminarSnapshot(snap.id, snap.nombre)}
-                                            className="text-xs font-medium text-rose-500 dark:text-rose-400 hover:underline px-2 py-1 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors">
-                                            Eliminar
-                                        </button>
+                                        <button onClick={() => setViewingSnapshot(viewingSnapshot?.id === snap.id ? null : snap)} className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline px-2 py-1 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">{viewingSnapshot?.id === snap.id ? "Ocultar" : "Ver"}</button>
+                                        <button onClick={() => restaurarSnapshot(snap)} disabled={saving} className="text-xs font-medium text-amber-600 dark:text-amber-400 hover:underline px-2 py-1 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors disabled:opacity-40">Restaurar</button>
+                                        <button onClick={() => eliminarSnapshot(snap.id, snap.nombre)} className="text-xs font-medium text-rose-500 dark:text-rose-400 hover:underline px-2 py-1 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors">Eliminar</button>
                                     </div>
                                 </div>
                             );
                         })}
                     </div>
                 )}
-
-                {/* Detalle de snapshot seleccionado */}
                 {viewingSnapshot && (
                     <div className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 px-5 py-4">
-                        <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-3">
-                            Detalle: {viewingSnapshot.nombre}
-                        </h4>
+                        <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-3">Detalle: {viewingSnapshot.nombre}</h4>
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 text-center">
                             {[
                                 { label: "Total equipos", value: viewingSnapshot.resumen_json.totalEquipos },
@@ -769,41 +888,23 @@ export default function SimuladorTab() {
                         <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-800">
                             <h2 className="text-base font-bold text-slate-900 dark:text-white">Guardar escenario</h2>
                             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                                Subsidio Altice: <strong className="text-blue-600">{formatRD(totales.totalSubsidioAltice)}</strong> · Diferencia: <strong className={overBudget ? "text-rose-600" : "text-green-600"}>{overBudget ? "−" : "+"}{formatRD(Math.abs(totales.diferencia))}</strong>
+                                Subsidio: <strong className="text-blue-600">{formatRD(totales.totalSubsidioAltice)}</strong> · <strong className={overBudget ? "text-rose-600" : "text-green-600"}>{overBudget ? "−" : "+"}{formatRD(Math.abs(totales.diferencia))}</strong>
                             </p>
                         </div>
                         <div className="px-6 py-5 space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Nombre del escenario *</label>
-                                <input
-                                    autoFocus
-                                    type="text"
-                                    value={snapNombre}
-                                    onChange={e => setSnapNombre(e.target.value)}
-                                    onKeyDown={e => e.key === "Enter" && guardarSnapshot()}
-                                    placeholder="Ej. Propuesta inicial, Versión ajustada…"
-                                    className="w-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Nombre *</label>
+                                <input autoFocus type="text" value={snapNombre} onChange={e => setSnapNombre(e.target.value)} onKeyDown={e => e.key === "Enter" && guardarSnapshot()} placeholder="Ej. Propuesta inicial, Versión ajustada…" className="w-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Descripción (opcional)</label>
-                                <textarea
-                                    value={snapDesc}
-                                    onChange={e => setSnapDesc(e.target.value)}
-                                    rows={2}
-                                    placeholder="Notas sobre este escenario…"
-                                    className="w-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+                                <textarea value={snapDesc} onChange={e => setSnapDesc(e.target.value)} rows={2} placeholder="Notas sobre este escenario…" className="w-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
                             </div>
                         </div>
                         <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex gap-3 justify-end">
-                            <button onClick={() => setShowSaveModal(false)} disabled={saving}
-                                className="px-4 py-2 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all disabled:opacity-50">
-                                Cancelar
-                            </button>
-                            <button onClick={guardarSnapshot} disabled={saving || !snapNombre.trim()}
-                                className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 transition-all disabled:opacity-50 flex items-center gap-2">
-                                {saving
-                                    ? <><svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Guardando...</>
-                                    : "Guardar"}
+                            <button onClick={() => setShowSaveModal(false)} disabled={saving} className="px-4 py-2 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all disabled:opacity-50">Cancelar</button>
+                            <button onClick={guardarSnapshot} disabled={saving || !snapNombre.trim()} className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 transition-all disabled:opacity-50 flex items-center gap-2">
+                                {saving ? <><svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Guardando...</> : "Guardar"}
                             </button>
                         </div>
                     </div>
