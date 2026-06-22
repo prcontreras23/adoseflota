@@ -439,6 +439,27 @@ export default function SimuladorTab() {
     const overBudget = totales.diferencia < 0;
     const equipos = [...new Set(reglaRows.map(r => r.equipo))];
 
+    // ── Consulta rápida por empleado ──────────────────────────────────────────
+    const [consultaEquipo, setConsultaEquipo] = useState(EQUIPOS_CONOCIDOS[0]);
+    const [consultaPlan, setConsultaPlan] = useState("*");
+
+    const consultaResult = useMemo(() => {
+        // Primero buscar en reglas con plan exacto, luego con "*"
+        const regla = reglas.find(r => r.equipo === consultaEquipo && r.plan === consultaPlan)
+            ?? reglas.find(r => r.equipo === consultaEquipo && r.plan === "*");
+        if (!regla) return null;
+        const subsidio = regla.precio_base * regla.pct_subsidio;
+        const adose = regla.inst_paga;
+        const empleado = Math.max(0, regla.precio_base - subsidio - adose);
+        return { regla, subsidio, adose, empleado };
+    }, [reglas, consultaEquipo, consultaPlan]);
+
+    // planes disponibles para el equipo seleccionado
+    const planesDelEquipo = useMemo(() => {
+        const planes = reglas.filter(r => r.equipo === consultaEquipo).map(r => r.plan);
+        return PLANES_OPCIONES.filter(p => planes.includes(p));
+    }, [reglas, consultaEquipo]);
+
     return (
         <div className="space-y-6">
 
@@ -456,6 +477,69 @@ export default function SimuladorTab() {
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
                     Guardar escenario
                 </button>
+            </div>
+
+            {/* ── Consulta rápida por empleado ───────────────────────────── */}
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-2xl border border-blue-200 dark:border-blue-800 shadow-sm overflow-hidden">
+                <div className="px-5 py-4 border-b border-blue-200/60 dark:border-blue-800/60">
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-blue-600"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        ¿Cuánto le sale a un empleado?
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Selecciona equipo y plan para ver el desglose de costos.</p>
+                </div>
+                <div className="px-5 py-4">
+                    <div className="flex flex-wrap gap-3 mb-4">
+                        <div className="flex-1 min-w-[200px]">
+                            <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-wide">Equipo</label>
+                            <select value={consultaEquipo}
+                                onChange={e => { setConsultaEquipo(e.target.value); setConsultaPlan("*"); }}
+                                className="w-full border border-blue-200 dark:border-blue-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm">
+                                {EQUIPOS_CONOCIDOS.map(eq => <option key={eq} value={eq}>{eq}</option>)}
+                            </select>
+                        </div>
+                        <div className="w-40">
+                            <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-wide">Plan de datos</label>
+                            <select value={consultaPlan} onChange={e => setConsultaPlan(e.target.value)}
+                                className="w-full border border-blue-200 dark:border-blue-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm">
+                                {planesDelEquipo.length > 0
+                                    ? planesDelEquipo.map(p => <option key={p} value={p}>{p === "*" ? "Cualquier plan" : p}</option>)
+                                    : <option value="*">Cualquier plan</option>}
+                            </select>
+                        </div>
+                    </div>
+
+                    {consultaResult ? (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div className="bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-slate-200 dark:border-slate-700">
+                                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Precio del equipo</p>
+                                <p className="text-base font-bold text-slate-700 dark:text-slate-200">{formatRD(consultaResult.regla.precio_base)}</p>
+                            </div>
+                            <div className="bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-blue-200 dark:border-blue-700">
+                                <p className="text-[10px] font-semibold text-blue-500 uppercase tracking-wide mb-1">Altice cubre</p>
+                                <p className="text-base font-bold text-blue-700 dark:text-blue-400">{formatRD(consultaResult.subsidio)}</p>
+                                <p className="text-[10px] text-blue-400 mt-0.5">{(consultaResult.regla.pct_subsidio * 100).toFixed(0)}% del precio</p>
+                            </div>
+                            <div className="bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-amber-200 dark:border-amber-700">
+                                <p className="text-[10px] font-semibold text-amber-500 uppercase tracking-wide mb-1">ADOSE aporta</p>
+                                <p className="text-base font-bold text-amber-600 dark:text-amber-400">{formatRD(consultaResult.adose)}</p>
+                            </div>
+                            <div className={`rounded-xl p-3.5 border-2 ${consultaResult.empleado > 0 ? "bg-rose-50 dark:bg-rose-900/20 border-rose-300 dark:border-rose-700" : "bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700"}`}>
+                                <p className={`text-[10px] font-semibold uppercase tracking-wide mb-1 ${consultaResult.empleado > 0 ? "text-rose-500" : "text-green-600"}`}>El empleado paga</p>
+                                <p className={`text-xl font-black ${consultaResult.empleado > 0 ? "text-rose-600 dark:text-rose-400" : "text-green-600 dark:text-green-400"}`}>
+                                    {consultaResult.empleado > 0 ? formatRD(consultaResult.empleado) : "¡Gratis!"}
+                                </p>
+                                {consultaResult.empleado > 0 && (
+                                    <p className="text-[10px] text-rose-400 mt-0.5">{((consultaResult.empleado / consultaResult.regla.precio_base) * 100).toFixed(0)}% del precio</p>
+                                )}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="text-center py-4 text-sm text-slate-400">
+                            No hay regla configurada para <strong className="text-slate-600 dark:text-slate-300">{consultaEquipo}</strong> con plan <strong className="text-slate-600 dark:text-slate-300">{consultaPlan === "*" ? "cualquier plan" : consultaPlan}</strong>.
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* ── Cards resumen ───────────────────────────────────────────── */}
