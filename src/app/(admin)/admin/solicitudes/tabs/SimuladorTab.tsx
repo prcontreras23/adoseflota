@@ -624,7 +624,12 @@ export default function SimuladorTab() {
             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
                 <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between gap-3 flex-wrap">
                     <div>
-                        <h3 className="text-sm font-bold text-slate-900 dark:text-white">Reglas estándar por equipo y plan</h3>
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                            Reglas estándar por equipo y plan
+                            <span className="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-[11px] font-semibold">
+                                {reglaRows.reduce((s, r) => s + r.cantidad_calc, 0)} dispositivos
+                            </span>
+                        </h3>
                         <p className="text-xs text-slate-400 mt-0.5">
                             Usa el botón <strong>Editar</strong> en cada fila para modificar precio, porcentaje o cantidad.
                             {reglas.some(r => r.cantidad_override !== null) && (
@@ -722,6 +727,7 @@ export default function SimuladorTab() {
                                 const rows = reglaRows.filter(r => r.equipo === equipo).sort((a, b) => (PLAN_ORDER[a.plan] ?? 9) - (PLAN_ORDER[b.plan] ?? 9));
                                 const equipoTotal = rows.reduce((s, r) => s + r.total_subsidio, 0);
                                 const equipoTotalUsuario = rows.reduce((s, r) => s + r.total_usuario, 0);
+                                const equipoTotalCantidad = rows.reduce((s, r) => s + r.cantidad_calc, 0);
                                 return [
                                     ...rows.map((r, ri) => {
                                         const isEditing = editingReglaId === r.id;
@@ -795,7 +801,8 @@ export default function SimuladorTab() {
                                         );
                                     }),
                                     <tr key={`sub-${equipo}`} className="bg-blue-50/60 dark:bg-blue-900/10 border-t border-slate-100 dark:border-slate-700/50">
-                                        <td className="px-3 py-1.5 text-[10px] font-semibold text-slate-500 italic" colSpan={8}>Subtotal {equipo}</td>
+                                        <td className="px-3 py-1.5 text-[10px] font-semibold text-slate-500 italic" colSpan={7}>Subtotal {equipo}</td>
+                                        <td className="px-3 py-1.5 font-bold text-xs text-slate-700 dark:text-slate-200">{equipoTotalCantidad}</td>
                                         <td className="px-3 py-1.5 text-blue-700 dark:text-blue-400 font-bold text-xs">{formatRD(equipoTotal)}</td>
                                         <td className="px-3 py-1.5 text-rose-600 dark:text-rose-400 font-bold text-xs">{equipoTotalUsuario > 0 ? formatRD(equipoTotalUsuario) : "—"}</td>
                                         <td />
@@ -844,7 +851,12 @@ export default function SimuladorTab() {
             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
                 <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
                     <div>
-                        <h3 className="text-sm font-bold text-slate-900 dark:text-white">Reglas especiales (acuerdos particulares)</h3>
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                            Reglas especiales (acuerdos particulares)
+                            <span className="px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 text-[11px] font-semibold">
+                                {especialRows.reduce((s, e) => s + e.cantidad, 0)} dispositivos
+                            </span>
+                        </h3>
                         <p className="text-xs text-slate-400 mt-0.5">Montos fijos acordados individualmente. Usa el botón <strong>Editar</strong> en cada fila.</p>
                     </div>
                     <button onClick={() => { setShowNewEspecial(v => !v); setEditingEspecialId(null); }}
