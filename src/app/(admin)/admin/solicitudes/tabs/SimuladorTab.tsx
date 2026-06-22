@@ -596,7 +596,7 @@ export default function SimuladorTab() {
                 <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
                     <div>
                         <h3 className="text-sm font-bold text-slate-900 dark:text-white">Reglas estándar por equipo y plan</h3>
-                        <p className="text-xs text-slate-400 mt-0.5">Clic en una fila para editar. La cantidad se calcula desde líneas activas si no se especifica.</p>
+                        <p className="text-xs text-slate-400 mt-0.5">Usa el botón <strong>Editar</strong> en cada fila para modificar precio, porcentaje o cantidad.</p>
                     </div>
                     <button onClick={() => { setShowNewRegla(v => !v); setEditingReglaId(null); }}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${showNewRegla ? "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200" : "bg-blue-600 hover:bg-blue-500 text-white"}`}>
@@ -724,9 +724,12 @@ export default function SimuladorTab() {
                                                             {r.cantidad_override !== null && <span className="ml-1 text-[10px] text-blue-500">(manual)</span>}
                                                         </td>
                                                         <td className="px-3 py-2 text-blue-700 dark:text-blue-400 font-bold">{formatRD(r.total_subsidio)}</td>
-                                                        <td className="px-3 py-2 font-semibold text-rose-600 dark:text-rose-400">{r.total_usuario > 0 ? formatRD(r.total_usuario) : <span className="text-slate-300">—</span>}</td>
+                                                                        <td className="px-3 py-2 font-semibold text-rose-600 dark:text-rose-400">{r.total_usuario > 0 ? formatRD(r.total_usuario) : <span className="text-slate-300">—</span>}</td>
                                                         <td className="px-3 py-2">
-                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                                            <button onClick={e => { e.stopPropagation(); startEditRegla(r); }}
+                                                                className="px-2.5 py-1 text-[11px] font-semibold text-blue-600 hover:text-white hover:bg-blue-600 rounded-lg border border-blue-200 dark:border-blue-700 dark:text-blue-400 dark:hover:text-white dark:hover:bg-blue-600 transition-colors whitespace-nowrap">
+                                                                Editar
+                                                            </button>
                                                         </td>
                                                     </>
                                                 )}
@@ -757,7 +760,7 @@ export default function SimuladorTab() {
                 <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
                     <div>
                         <h3 className="text-sm font-bold text-slate-900 dark:text-white">Reglas especiales (acuerdos particulares)</h3>
-                        <p className="text-xs text-slate-400 mt-0.5">Montos fijos acordados individualmente. Clic en una fila para editar.</p>
+                        <p className="text-xs text-slate-400 mt-0.5">Montos fijos acordados individualmente. Usa el botón <strong>Editar</strong> en cada fila.</p>
                     </div>
                     <button onClick={() => { setShowNewEspecial(v => !v); setEditingEspecialId(null); }}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${showNewEspecial ? "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200" : "bg-indigo-600 hover:bg-indigo-500 text-white"}`}>
@@ -872,7 +875,12 @@ export default function SimuladorTab() {
                                                 <td className="px-3 py-2 text-slate-500 dark:text-slate-400">{formatRD(e.usuario_paga)}</td>
                                                 <td className="px-3 py-2 text-indigo-700 dark:text-indigo-400 font-bold">{formatRD(e.total_subsidio)}</td>
                                                 <td className="px-3 py-2 font-semibold text-rose-600 dark:text-rose-400">{e.total_usuario > 0 ? formatRD(e.total_usuario) : <span className="text-slate-300">—</span>}</td>
-                                                <td className="px-3 py-2"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></td>
+                                                <td className="px-3 py-2">
+                                                    <button onClick={ev => { ev.stopPropagation(); startEditEspecial(e); }}
+                                                        className="px-2.5 py-1 text-[11px] font-semibold text-indigo-600 hover:text-white hover:bg-indigo-600 rounded-lg border border-indigo-200 dark:border-indigo-700 dark:text-indigo-400 dark:hover:text-white dark:hover:bg-indigo-600 transition-colors whitespace-nowrap">
+                                                        Editar
+                                                    </button>
+                                                </td>
                                             </>
                                         )}
                                     </tr>
