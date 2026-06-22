@@ -68,7 +68,7 @@ interface EspecialRow extends SimEspecial {
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
-const PLANES_OPCIONES = ["*", "5GB", "10GB", "15GB", "25GB", "50GB"];
+const PLANES_OPCIONES = ["*", "sin_datos", "5GB", "10GB", "15GB", "25GB", "50GB"];
 const EQUIPOS_CONOCIDOS = [
     "Motorola G56 5G 256GB",
     "Samsung A17 5G 256GB",
@@ -132,7 +132,7 @@ function countLineas(lineas: LineaAltice[], equipo: string, plan: string): numbe
         if (!l.dispositivo_2026) return false;
         if (normalizeDevice(l.dispositivo_2026) !== equipo) return false;
         if (plan === "*") return true;
-        return extractPlan(l.gb_solicitado) === plan;
+        return extractPlan(l.gb_solicitado ?? "") === plan;
     }).length;
 }
 
@@ -196,8 +196,12 @@ function calcularResumen(
     };
 }
 
-const PLAN_ORDER: Record<string, number> = { "50GB": 0, "25GB": 1, "15GB": 2, "10GB": 3, "5GB": 4, "*": 5 };
-function planLabel(plan: string) { return plan === "*" ? "Cualquier plan" : plan; }
+const PLAN_ORDER: Record<string, number> = { "50GB": 0, "25GB": 1, "15GB": 2, "10GB": 3, "5GB": 4, "sin_datos": 5, "*": 6 };
+function planLabel(plan: string) {
+    if (plan === "*") return "Cualquier plan";
+    if (plan === "sin_datos") return "No desea internet";
+    return plan;
+}
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 
@@ -526,7 +530,7 @@ export default function SimuladorTab() {
                             <select value={consultaPlan} onChange={e => setConsultaPlan(e.target.value)}
                                 className="w-full border border-blue-200 dark:border-blue-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm">
                                 {planesDelEquipo.length > 0
-                                    ? planesDelEquipo.map(p => <option key={p} value={p}>{p === "*" ? "Cualquier plan" : p}</option>)
+                                    ? planesDelEquipo.map(p => <option key={p} value={p}>{planLabel(p)}</option>)
                                     : <option value="*">Cualquier plan</option>}
                             </select>
                         </div>
@@ -671,7 +675,7 @@ export default function SimuladorTab() {
                                 <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Plan de datos</label>
                                 <select value={newRegla.plan} onChange={e => setNewRegla(p => ({ ...p, plan: e.target.value }))}
                                     className="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                    {PLANES_OPCIONES.map(pl => <option key={pl} value={pl}>{pl === "*" ? "* Cualquier plan" : pl}</option>)}
+                                    {PLANES_OPCIONES.map(pl => <option key={pl} value={pl}>{pl === "*" ? "* Cualquier plan" : planLabel(pl)}</option>)}
                                 </select>
                             </div>
                             <div>
