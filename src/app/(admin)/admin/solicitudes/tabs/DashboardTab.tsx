@@ -1,10 +1,225 @@
 "use client";
 import { useMemo, useState, useCallback, useEffect } from "react";
 import React from "react";
-import { type LineaAltice, ACCION_COLORS } from "@/lib/supabase";
+import { supabase, type LineaAltice, ACCION_COLORS } from "@/lib/supabase";
 import { useLineas } from "@/lib/LineasContext";
 import { useNav } from "@/lib/NavContext";
 import { useConfigListas } from "@/lib/ConfigListasContext";
+import toast from "react-hot-toast";
+
+// ── Tipos de propuesta ────────────────────────────────────────────────────────
+interface PropuestaRow {
+    id: string;
+    nombre: string;
+    cantidad_propuesta: number;
+    busqueda: string;   // pipe-separated search terms
+    excluir: string;    // term to exclude (e.g. "pro" for plain iPhone 17)
+    es_nuevo: boolean;
+    orden: number;
+}
+
+function calcActual(lineas: LineaAltice[], row: PropuestaRow): number {
+    return lineas.filter(r => {
+        const disp = r.dispositivo_2026?.toLowerCase() ?? "";
+        const terms = row.busqueda.split("|").map(t => t.trim()).filter(Boolean);
+        const matches = terms.some(t => disp.includes(t));
+        const excluded = row.excluir ? disp.includes(row.excluir.toLowerCase()) : false;
+        return matches && !excluded;
+    }).length;
+}
+
+// ── Modal de edición de propuesta ────────────────────────────────────────────
+function PropuestaModal({
+    rows,
+    onSave,
+    onClose,
+}: {
+    rows: PropuestaRow[];
+    onSave: (updated: PropuestaRow[]) => void;
+    onClose: () => void;
+}) {
+    const [draft, setDraft] = useState<PropuestaRow[]>(rows.map(r => ({ ...r })));
+    const [saving, setSaving] = useState(false);
+    const [adding, setAdding] = useState(false);
+    const [newNombre, setNewNombre] = useState("");
+    const [newCantidad, setNewCantidad] = useState("0");
+    const [newBusqueda, setNewBusqueda] = useState("");
+    const [newExcluir, setNewExcluir] = useState("");
+    const [newEsNuevo, setNewEsNuevo] = useState(false);
+
+    function update(id: string, field: keyof PropuestaRow, value: string | number | boolean) {
+        setDraft(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r));
+    }
+
+    async function eliminar(id: string) {
+        setDraft(prev => prev.filter(r => r.id !== id));
+        await supabase.from("propuesta_altice").delete().eq("id", id);
+    }
+
+    async function agregar() {
+        if (!newNombre.trim() || !newBusqueda.trim()) { return; }
+        const { data, error } = await supabase.from("propuesta_altice").insert({
+            nombre: newNombre.trim(),
+            cantidad_propuesta: parseInt(newCantidad) || 0,
+            busqueda: newBusqueda.trim(),
+            excluir: newExcluir.trim(),
+            es_nuevo: newEsNuevo,
+            orden: (draft[draft.length - 1]?.orden ?? 0) + 1,
+        }).select().single();
+        if (!error && data) {
+            setDraft(prev => [...prev, data as PropuestaRow]);
+            setNewNombre(""); setNewCantidad("0"); setNewBusqueda(""); setNewExcluir(""); setNewEsNuevo(false);
+            setAdding(false);
+        }
+    }
+
+    async function handleSave() {
+        setSaving(true);
+        for (const r of draft) {
+            await supabase.from("propuesta_altice").update({
+                nombre: r.nombre,
+                cantidad_propuesta: r.cantidad_propuesta,
+                busqueda: r.busqueda,
+                excluir: r.excluir,
+                es_nuevo: r.es_nuevo,
+                orden: r.orden,
+                updated_at: new Date().toISOString(),
+            }).eq("id", r.id);
+        }
+        setSaving(false);
+        toast.success("Propuesta actualizada para todos los usuarios");
+        onSave(draft);
+        onClose();
+    }
+
+    const inputCls = "border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                {/* Header */}
+                <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between shrink-0">
+                    <div>
+                        <h3 className="text-base font-bold text-slate-800 dark:text-white">Editar propuesta enviada a Altice</h3>
+                        <p className="text-xs text-slate-400 mt-0.5">Los cambios se reflejan para todos los usuarios inmediatamente</p>
+                    </div>
+                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+
+                {/* Table */}
+                <div className="overflow-y-auto flex-1 p-4">
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="text-xs text-slate-500 dark:text-slate-400 font-semibold">
+                                <th className="text-left pb-2 pr-2">Equipo</th>
+                                <th className="text-center pb-2 pr-2 w-20">Propuesto</th>
+                                <th className="text-left pb-2 pr-2">Búsqueda (palabras clave)</th>
+                                <th className="text-left pb-2 pr-2">Excluir</th>
+                                <th className="text-center pb-2 w-16">¿Nuevo?</th>
+                                <th className="w-8 pb-2" />
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                            {draft.map(r => (
+                                <tr key={r.id} className="group">
+                                    <td className="py-2 pr-2">
+                                        <input value={r.nombre} onChange={e => update(r.id, "nombre", e.target.value)}
+                                            className={inputCls + " w-full"} />
+                                    </td>
+                                    <td className="py-2 pr-2">
+                                        <input type="number" min={0} value={r.cantidad_propuesta}
+                                            onChange={e => update(r.id, "cantidad_propuesta", parseInt(e.target.value) || 0)}
+                                            className={inputCls + " w-full text-center"} />
+                                    </td>
+                                    <td className="py-2 pr-2">
+                                        <input value={r.busqueda} onChange={e => update(r.id, "busqueda", e.target.value)}
+                                            placeholder="ej: a56 o g56|motorola"
+                                            className={inputCls + " w-full"} />
+                                    </td>
+                                    <td className="py-2 pr-2">
+                                        <input value={r.excluir} onChange={e => update(r.id, "excluir", e.target.value)}
+                                            placeholder="ej: pro"
+                                            className={inputCls + " w-full"} />
+                                    </td>
+                                    <td className="py-2 text-center pr-2">
+                                        <button onClick={() => update(r.id, "es_nuevo", !r.es_nuevo)}
+                                            className={`w-8 h-4 rounded-full transition-colors ${r.es_nuevo ? "bg-rose-500" : "bg-slate-200 dark:bg-slate-600"}`}>
+                                            <span className={`block w-3 h-3 rounded-full bg-white shadow mx-0.5 transition-transform ${r.es_nuevo ? "translate-x-4" : "translate-x-0"}`} />
+                                        </button>
+                                    </td>
+                                    <td className="py-2">
+                                        <button onClick={() => eliminar(r.id)}
+                                            className="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all">
+                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+
+                    {/* Add row */}
+                    {adding ? (
+                        <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+                            <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-2">Nuevo equipo</p>
+                            <div className="grid grid-cols-2 gap-2 mb-2">
+                                <div>
+                                    <label className="text-xs text-slate-500 dark:text-slate-400 mb-0.5 block">Nombre</label>
+                                    <input value={newNombre} onChange={e => setNewNombre(e.target.value)} placeholder="Samsung A36 5G" className={inputCls + " w-full"} />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-slate-500 dark:text-slate-400 mb-0.5 block">Cantidad propuesta</label>
+                                    <input type="number" min={0} value={newCantidad} onChange={e => setNewCantidad(e.target.value)} className={inputCls + " w-full"} />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-slate-500 dark:text-slate-400 mb-0.5 block">Búsqueda (separar con |)</label>
+                                    <input value={newBusqueda} onChange={e => setNewBusqueda(e.target.value)} placeholder="a36" className={inputCls + " w-full"} />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-slate-500 dark:text-slate-400 mb-0.5 block">Excluir (opcional)</label>
+                                    <input value={newExcluir} onChange={e => setNewExcluir(e.target.value)} placeholder="pro" className={inputCls + " w-full"} />
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3 mb-3">
+                                <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 cursor-pointer">
+                                    <input type="checkbox" checked={newEsNuevo} onChange={e => setNewEsNuevo(e.target.checked)} className="rounded" />
+                                    Equipo no incluido en propuesta original (mostrar como "nuevo")
+                                </label>
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={() => setAdding(false)} className="flex-1 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 text-xs font-semibold text-slate-500">Cancelar</button>
+                                <button onClick={agregar} disabled={!newNombre.trim() || !newBusqueda.trim()}
+                                    className="flex-1 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold disabled:opacity-50">Agregar</button>
+                            </div>
+                        </div>
+                    ) : (
+                        <button onClick={() => setAdding(true)}
+                            className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            Agregar equipo
+                        </button>
+                    )}
+
+                    <p className="text-xs text-slate-400 mt-4">
+                        <strong>Búsqueda:</strong> palabras clave separadas por | (OR). Ej: <code>g56|motorola</code> coincide con cualquiera.<br/>
+                        <strong>Excluir:</strong> término que excluye la línea si aparece en el dispositivo. Ej: <code>pro</code> excluye &quot;iPhone 17 Pro Max&quot;.
+                    </p>
+                </div>
+
+                <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-700 flex gap-3 shrink-0">
+                    <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700">Cancelar</button>
+                    <button onClick={handleSave} disabled={saving}
+                        className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-semibold">
+                        {saving ? "Guardando..." : "Guardar cambios"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
 
 interface Stats {
     total: number;
@@ -31,12 +246,13 @@ function parseMonto(str: string): number {
 }
 
 function calcStats(rows: LineaAltice[]): Stats {
-    const confirmadas = rows.filter(r => r.estado === "CONFIRMADA" || r.estado === "OK").length;
-    const porConfirmar = rows.filter(r => r.estado === "POR CONFIRMAR").length;
-    const respondio = rows.filter(r => r.estado === "RESPONDIÓ").length;
-    const pendientes = rows.filter(r =>
-        r.estado === "PENDIENTE" || r.estado === "SIN RESPUESTA" || !r.estado
-    ).length;
+    const confirmadas = rows.filter(r => { const e = r.estado?.trim(); return e === "CONFIRMADA" || e === "OK"; }).length;
+    const porConfirmar = rows.filter(r => r.estado?.trim() === "POR CONFIRMAR").length;
+    const respondio = rows.filter(r => r.estado?.trim() === "RESPONDIÓ").length;
+    const pendientes = rows.filter(r => {
+        const e = r.estado?.trim();
+        return e === "PENDIENTE" || e === "SIN RESPUESTA" || !e;
+    }).length;
     const conMonto = rows.filter(r => parseMonto(r.monto_mensual) > 0);
     const montoTotal = conMonto.reduce((acc, r) => acc + parseMonto(r.monto_mensual), 0);
     return {
@@ -128,6 +344,12 @@ const POLITICAS_BASE: Omit<PoliticaAlerta, "habilitada">[] = [
         id: "sin_titular",
         nombre: "Líneas sin titular",
         descripcion: "Líneas que no tienen un titular responsable asignado.",
+        nivel: "naranja",
+    },
+    {
+        id: "sin_numero",
+        nombre: "Líneas nuevas sin número asignado",
+        descripcion: "Altas (NUEVA-XX) que aún no tienen un número Altice real asignado.",
         nivel: "naranja",
     },
 ];
@@ -279,7 +501,33 @@ function PoliticasPanel({
 
 export default function DashboardTab() {
     const { lineas: todasLineas, loading, reload } = useLineas();
-    const { goToPerfiles } = useNav();
+    const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+    const [propuestaRows, setPropuestaRows] = useState<PropuestaRow[]>([]);
+    const [showPropuestaModal, setShowPropuestaModal] = useState(false);
+
+    useEffect(() => {
+        supabase.from("propuesta_altice").select("*").order("orden").then(({ data }) => {
+            if (data) setPropuestaRows(data as PropuestaRow[]);
+        });
+        const ch = supabase.channel("propuesta-rt")
+            .on("postgres_changes", { event: "*", schema: "public", table: "propuesta_altice" }, () => {
+                supabase.from("propuesta_altice").select("*").order("orden").then(({ data }) => {
+                    if (data) setPropuestaRows(data as PropuestaRow[]);
+                });
+            })
+            .subscribe();
+        return () => { supabase.removeChannel(ch); };
+    }, []);
+
+    function handleReload() {
+        reload();
+        setLastUpdated(new Date());
+    }
+
+    const lastUpdatedLabel = lastUpdated
+        ? `Hace ${Math.max(0, Math.floor((Date.now() - lastUpdated.getTime()) / 60000))} min`
+        : null;
+    const { goToPerfiles, goToAlmacen } = useNav();
     const { getList } = useConfigListas();
     const lineas = useMemo(() => todasLineas.filter(r => !r.archivada), [todasLineas]);
     const stats = useMemo(() => calcStats(lineas), [lineas]);
@@ -310,41 +558,36 @@ export default function DashboardTab() {
 
     // ── GENERAR ALERTAS desde las políticas ───────────────────────────────────
     const todasAlertas: AlertaGenerada[] = useMemo(() => {
-        const propuesta: Record<string, number> = {
-            "iPhone 17 Pro Max": 4,
-            "iPhone 17": 6,
-            "Samsung A56 5G": 16,
-            "Samsung A17 5G": 30,
-            "Motorola G56 5G": 107,
-        };
-        const actual: Record<string, number> = {
-            "iPhone 17 Pro Max": lineas.filter(r => r.dispositivo_2026?.toLowerCase().includes("iphone 17 pro max")).length,
-            "iPhone 17": lineas.filter(r => r.dispositivo_2026?.toLowerCase().includes("iphone 17") && !r.dispositivo_2026?.toLowerCase().includes("pro")).length,
-            "Samsung A56 5G": lineas.filter(r => r.dispositivo_2026?.toLowerCase().includes("a56")).length,
-            "Samsung A17 5G": lineas.filter(r => r.dispositivo_2026?.toLowerCase().includes("a17")).length,
-            "Motorola G56 5G": lineas.filter(r => r.dispositivo_2026?.toLowerCase().includes("g56") || r.dispositivo_2026?.toLowerCase().includes("motorola")).length,
-        };
-        const hasDiff = Object.keys(propuesta).some(k => (actual[k] ?? 0) !== propuesta[k]);
+        // Usa propuesta dinámica desde BD
+        const noNuevos = propuestaRows.filter(r => !r.es_nuevo);
+        const hasDiff = noNuevos.some(row => calcActual(lineas, row) !== row.cantidad_propuesta);
 
         const cotizar = lineas.filter(r => r.proxima_accion === "COTIZAR").length;
         const cartas  = lineas.filter(r => r.proxima_accion === "CARTA").length;
         const sinMonto = lineas.filter(r => parseMonto(r.monto_mensual) === 0).length;
         const sinRespuesta = lineas.filter(r => r.estado === "SIN RESPUESTA" || r.estado === "PENDIENTE").length;
-        const s26 = lineas.filter(r => r.dispositivo_2026?.toLowerCase().includes("s26") || r.dispositivo_2026?.toLowerCase().includes("ultra")).length;
+        const nuevosRows = propuestaRows.filter(r => r.es_nuevo);
+        const s26 = nuevosRows.length > 0
+            ? nuevosRows.reduce((acc, r) => acc + calcActual(lineas, r), 0)
+            : lineas.filter(r => r.dispositivo_2026?.toLowerCase().includes("s26")).length;
         const sinPorta = lineas.filter(r => !r.portabilidad?.trim()).length;
-        const sinTitularCount = lineas.filter(r => !r.titular_responsable || r.titular_responsable.includes("SIN TITULAR")).length;
+        const sinTitularCount = lineas.filter(r => !r.titular_responsable?.trim() || r.titular_responsable.trim().toUpperCase().includes("SIN TITULAR")).length;
 
         const candidatas: AlertaGenerada[] = [];
 
-        if (hasDiff) candidatas.push({
-            id: "propuesta_altice",
-            nivel: "rojo",
-            titulo: "La propuesta enviada a Altice no refleja el levantamiento actual",
-            desc: `Enviaste 4 iPhone Pro Max y 107 Motorola G56; el levantamiento real muestra ${actual["iPhone 17 Pro Max"]} Pro Max y ${actual["Motorola G56 5G"]} Motorola G56. Altice necesita los números actualizados antes de firmar.`,
-            ctaLabel: "Ver iPhone 17 Pro Max",
-            accion: () => goToPerfiles({ dispositivoContains: "iPhone 17 Pro Max" }),
-            count: Object.values(actual).reduce((a, b) => a + b, 0),
-        });
+        if (hasDiff) {
+            const diffs = noNuevos.filter(r => calcActual(lineas, r) !== r.cantidad_propuesta);
+            const firstDiff = diffs[0];
+            candidatas.push({
+                id: "propuesta_altice",
+                nivel: "rojo",
+                titulo: "La propuesta enviada a Altice no refleja el levantamiento actual",
+                desc: `${diffs.map(r => `${r.nombre}: propuesto ${r.cantidad_propuesta}, actual ${calcActual(lineas, r)}`).join(" · ")}. Altice necesita los números actualizados antes de firmar.`,
+                ctaLabel: firstDiff ? `Ver ${firstDiff.nombre}` : undefined,
+                accion: firstDiff ? () => goToPerfiles({ dispositivoContains: firstDiff.busqueda.split("|")[0] }) : undefined,
+                count: diffs.reduce((acc, r) => acc + calcActual(lineas, r), 0),
+            });
+        }
 
         if (cotizar > 0) candidatas.push({
             id: "cotizar",
@@ -382,7 +625,7 @@ export default function DashboardTab() {
             titulo: `${sinRespuesta} titulares sin respuesta o pendientes`,
             desc: `Confirmar estas personas antes de formalizar el contrato evita comprometerte con solicitudes que aún pueden cambiar.`,
             ctaLabel: `Ver ${sinRespuesta} líneas →`,
-            accion: () => goToPerfiles({ estado: "PENDIENTE" }),
+            accion: () => goToPerfiles({ estadoIn: ["PENDIENTE", "SIN RESPUESTA"] }),
             count: sinRespuesta,
         });
 
@@ -412,13 +655,24 @@ export default function DashboardTab() {
             titulo: `${sinTitularCount} líneas sin titular identificado`,
             desc: `Requieren regularización antes del cierre del contrato.`,
             ctaLabel: `Ver ${sinTitularCount} líneas →`,
-            accion: () => goToPerfiles({ search: "SIN TITULAR" }),
+            accion: () => goToPerfiles({ sinTitular: true }),
             count: sinTitularCount,
+        });
+
+        const sinNumero = lineas.filter(r => r.telefono?.toUpperCase().startsWith("NUEVA") || r.telefono?.toUpperCase().startsWith("NUEVO")).length;
+        if (sinNumero > 0) candidatas.push({
+            id: "sin_numero",
+            nivel: "naranja",
+            titulo: `${sinNumero} líneas nuevas (ALTA) aún sin número Altice asignado`,
+            desc: `Estas líneas tienen código temporal (NUEVA-XX). Ve a Perfiles, abre cada una y usa el panel naranja para asignar el número real.`,
+            ctaLabel: `Asignar números →`,
+            accion: () => goToPerfiles({ accion: "ALTA" }),
+            count: sinNumero,
         });
 
         return candidatas;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [lineas]);
+    }, [lineas, propuestaRows]);
 
     // Separar alertas: activas vs descartadas vs de política desactivada
     const alertasVisibles = useMemo(() =>
@@ -459,6 +713,16 @@ export default function DashboardTab() {
         </div>
     );
 
+    // Hooks must be declared before any early returns (Rules of Hooks)
+    const propuestaActual = useMemo(() =>
+        propuestaRows.map(row => ({ row, actual: calcActual(lineas, row) })),
+        [propuestaRows, lineas]
+    );
+    const s26 = useMemo(() => {
+        const s26Row = propuestaRows.find(r => r.es_nuevo);
+        return s26Row ? calcActual(lineas, s26Row) : lineas.filter(r => r.dispositivo_2026?.toLowerCase().includes("s26")).length;
+    }, [propuestaRows, lineas]);
+
     if (loading) return (
         <div className="flex justify-center py-20">
             <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
@@ -471,20 +735,6 @@ export default function DashboardTab() {
     const pctRespondio    = stats.total > 0 ? Math.round((stats.respondio    / stats.total) * 100) : 0;
     const pctPendientes   = Math.max(0, 100 - pctConfirmadas - pctPorConfirmar - pctRespondio);
     const pctGestionadas  = pctConfirmadas + pctPorConfirmar + pctRespondio;
-
-    // Propuesta vs actual (para la tabla)
-    const propuesta: Record<string, number> = {
-        "iPhone 17 Pro Max": 4, "iPhone 17": 6,
-        "Samsung A56 5G": 16,  "Samsung A17 5G": 30, "Motorola G56 5G": 107,
-    };
-    const actual: Record<string, number> = {
-        "iPhone 17 Pro Max": lineas.filter(r => r.dispositivo_2026?.toLowerCase().includes("iphone 17 pro max")).length,
-        "iPhone 17": lineas.filter(r => r.dispositivo_2026?.toLowerCase().includes("iphone 17") && !r.dispositivo_2026?.toLowerCase().includes("pro")).length,
-        "Samsung A56 5G": lineas.filter(r => r.dispositivo_2026?.toLowerCase().includes("a56")).length,
-        "Samsung A17 5G": lineas.filter(r => r.dispositivo_2026?.toLowerCase().includes("a17")).length,
-        "Motorola G56 5G": lineas.filter(r => r.dispositivo_2026?.toLowerCase().includes("g56") || r.dispositivo_2026?.toLowerCase().includes("motorola")).length,
-    };
-    const s26 = lineas.filter(r => r.dispositivo_2026?.toLowerCase().includes("s26") || r.dispositivo_2026?.toLowerCase().includes("ultra")).length;
 
     return (
         <div className="space-y-6">
@@ -506,10 +756,10 @@ export default function DashboardTab() {
                         Contrato Altice · {stats.total} registros · {new Date().toLocaleDateString("es-DO", { day: "2-digit", month: "short", year: "numeric" })}
                     </p>
                 </div>
-                <button onClick={reload}
+                <button onClick={handleReload}
                     className="text-sm bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 px-4 py-2 rounded-xl font-medium transition-colors flex items-center gap-1.5">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
-                    Actualizar
+                    {lastUpdatedLabel ? `Actualizado · ${lastUpdatedLabel}` : "Actualizar"}
                 </button>
             </div>
 
@@ -527,56 +777,25 @@ export default function DashboardTab() {
                     </div>
                 </div>
                 <div className="w-full h-4 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden flex">
-                    {pctConfirmadas > 0  && <div className="h-full bg-emerald-500 transition-all duration-700 cursor-pointer hover:brightness-90" style={{ width: `${pctConfirmadas}%` }} title={`Confirmadas: ${stats.confirmadas}`} onClick={() => goToPerfiles({ estado: "CONFIRMADA" })} />}
+                    {pctConfirmadas > 0  && <div className="h-full bg-emerald-500 transition-all duration-700 cursor-pointer hover:brightness-90" style={{ width: `${pctConfirmadas}%` }} title={`Confirmadas: ${stats.confirmadas}`} onClick={() => goToPerfiles({ estadoIn: ["CONFIRMADA", "OK"] })} />}
                     {pctPorConfirmar > 0 && <div className="h-full bg-blue-400   transition-all duration-700 cursor-pointer hover:brightness-90" style={{ width: `${pctPorConfirmar}%` }} title={`Por confirmar: ${stats.porConfirmar}`} onClick={() => goToPerfiles({ estado: "POR CONFIRMAR" })} />}
                     {pctRespondio > 0    && <div className="h-full bg-amber-400  transition-all duration-700 cursor-pointer hover:brightness-90" style={{ width: `${pctRespondio}%` }} title={`Respondió: ${stats.respondio}`} onClick={() => goToPerfiles({ estado: "RESPONDIÓ" })} />}
-                    {pctPendientes > 0   && <div className="h-full bg-slate-200 dark:bg-slate-600 transition-all duration-700 cursor-pointer hover:brightness-90" style={{ width: `${pctPendientes}%` }} onClick={() => goToPerfiles({ estado: "PENDIENTE" })} />}
+                    {pctPendientes > 0   && <div className="h-full bg-slate-200 dark:bg-slate-600 transition-all duration-700 cursor-pointer hover:brightness-90" style={{ width: `${pctPendientes}%` }} onClick={() => goToPerfiles({ estadoIn: ["PENDIENTE", "SIN RESPUESTA", ""] })} />}
                 </div>
                 <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2.5">
                     {[
-                        { color: "bg-emerald-500", label: "Confirmadas",   count: stats.confirmadas,  estado: "CONFIRMADA"   },
-                        { color: "bg-blue-400",    label: "Por confirmar", count: stats.porConfirmar, estado: "POR CONFIRMAR" },
-                        { color: "bg-amber-400",   label: "Respondió",     count: stats.respondio,    estado: "RESPONDIÓ"    },
-                        { color: "bg-slate-300 dark:bg-slate-600", label: "Pendientes", count: stats.pendientes, estado: "PENDIENTE" },
-                    ].map(item => (
+                        { color: "bg-emerald-500", label: "Confirmadas",   count: stats.confirmadas,  filter: { estadoIn: ["CONFIRMADA", "OK"] } },
+                        { color: "bg-blue-400",    label: "Por confirmar", count: stats.porConfirmar, filter: { estado: "POR CONFIRMAR" } },
+                        { color: "bg-amber-400",   label: "Respondió",     count: stats.respondio,    filter: { estado: "RESPONDIÓ" } },
+                        { color: "bg-slate-300 dark:bg-slate-600", label: "Pendientes", count: stats.pendientes, filter: { estadoIn: ["PENDIENTE", "SIN RESPUESTA", ""] } },
+                    ].filter(item => item.count > 0).map(item => (
                         <button key={item.label}
-                            onClick={() => goToPerfiles({ estado: item.estado })}
+                            onClick={() => goToPerfiles(item.filter)}
                             className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
                             <span className={`w-2.5 h-2.5 rounded-full inline-block ${item.color}`} />
                             {item.label} ({item.count})
                         </button>
                     ))}
-                </div>
-            </div>
-
-            {/* ── PROYECCIÓN ───────────────────────────────────────────── */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="sm:col-span-2 bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl p-5 flex items-center gap-4">
-                    <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center shrink-0">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
-                    </div>
-                    <div>
-                        <p className="text-xs font-semibold text-blue-100 uppercase tracking-wider mb-0.5">Proyección mensual total</p>
-                        <p className="text-3xl font-black text-white leading-none">
-                            {stats.montoTotal > 0 ? formatRD(stats.montoTotal) : "Sin datos aún"}
-                        </p>
-                        <p className="text-xs text-blue-200 mt-1">
-                            Basado en {stats.lineasConMonto} líneas con monto definido
-                            {stats.lineasSinMonto > 0 && ` · ${stats.lineasSinMonto} aún sin precio`}
-                        </p>
-                    </div>
-                </div>
-                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 flex flex-col justify-between">
-                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Promedio por línea</p>
-                    <p className="text-2xl font-black text-slate-800 dark:text-white mt-2">
-                        {stats.lineasConMonto > 0 ? formatRD(Math.round(stats.montoTotal / stats.lineasConMonto)) : "—"}
-                    </p>
-                    <p className="text-xs text-slate-400 mt-1">
-                        {stats.lineasSinMonto > 0
-                            ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{display:"inline",verticalAlign:"middle",marginRight:3}}><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>{stats.lineasSinMonto} sin cotización</>
-                            : <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{display:"inline",verticalAlign:"middle",marginRight:3}}><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.1 9 11.1"/></svg>Todas cotizadas</>
-                        }
-                    </p>
                 </div>
             </div>
 
@@ -623,6 +842,164 @@ export default function DashboardTab() {
                     })}
                 </div>
             </div>
+
+            {/* ── PANEL ASIGNACIÓN DE NÚMEROS ──────────────────────────── */}
+            {(() => {
+                const isNueva = (t: string) => t?.toUpperCase().startsWith("NUEVA") || t?.toUpperCase().startsWith("NUEVO");
+
+                // Líneas ALTA nuevas (código NUEVA-XX → necesitan telefono real)
+                const altasNuevas      = lineas.filter(r => r.accion_2026 === "ALTA" && isNueva(r.telefono));
+                const altasAsignadas   = lineas.filter(r => r.accion_2026 === "ALTA" && !isNueva(r.telefono));
+
+                // Portabilidades que requieren numero_altice provisional
+                const portClaro  = lineas.filter(r => r.portabilidad === "Claro");
+                const portAltice = lineas.filter(r => r.portabilidad === "Altice");
+                const portNuevo  = lineas.filter(r => r.portabilidad === "Nuevo");
+
+                const portClaroOk  = portClaro.filter(r => !!r.numero_altice);
+                const portAlticeOk = portAltice.filter(r => !!r.numero_altice);
+                const portNuevoOk  = portNuevo.filter(r => !!r.numero_altice || !isNueva(r.telefono));
+
+                // Totales globales
+                const totalNecesitan = altasNuevas.length + altasAsignadas.length + portClaro.length + portAltice.length + portNuevo.length;
+                const totalAsignados = altasAsignadas.length + portClaroOk.length + portAlticeOk.length + portNuevoOk.length;
+                const totalPendientes = totalNecesitan - totalAsignados;
+                const pctGlobal = totalNecesitan > 0 ? Math.round((totalAsignados / totalNecesitan) * 100) : 0;
+
+                if (totalNecesitan === 0) return null;
+
+                function BarraCategoria({ label, ok, total, color, onClick }: { label: string; ok: number; total: number; color: string; onClick?: () => void }) {
+                    if (total === 0) return null;
+                    const p = Math.round((ok / total) * 100);
+                    return (
+                        <div
+                            className={`space-y-1 ${onClick ? "cursor-pointer rounded-lg px-2 py-1.5 -mx-2 hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-colors" : ""}`}
+                            onClick={onClick}
+                            role={onClick ? "button" : undefined}
+                            tabIndex={onClick ? 0 : undefined}
+                            onKeyDown={onClick ? e => { if (e.key === "Enter" || e.key === " ") onClick(); } : undefined}
+                        >
+                            <div className="flex items-center justify-between text-xs">
+                                <span className="text-slate-600 dark:text-slate-300 font-medium">{label}</span>
+                                <span className={`font-bold ${ok === total ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>{ok}/{total}</span>
+                            </div>
+                            <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                                <div className={`h-full rounded-full transition-all duration-700 ${color}`} style={{ width: `${p}%` }} />
+                            </div>
+                        </div>
+                    );
+                }
+
+                return (
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                        {/* Header */}
+                        <div className="px-5 py-3 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                                <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Asignación de números Altice</p>
+                                {totalPendientes > 0 && (
+                                    <span className="flex h-2 w-2 relative">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+                                    </span>
+                                )}
+                            </div>
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${totalPendientes === 0 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"}`}>
+                                {pctGlobal}% completo
+                            </span>
+                        </div>
+
+                        <div className="p-5 space-y-5">
+                            {/* Contadores globales */}
+                            <div className="grid grid-cols-3 gap-3">
+                                <div className="rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 p-3 text-center">
+                                    <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{totalAsignados}</p>
+                                    <p className="text-[10px] font-semibold text-emerald-600/70 dark:text-emerald-400/70 uppercase tracking-wide mt-0.5">Asignados</p>
+                                </div>
+                                <div className={`rounded-xl border p-3 text-center ${totalPendientes > 0 ? "bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-800" : "bg-slate-50 dark:bg-slate-700/40 border-slate-100 dark:border-slate-700"}`}>
+                                    <p className={`text-2xl font-bold ${totalPendientes > 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-400"}`}>{totalPendientes}</p>
+                                    <p className={`text-[10px] font-semibold uppercase tracking-wide mt-0.5 ${totalPendientes > 0 ? "text-amber-600/70 dark:text-amber-400/70" : "text-slate-400"}`}>Pendientes</p>
+                                </div>
+                                <div className="rounded-xl bg-slate-50 dark:bg-slate-700/40 border border-slate-100 dark:border-slate-700 p-3 text-center">
+                                    <p className="text-2xl font-bold text-slate-600 dark:text-slate-300">{totalNecesitan}</p>
+                                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mt-0.5">Total</p>
+                                </div>
+                            </div>
+
+                            {/* Barra global */}
+                            <div className="w-full h-3 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                                <div className={`h-full rounded-full transition-all duration-700 ${pctGlobal === 100 ? "bg-emerald-500" : "bg-amber-400"}`} style={{ width: `${pctGlobal}%` }} />
+                            </div>
+
+                            {/* Desglose por categoría */}
+                            <div className="space-y-3 pt-1 border-t border-slate-100 dark:border-slate-700">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Por tipo de portabilidad</p>
+                                <BarraCategoria label="Líneas ALTA nuevas" ok={altasAsignadas.length} total={altasNuevas.length + altasAsignadas.length} color="bg-blue-400" onClick={() => goToPerfiles({ accion: "ALTA" })} />
+                                <BarraCategoria label="Portabilidad · Claro" ok={portClaroOk.length} total={portClaro.length} color="bg-red-400" onClick={() => goToPerfiles({ portabilidad: "Claro" })} />
+                                <BarraCategoria label="Portabilidad · Altice" ok={portAlticeOk.length} total={portAltice.length} color="bg-indigo-400" onClick={() => goToPerfiles({ portabilidad: "Altice" })} />
+                                <BarraCategoria label="Número nuevo · Nuevo" ok={portNuevoOk.length} total={portNuevo.length} color="bg-emerald-400" onClick={() => goToPerfiles({ portabilidad: "Nuevo" })} />
+                            </div>
+
+                            {/* Distribución por plan */}
+                            {(() => {
+                                const todasLasLineas = lineas.filter(r => !r.archivada);
+                                const tieneNumero = (r: LineaAltice) => !!(r.numero_altice && r.numero_altice.trim());
+                                const planes = [...new Set(todasLasLineas.map(r => r.gb_solicitado?.trim()).filter(Boolean))].sort();
+                                if (planes.length === 0) return null;
+                                const filas = planes.map(plan => {
+                                    const grupo = todasLasLineas.filter(r => r.gb_solicitado?.trim() === plan);
+                                    const asig = grupo.filter(tieneNumero).length;
+                                    const pend = grupo.length - asig;
+                                    const pct = grupo.length > 0 ? Math.round((asig / grupo.length) * 100) : 0;
+                                    return { plan, total: grupo.length, asig, pend, pct };
+                                }).filter(f => f.total > 0).sort((a, b) => b.total - a.total);
+                                const totales = filas.reduce((acc, f) => ({ total: acc.total + f.total, asig: acc.asig + f.asig, pend: acc.pend + f.pend }), { total: 0, asig: 0, pend: 0 });
+                                return (
+                                    <div className="pt-1 border-t border-slate-100 dark:border-slate-700 space-y-3">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Distribución por plan (GB)</p>
+                                        <div className="space-y-2">
+                                            {filas.map(f => (
+                                                <div key={f.plan} role="button" tabIndex={0} onClick={() => goToPerfiles({ gbContains: f.plan })} onKeyDown={e => { if (e.key === "Enter" || e.key === " ") goToPerfiles({ gbContains: f.plan }); }} className="rounded-xl bg-slate-50 dark:bg-slate-700/40 px-4 py-3 space-y-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">{f.plan}</span>
+                                                        <div className="flex items-center gap-2 shrink-0">
+                                                            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">{f.asig} ✓</span>
+                                                            {f.pend > 0 && <span className="text-xs font-bold text-amber-500">{f.pend} ⏳</span>}
+                                                            <span className="text-[10px] text-slate-400 font-mono">{f.total} total</span>
+                                                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${f.pct === 100 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-slate-200 text-slate-500 dark:bg-slate-600 dark:text-slate-300"}`}>{f.pct}%</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-600 overflow-hidden">
+                                                        <div className={`h-full rounded-full transition-all duration-700 ${f.pct === 100 ? "bg-emerald-500" : "bg-amber-400"}`} style={{ width: `${f.pct}%` }} />
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="flex items-center justify-between px-1 pt-1 border-t border-slate-100 dark:border-slate-700">
+                                            <span className="text-xs font-bold text-slate-500 dark:text-slate-400">TOTAL</span>
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">{totales.asig} asignados</span>
+                                                {totales.pend > 0 && <span className="text-xs font-bold text-amber-500">{totales.pend} pendientes</span>}
+                                                <span className="text-xs text-slate-400 font-mono">{totales.total} líneas</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
+                            {totalPendientes > 0 && (
+                                <div className="flex gap-2">
+                                    <button onClick={() => goToPerfiles({ accion: "ALTA" })} className="flex-1 text-center text-xs text-amber-600 dark:text-amber-400 font-semibold hover:underline">
+                                        Ver perfiles pendientes →
+                                    </button>
+                                    <button onClick={() => goToAlmacen()} className="flex-1 text-center text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline">
+                                        Stock disponible en Almacén →
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            })()}
 
             {/* ── ALERTAS (dinámicas y descartables) ───────────────────── */}
             <div>
@@ -719,9 +1096,24 @@ export default function DashboardTab() {
             </div>
 
             {/* ── TABLA PROPUESTA VS LEVANTAMIENTO ─────────────────────── */}
+            {showPropuestaModal && (
+                <PropuestaModal
+                    rows={propuestaRows}
+                    onSave={updated => setPropuestaRows(updated)}
+                    onClose={() => setShowPropuestaModal(false)}
+                />
+            )}
             <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
-                <div className="px-5 py-3 border-b border-slate-100 dark:border-slate-700">
-                    <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Propuesta enviada a Altice (9 abr) vs levantamiento actual</p>
+                <div className="px-5 py-3 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between gap-3">
+                    <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Propuesta enviada a Altice vs levantamiento actual</p>
+                    <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-slate-400 italic hidden sm:inline">Clic en fila para filtrar</span>
+                        <button onClick={() => setShowPropuestaModal(true)}
+                            className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline shrink-0">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                            Editar propuesta
+                        </button>
+                    </div>
                 </div>
                 <table className="w-full text-sm">
                     <thead className="bg-slate-50 dark:bg-slate-700/50 text-xs text-slate-500 dark:text-slate-400">
@@ -733,13 +1125,26 @@ export default function DashboardTab() {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                        {Object.entries(propuesta).map(([k, prop]) => {
-                            const act = actual[k] ?? 0;
-                            const diff = act - prop;
+                        {propuestaActual.map(({ row, actual: act }) => {
+                            if (row.es_nuevo) {
+                                return act > 0 ? (
+                                    <tr key={row.id}
+                                        className="bg-rose-50/50 dark:bg-rose-950/10 cursor-pointer hover:bg-rose-100/60 dark:hover:bg-rose-950/30 transition-colors"
+                                        onClick={() => goToPerfiles({ dispositivoContains: row.busqueda.split("|")[0] })}>
+                                        <td className="px-5 py-2.5 text-slate-700 dark:text-slate-200">{row.nombre}</td>
+                                        <td className="px-4 py-2.5 text-center text-slate-400">—</td>
+                                        <td className="px-4 py-2.5 text-center font-medium text-rose-600 dark:text-rose-400">{act}</td>
+                                        <td className="px-4 py-2.5 text-center font-bold text-rose-600 dark:text-rose-400">+{act} nuevo</td>
+                                    </tr>
+                                ) : null;
+                            }
+                            const diff = act - row.cantidad_propuesta;
                             return (
-                                <tr key={k}>
-                                    <td className="px-5 py-2.5 text-slate-700 dark:text-slate-200">{k}</td>
-                                    <td className="px-4 py-2.5 text-center text-slate-500 dark:text-slate-400">{prop}</td>
+                                <tr key={row.id}
+                                    onClick={() => goToPerfiles({ dispositivoContains: row.busqueda.split("|")[0] })}
+                                    className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-colors">
+                                    <td className="px-5 py-2.5 text-slate-700 dark:text-slate-200">{row.nombre}</td>
+                                    <td className="px-4 py-2.5 text-center text-slate-500 dark:text-slate-400">{row.cantidad_propuesta}</td>
                                     <td className="px-4 py-2.5 text-center font-medium text-slate-700 dark:text-slate-200">{act}</td>
                                     <td className={`px-4 py-2.5 text-center font-bold ${diff > 0 ? "text-rose-600 dark:text-rose-400" : diff < 0 ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"}`}>
                                         {diff > 0 ? `+${diff}` : diff === 0 ? "=" : diff}
@@ -747,16 +1152,15 @@ export default function DashboardTab() {
                                 </tr>
                             );
                         })}
-                        {s26 > 0 && (
-                            <tr className="bg-rose-50/50 dark:bg-rose-950/10">
-                                <td className="px-5 py-2.5 text-slate-700 dark:text-slate-200">Samsung S26 Ultra</td>
-                                <td className="px-4 py-2.5 text-center text-slate-400">—</td>
-                                <td className="px-4 py-2.5 text-center font-medium text-rose-600 dark:text-rose-400">{s26}</td>
-                                <td className="px-4 py-2.5 text-center font-bold text-rose-600 dark:text-rose-400">+{s26} nuevo</td>
-                            </tr>
-                        )}
                     </tbody>
                 </table>
+                {propuestaRows.length === 0 && (
+                    <div className="px-5 py-6 text-center text-sm text-slate-400">
+                        <button onClick={() => setShowPropuestaModal(true)} className="text-blue-600 dark:text-blue-400 font-semibold hover:underline">
+                            Configurar propuesta →
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* ── PRÓXIMAS ACCIONES PENDIENTES ─────────────────────────── */}
@@ -775,10 +1179,12 @@ export default function DashboardTab() {
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                             {accionesPendientes.map(a => (
                                 <button key={a.label} onClick={() => goToPerfiles({ proximaAccion: a.label })}
-                                    className={`rounded-2xl p-4 text-center w-full transition-transform hover:scale-105 active:scale-95 cursor-pointer ${a.color}`}>
-                                    <p className="text-3xl font-black leading-none">{a.count}</p>
-                                    <p className="text-xs font-semibold mt-1 opacity-80">{a.label}</p>
-                                    <p className="text-[10px] opacity-50 mt-0.5">Ver →</p>
+                                    className={`rounded-2xl px-4 py-3 w-full transition-all hover:scale-[1.02] active:scale-95 cursor-pointer flex items-center justify-between gap-3 ${a.color}`}>
+                                    <div className="text-left">
+                                        <p className="text-2xl font-black leading-none">{a.count}</p>
+                                        <p className="text-xs font-semibold mt-0.5 opacity-80">{a.label}</p>
+                                    </div>
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 opacity-50"><polyline points="9 18 15 12 9 6"/></svg>
                                 </button>
                             ))}
                         </div>
@@ -845,7 +1251,7 @@ export default function DashboardTab() {
                                     const c = getColors(k);
                                     return (
                                         <button key={k}
-                                            onClick={() => goToPerfiles({ search: k === "Sin marcar" ? undefined : k, sinPortabilidad: k === "Sin marcar" })}
+                                            onClick={() => goToPerfiles(k === "Sin marcar" ? { sinPortabilidad: true } : { portabilidad: k })}
                                             className={`flex items-center justify-between gap-2 px-3 py-2 rounded-xl ${c.bg} hover:opacity-80 transition-opacity`}>
                                             <span className={`text-xs font-semibold ${c.text}`}>{k}</span>
                                             <span className={`text-sm font-black ${c.text}`}>{v}</span>
@@ -920,12 +1326,13 @@ export default function DashboardTab() {
                                 {sorted.map((k, i) => {
                                     const c = k === "Sin definir" ? sinDefinirStyle : PALETTE[i % PALETTE.length];
                                     const v = gbMap[k] ?? 0;
+                                    const displayLabel = k.replace(/\s*\(RD\$[^)]+\)/i, '').trim();
                                     return (
                                         <button key={k}
-                                            onClick={() => goToPerfiles({ search: k === "Sin definir" ? "" : k })}
+                                            onClick={() => goToPerfiles(k === "Sin definir" ? { sinGb: true } : { gbContains: k })}
                                             className={`flex items-center justify-between gap-2 px-3 py-2 rounded-xl ${c.bg} hover:opacity-80 transition-opacity`}>
-                                            <span className={`text-xs font-semibold ${c.text}`}>{k}</span>
-                                            <span className={`text-sm font-black ${c.text}`}>{v}</span>
+                                            <span className={`text-xs font-semibold ${c.text} truncate`}>{displayLabel}</span>
+                                            <span className={`text-sm font-black ${c.text} shrink-0`}>{v}</span>
                                         </button>
                                     );
                                 })}
@@ -936,25 +1343,64 @@ export default function DashboardTab() {
             })()}
 
             {/* ── DISTRIBUCIÓN POR TIPO ────────────────────────────────── */}
-            <div>
-                <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3">Distribución por tipo</h3>
-                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-                        {Object.entries(
-                            lineas.reduce((acc, r) => {
-                                const tipo = r.tipo || "Sin tipo";
-                                acc[tipo] = (acc[tipo] || 0) + 1;
-                                return acc;
-                            }, {} as Record<string, number>)
-                        ).sort((a, b) => b[1] - a[1]).map(([tipo, cnt]) => (
-                            <div key={tipo} className="flex items-center justify-between bg-slate-50 dark:bg-slate-700/50 rounded-xl px-3 py-2">
-                                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{tipo}</span>
-                                <span className="text-sm font-bold text-slate-500 dark:text-slate-400">{cnt}</span>
+            {(() => {
+                const tipoMap = lineas.reduce((acc, r) => {
+                    const tipo = r.tipo || "Sin tipo";
+                    acc[tipo] = (acc[tipo] || 0) + 1;
+                    return acc;
+                }, {} as Record<string, number>);
+                const tipoEntries = Object.entries(tipoMap).sort((a, b) => b[1] - a[1]);
+                const tipoTotal = lineas.length || 1;
+                const TIPO_PALETTE = [
+                    { bar: "bg-blue-500",    bg: "bg-blue-50 dark:bg-blue-900/20",       text: "text-blue-700 dark:text-blue-300" },
+                    { bar: "bg-violet-500",  bg: "bg-violet-50 dark:bg-violet-900/20",   text: "text-violet-700 dark:text-violet-300" },
+                    { bar: "bg-emerald-500", bg: "bg-emerald-50 dark:bg-emerald-900/20", text: "text-emerald-700 dark:text-emerald-300" },
+                    { bar: "bg-amber-500",   bg: "bg-amber-50 dark:bg-amber-900/20",     text: "text-amber-700 dark:text-amber-300" },
+                    { bar: "bg-rose-500",    bg: "bg-rose-50 dark:bg-rose-900/20",       text: "text-rose-700 dark:text-rose-300" },
+                    { bar: "bg-cyan-500",    bg: "bg-cyan-50 dark:bg-cyan-900/20",       text: "text-cyan-700 dark:text-cyan-300" },
+                    { bar: "bg-pink-500",    bg: "bg-pink-50 dark:bg-pink-900/20",       text: "text-pink-700 dark:text-pink-300" },
+                    { bar: "bg-lime-500",    bg: "bg-lime-50 dark:bg-lime-900/20",       text: "text-lime-700 dark:text-lime-300" },
+                ];
+                return (
+                    <div>
+                        <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3">Distribución por tipo</h3>
+                        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 space-y-3">
+                            {/* Barra stacked */}
+                            <div className="flex rounded-full overflow-hidden h-3 gap-px">
+                                {tipoEntries.map(([tipo, cnt], i) => {
+                                    const c = TIPO_PALETTE[i % TIPO_PALETTE.length];
+                                    return (
+                                        <div key={tipo} title={`${tipo}: ${cnt}`}
+                                            style={{ width: `${(cnt / tipoTotal) * 100}%` }}
+                                            className={`${c.bar} transition-all`} />
+                                    );
+                                })}
                             </div>
-                        ))}
+                            {/* Filas con barra de progreso */}
+                            <div className="space-y-1.5">
+                                {tipoEntries.map(([tipo, cnt], i) => {
+                                    const c = TIPO_PALETTE[i % TIPO_PALETTE.length];
+                                    const pct = Math.round((cnt / tipoTotal) * 100);
+                                    return (
+                                        <button key={tipo}
+                                            onClick={() => goToPerfiles(tipo === "Sin tipo" ? { sinTipo: true } : { tipo })}
+                                            className="w-full flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group">
+                                            <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${c.bar}`} />
+                                            <span className="text-sm font-medium text-slate-700 dark:text-slate-200 w-32 text-left truncate">{tipo}</span>
+                                            <div className="flex-1 h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                                                <div className={`h-full ${c.bar} rounded-full transition-all`} style={{ width: `${pct}%` }} />
+                                            </div>
+                                            <span className="text-xs text-slate-400 dark:text-slate-500 w-8 text-right shrink-0">{pct}%</span>
+                                            <span className="text-sm font-bold text-slate-600 dark:text-slate-300 w-6 text-right shrink-0">{cnt}</span>
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 opacity-0 group-hover:opacity-40 transition-opacity"><polyline points="9 18 15 12 9 6"/></svg>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
+                );
+            })()}
         </div>
     );
 }

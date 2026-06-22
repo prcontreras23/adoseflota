@@ -8,6 +8,10 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
     title: "ADOSE Flota 2026",
     description: "Gestión de flota móvil corporativa - Unión Adventista Sureste",
+    icons: {
+        icon: "/logo-adose.png",
+        apple: "/logo-adose.png",
+    },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -5,20 +5,29 @@ export interface NavFilter {
     proximaAccion?: string;
     accion?: string;
     estado?: string;
+    estadoIn?: string[];      // múltiples estados a la vez (OR)
     titular?: string;
     search?: string;
     sinMonto?: boolean;
     sinPortabilidad?: boolean;
     dispositivoContains?: string;
+    tipo?: string;
+    portabilidad?: string;    // filtra por campo portabilidad exacto
+    gbContains?: string;      // filtra por gb_solicitado que contenga este string
+    sinGb?: boolean;          // filtra líneas sin gb_solicitado
+    sinTitular?: boolean;     // filtra líneas sin titular (null o "SIN TITULAR")
+    sinTipo?: boolean;        // filtra líneas sin tipo
 }
 
 interface NavContextValue {
     goToPerfiles: (filter?: NavFilter) => void;
+    goToAlmacen: () => void;
     consumeFilter: () => NavFilter | null;
 }
 
 const NavContext = createContext<NavContextValue>({
     goToPerfiles: () => {},
+    goToAlmacen: () => {},
     consumeFilter: () => null,
 });
 
@@ -30,6 +39,10 @@ export function NavProvider({ children, onNavigate }: { children: React.ReactNod
         onNavigate("perfiles");
     }
 
+    function goToAlmacen() {
+        onNavigate("almacen");
+    }
+
     function consumeFilter() {
         const f = pendingFilter;
         setPendingFilter(null);
@@ -37,7 +50,7 @@ export function NavProvider({ children, onNavigate }: { children: React.ReactNod
     }
 
     return (
-        <NavContext.Provider value={{ goToPerfiles, consumeFilter }}>
+        <NavContext.Provider value={{ goToPerfiles, goToAlmacen, consumeFilter }}>
             {children}
         </NavContext.Provider>
     );

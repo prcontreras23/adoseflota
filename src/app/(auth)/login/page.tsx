@@ -247,12 +247,11 @@ export default function LoginPage() {
                         )}
                     </div>
                 )}
+                {/* Footer */}
+                <p className="text-center text-blue-400/40 text-xs mt-6">
+                    © 2026 ADOSE · Todos los derechos reservados
+                </p>
             </div>
-
-            {/* Footer */}
-            <p className="text-center text-blue-400/40 text-xs mt-6">
-                © 2026 ADOSE · Todos los derechos reservados
-            </p>
             <style jsx global>{`
                 @keyframes shake {
                     0%, 100% { transform: translateX(0); }

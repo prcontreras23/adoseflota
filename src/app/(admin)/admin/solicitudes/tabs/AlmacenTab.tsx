@@ -5,6 +5,14 @@ import { useLineas } from "@/lib/LineasContext";
 import * as XLSX from "xlsx";
 import toast from "react-hot-toast";
 
+interface NumeroAlticeStock {
+    id: string;
+    numero: string;
+    plan: string;
+    linea_id: string | null;
+    lineas_altice: { usuario_linea: string; telefono: string; titular_responsable: string } | null;
+}
+
 interface DispositivoStock {
     id: string;
     dispositivo: string;
@@ -51,11 +59,15 @@ const FORM_VACIO: FormState = { dispositivo: "", cantidad_stock: "", notas: "" }
 export default function AlmacenTab() {
     const { lineas: ctxLineas } = useLineas();
     const [rawStock, setRawStock] = useState<DispositivoStock[]>([]);
+    const [numerosAltice, setNumerosAltice] = useState<NumeroAlticeStock[]>([]);
+    const [numerosLoading, setNumerosLoading] = useState(true);
+    const [numFiltro, setNumFiltro] = useState<"todos" | "libres" | "asignados">("todos");
     const [loading, setLoading] = useState(true);
 
     // Modal agregar / editar
     const [modal, setModal] = useState<"closed" | "nuevo" | "editar">("closed");
     const [editId, setEditId] = useState<string | null>(null);
+    const [editNombreOriginal, setEditNombreOriginal] = useState<string>("");
     const [form, setForm] = useState<FormState>(FORM_VACIO);
     const [saving, setSaving] = useState(false);
 
@@ -71,7 +83,18 @@ export default function AlmacenTab() {
         setLoading(false);
     }, []);
 
+    const loadNumerosAltice = useCallback(async () => {
+        setNumerosLoading(true);
+        const { data } = await supabase
+            .from("numeros_altice_stock")
+            .select("id, numero, plan, linea_id, lineas_altice(usuario_linea, telefono, titular_responsable)")
+            .order("numero");
+        setNumerosAltice((data ?? []) as unknown as NumeroAlticeStock[]);
+        setNumerosLoading(false);
+    }, []);
+
     useEffect(() => { loadStock(); }, [loadStock]);
+    useEffect(() => { loadNumerosAltice(); }, [loadNumerosAltice]);
 
     // Suscripción Realtime al inventario: altas/ediciones/bajas de stock se
     // reflejan al instante en cualquier ventana o dispositivo (sin recargar).
@@ -168,6 +191,7 @@ export default function AlmacenTab() {
     function abrirEditar(item: DispositivoConStats) {
         setForm({ dispositivo: item.dispositivo, cantidad_stock: String(item.cantidad_stock), notas: item.notas });
         setEditId(item.id);
+        setEditNombreOriginal(item.dispositivo);
         setModal("editar");
     }
 
@@ -186,13 +210,36 @@ export default function AlmacenTab() {
             if (error) { toast.error("Error al crear: " + error.message); setSaving(false); return; }
             toast.success("Dispositivo agregado al almacén ✓");
         } else if (editId) {
+            const nuevoNombre = form.dispositivo.trim();
             const { error } = await supabase.from("almacen_dispositivos").update({
-                dispositivo: form.dispositivo.trim(),
+                dispositivo: nuevoNombre,
                 cantidad_stock: cantidad,
                 notas: form.notas.trim(),
             }).eq("id", editId);
             if (error) { toast.error("Error al guardar: " + error.message); setSaving(false); return; }
-            toast.success("Stock actualizado ✓");
+
+            // Si el nombre cambió, actualizar dispositivo_2026 en todas las líneas que lo tenían
+            if (nuevoNombre.toLowerCase() !== editNombreOriginal.toLowerCase()) {
+                const lineasAfectadas = ctxLineas.filter(
+                    l => l.dispositivo_2026?.trim().toLowerCase() === editNombreOriginal.toLowerCase()
+                );
+                if (lineasAfectadas.length > 0) {
+                    const ids = lineasAfectadas.map(l => l.id);
+                    const { error: lineaError } = await supabase
+                        .from("lineas_altice")
+                        .update({ dispositivo_2026: nuevoNombre })
+                        .in("id", ids);
+                    if (lineaError) {
+                        toast.error("Stock guardado, pero error al actualizar líneas: " + lineaError.message);
+                    } else {
+                        toast.success(`Stock actualizado · ${lineasAfectadas.length} línea${lineasAfectadas.length !== 1 ? "s" : ""} sincronizadas ✓`);
+                    }
+                } else {
+                    toast.success("Stock actualizado ✓");
+                }
+            } else {
+                toast.success("Stock actualizado ✓");
+            }
         }
         setSaving(false);
         setModal("closed");
@@ -268,9 +315,26 @@ export default function AlmacenTab() {
                                 onChange={e => setForm(p => ({ ...p, dispositivo: e.target.value }))}
                                 placeholder="Ej: Samsung A56, iPhone 17 Pro Max..."
                                 className={inputCls} />
-                            <p className="text-[11px] text-slate-400 mt-1">
-                                Debe coincidir exactamente con el nombre usado en las líneas
-                            </p>
+                            {modal === "editar" && form.dispositivo.trim().toLowerCase() !== editNombreOriginal.toLowerCase() && (() => {
+                                const lineasAfectadas = ctxLineas.filter(
+                                    l => l.dispositivo_2026?.trim().toLowerCase() === editNombreOriginal.toLowerCase()
+                                ).length;
+                                return lineasAfectadas > 0 ? (
+                                    <p className="text-[11px] mt-1.5 px-2 py-1.5 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-blue-700 dark:text-blue-300 flex items-center gap-1.5">
+                                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                                        Se actualizará <strong>dispositivo_2026</strong> en <strong>{lineasAfectadas} línea{lineasAfectadas !== 1 ? "s" : ""}</strong> automáticamente
+                                    </p>
+                                ) : (
+                                    <p className="text-[11px] text-slate-400 mt-1">
+                                        No hay líneas con el nombre anterior · solo se renombra en almacén
+                                    </p>
+                                );
+                            })()}
+                            {modal === "nuevo" && (
+                                <p className="text-[11px] text-slate-400 mt-1">
+                                    Usa el mismo nombre que aparece en las líneas para que se vinculen automáticamente
+                                </p>
+                            )}
                         </div>
 
                         <div>
@@ -489,6 +553,100 @@ export default function AlmacenTab() {
                     </p>
                 </div>
             )}
+
+            {/* ── NÚMEROS ALTICE PROVISTOS ─────────────────────────────── */}
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                {/* Header */}
+                <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h2 className="text-base font-bold text-slate-800 dark:text-white flex items-center gap-1.5">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>
+                            Números Altice provistos
+                        </h2>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                            Todos los números asignados por Altice para la flota 2026
+                        </p>
+                    </div>
+                    {/* Filtro */}
+                    <div className="flex gap-1 bg-slate-100 dark:bg-slate-700 rounded-xl p-1">
+                        {(["todos", "libres", "asignados"] as const).map(f => (
+                            <button key={f}
+                                onClick={() => setNumFiltro(f)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors capitalize ${numFiltro === f ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-700"}`}>
+                                {f === "todos" ? `Todos (${numerosAltice.length})` : f === "libres" ? `Libres (${numerosAltice.filter(n => !n.linea_id).length})` : `Asignados (${numerosAltice.filter(n => !!n.linea_id).length})`}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* KPIs */}
+                <div className="grid grid-cols-3 gap-3 p-4 border-b border-slate-100 dark:border-slate-700">
+                    <div className="rounded-xl bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-700 p-3 text-center">
+                        <p className="text-2xl font-bold text-slate-700 dark:text-slate-200">{numerosAltice.length}</p>
+                        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mt-0.5">Total</p>
+                    </div>
+                    <div className="rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 p-3 text-center">
+                        <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{numerosAltice.filter(n => !!n.linea_id).length}</p>
+                        <p className="text-[10px] font-semibold text-emerald-600/70 dark:text-emerald-400/70 uppercase tracking-wide mt-0.5">Asignados</p>
+                    </div>
+                    <div className="rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 p-3 text-center">
+                        <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{numerosAltice.filter(n => !n.linea_id).length}</p>
+                        <p className="text-[10px] font-semibold text-amber-600/70 dark:text-amber-400/70 uppercase tracking-wide mt-0.5">Libres</p>
+                    </div>
+                </div>
+
+                {/* Tabla */}
+                {numerosLoading ? (
+                    <div className="flex justify-center py-10">
+                        <div className="w-6 h-6 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead className="bg-slate-50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-700">
+                                <tr>
+                                    {["Número Altice", "Plan", "Estado", "Asignado a", "Teléfono real"].map(h => (
+                                        <th key={h} className="p-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">{h}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                                {numerosAltice
+                                    .filter(n => numFiltro === "todos" ? true : numFiltro === "libres" ? !n.linea_id : !!n.linea_id)
+                                    .map(n => (
+                                    <tr key={n.id} className={`hover:bg-slate-50 dark:hover:bg-slate-700/30 ${!n.linea_id ? "bg-amber-50/30 dark:bg-amber-900/5" : ""}`}>
+                                        <td className="p-3 font-mono font-bold text-slate-800 dark:text-white">{n.numero}</td>
+                                        <td className="p-3 text-xs text-slate-600 dark:text-slate-300">{n.plan}</td>
+                                        <td className="p-3">
+                                            {n.linea_id ? (
+                                                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                                                    Asignado
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                                                    Libre
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td className="p-3 text-sm text-slate-700 dark:text-slate-200">
+                                            {n.lineas_altice?.usuario_linea ?? <span className="text-slate-400 text-xs italic">—</span>}
+                                            {n.lineas_altice?.titular_responsable && (
+                                                <p className="text-xs text-slate-400">{n.lineas_altice.titular_responsable}</p>
+                                            )}
+                                        </td>
+                                        <td className="p-3 font-mono text-xs text-slate-500">
+                                            {n.lineas_altice?.telefono ?? "—"}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        {numerosAltice.filter(n => numFiltro === "todos" ? true : numFiltro === "libres" ? !n.linea_id : !!n.linea_id).length === 0 && (
+                            <p className="text-center text-sm text-slate-400 py-8">Sin resultados para este filtro</p>
+                        )}
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

@@ -43,7 +43,22 @@ const CAMPOS_ETIQUETAS: Partial<Record<keyof LineaAltice, string>> = {
   seguimiento: "Seguimiento",
 };
 
+const ACCION_TITULO: Record<string, string> = {
+  LLAMAR:   "Llamar a",
+  CARTA:    "Enviar carta a",
+  COTIZAR:  "Enviar cotización a",
+  CANCELAR: "Gestionar cancelación de",
+};
+
 // PLANES_DATA se carga desde config_listas (plan_datos) vía useConfigListas()
+
+function toProperCase(str: string): string {
+  if (!str) return str;
+  const particles = new Set(["de", "del", "la", "las", "los", "el", "y", "a"]);
+  return str.toLowerCase().split(" ").map((word, i) =>
+    i === 0 || !particles.has(word) ? word.charAt(0).toUpperCase() + word.slice(1) : word
+  ).join(" ");
+}
 
 interface TitularGroup {
   nombre: string;
@@ -208,7 +223,51 @@ function EditModal({ linea, onClose, onSave, onDelete, session, upsertLocal, tit
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [archivando, setArchivando] = useState(false);
+  const [nuevoNum, setNuevoNum] = useState("");
+  const [asignando, setAsignando] = useState(false);
+  const isNueva = linea.telefono?.toUpperCase().startsWith("NUEVA") || linea.telefono?.toUpperCase().startsWith("NUEVO");
+
+  // Para líneas NUEVA-XX (altas sin número) → actualiza telefono
+  // Para líneas con portabilidad (tienen número propio) → guarda en numero_altice
+  const usaNumeroAltice = !isNueva && !!linea.portabilidad && linea.portabilidad !== "Nuevo";
+
+  async function asignarNumero() {
+    const num = nuevoNum.trim().replace(/\s/g, "");
+    if (!num) return;
+    setAsignando(true);
+    const patch = usaNumeroAltice
+      ? { numero_altice: num, updated_at: new Date().toISOString() }
+      : { telefono: num, updated_at: new Date().toISOString() };
+    const { error } = await supabase.from("lineas_altice").update(patch).eq("id", linea.id);
+    if (error) { toast.error("Error al asignar número"); setAsignando(false); return; }
+    if (session) {
+      await supabase.from("historial_cambios").insert({
+        linea_id: linea.id,
+        usuario_id: session.id,
+        usuario_nombre: session.nombre,
+        campo: usaNumeroAltice ? "Número Altice (temporal)" : "Teléfono",
+        valor_anterior: usaNumeroAltice ? (linea.numero_altice || "") : linea.telefono,
+        valor_nuevo: num,
+      });
+    }
+    // Sync numeros_altice_stock: un-assign old, assign new
+    await supabase.from("numeros_altice_stock").update({ linea_id: null }).eq("linea_id", linea.id);
+    await supabase.from("numeros_altice_stock").update({ linea_id: linea.id }).eq("numero", num);
+    setNumerosAlticeStock(prev => prev.map(n => {
+      if (n.linea_id === linea.id) return { ...n, linea_id: null };
+      if (n.numero === num) return { ...n, linea_id: linea.id };
+      return n;
+    }));
+
+    const updated = usaNumeroAltice ? { ...linea, numero_altice: num } : { ...linea, telefono: num };
+    upsertLocal(updated);
+    setForm(prev => usaNumeroAltice ? { ...prev, numero_altice: num } : { ...prev, telefono: num });
+    toast.success(`✅ Número Altice ${num} asignado a ${linea.usuario_linea}`);
+    setAsignando(false);
+    setNuevoNum("");
+  }
   const [dispositivosStock, setDispositivosStock] = useState<{ dispositivo: string; disponibles: number }[]>([]);
+  const [numerosAlticeStock, setNumerosAlticeStock] = useState<{ id: string; numero: string; plan: string; linea_id: string | null }[]>([]);
   const [inventarioItems, setInventarioItems] = useState<{ id: string; marca: string; imei: string; sim: string; asignado: boolean; linea_id: string | null }[]>([]);
   const [selectedInvId, setSelectedInvId] = useState<string>("");
   const [imeiOpen, setImeiOpen] = useState(false);
@@ -231,10 +290,11 @@ function EditModal({ linea, onClose, onSave, onDelete, session, upsertLocal, tit
 
   useEffect(() => {
     async function cargarDatos() {
-      const [{ data: stockData }, { data: lineasData }, { data: invData }] = await Promise.all([
+      const [{ data: stockData }, { data: lineasData }, { data: invData }, { data: numStockData }] = await Promise.all([
         supabase.from("almacen_dispositivos").select("dispositivo, cantidad_stock").order("dispositivo"),
         supabase.from("lineas_altice").select("dispositivo_2026"),
         supabase.from("inventario_altice").select("*").order("marca"),
+        supabase.from("numeros_altice_stock").select("id, numero, plan, linea_id").order("numero"),
       ]);
       if (stockData) {
         const conteo: Record<string, number> = {};
@@ -252,6 +312,9 @@ function EditModal({ linea, onClose, onSave, onDelete, session, upsertLocal, tit
         // Pre-select if already assigned to this line
         const current = (invData as typeof inventarioItems).find(i => i.linea_id === linea.id);
         if (current) setSelectedInvId(current.id);
+      }
+      if (numStockData) {
+        setNumerosAlticeStock(numStockData as typeof numerosAlticeStock);
       }
     }
     cargarDatos();
@@ -302,6 +365,7 @@ function EditModal({ linea, onClose, onSave, onDelete, session, upsertLocal, tit
       seguimiento: form.seguimiento,
       nota_resolucion: form.nota_resolucion,
       portabilidad: form.portabilidad ?? "",
+      numero_altice: form.numero_altice ?? "",
       revisado_por: form.revisado_por,
       imei: form.imei ?? "",
       sim: form.sim ?? "",
@@ -343,6 +407,24 @@ function EditModal({ linea, onClose, onSave, onDelete, session, upsertLocal, tit
       }
     }
 
+    // Auto-crear tarea si proxima_accion cambió a un valor no vacío
+    const accionAnterior = (linea.proxima_accion ?? "").trim();
+    const accionNueva = (form.proxima_accion ?? "").trim();
+    if (accionNueva && accionNueva !== accionAnterior) {
+      const prefijo = ACCION_TITULO[accionNueva] ?? accionNueva;
+      const nombre = form.titular_responsable?.trim() || form.usuario_linea?.trim() || form.telefono;
+      await supabase.from("tareas").insert({
+        titulo: `${prefijo} ${nombre}`,
+        descripcion: `Línea ${form.telefono} — creada automáticamente desde perfil`,
+        titular: form.titular_responsable?.trim() ?? "",
+        linea_id: linea.id,
+        prioridad: "normal",
+        estado: "pendiente",
+        completada: false,
+        updated_at: new Date().toISOString(),
+      });
+    }
+
     setSaving(false);
     onSave({ ...form, entregado: tieneImeiSim, fecha_entrega: nuevaFecha });
     if (tieneImeiSim && !form.entregado) toast.success("IMEI/SIM asignados — marcado como entregado");
@@ -357,7 +439,8 @@ function EditModal({ linea, onClose, onSave, onDelete, session, upsertLocal, tit
   const inputCls = "w-full border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
   const labelCls = "text-xs text-slate-500 mb-1 block font-medium";
   const sectionTitleCls = "text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3";
-  const [drawerTab, setDrawerTab] = React.useState<"resumen" | "avanzado">("resumen");
+  const [drawerTab, setDrawerTab] = React.useState<"resumen" | "avanzado" | "numtemp">("resumen");
+  const showNumTemp = isNueva || (!!linea.portabilidad && linea.portabilidad !== "Nuevo");
 
   return (
     <div className="fixed inset-0 z-50 flex">
@@ -373,17 +456,224 @@ function EditModal({ linea, onClose, onSave, onDelete, session, upsertLocal, tit
           </button>
         </div>
 
-        {/* Tabs Resumen / Avanzado */}
-        <div className="flex border-b border-slate-200 dark:border-slate-700 px-4 gap-1 sticky top-[61px] bg-white dark:bg-slate-900 z-10">
+        {/* Tabs Resumen / Avanzado / Núm. temp. */}
+        <div className="flex border-b border-slate-200 dark:border-slate-700 px-4 gap-1 sticky top-[61px] bg-white dark:bg-slate-900 z-10 overflow-x-auto">
           {(["resumen", "avanzado"] as const).map(t => (
             <button key={t} onClick={() => setDrawerTab(t)}
-              className={`py-2.5 px-4 text-sm font-semibold border-b-2 transition-colors capitalize -mb-px ${drawerTab === t ? "border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400" : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"}`}>
+              className={`py-2.5 px-4 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap -mb-px ${drawerTab === t ? "border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400" : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"}`}>
               {t === "resumen" ? "⚡ Rápido" : "⚙️ Avanzado"}
             </button>
           ))}
+          {showNumTemp && (
+            <button onClick={() => setDrawerTab("numtemp")}
+              className={`py-2.5 px-4 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap -mb-px flex items-center gap-1.5 ${drawerTab === "numtemp" ? "border-amber-500 text-amber-600 dark:text-amber-400 dark:border-amber-400" : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"}`}>
+              📱 Núm. temporal
+              {isNueva && (
+                <span className="flex h-1.5 w-1.5 relative">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500" />
+                </span>
+              )}
+            </button>
+          )}
         </div>
 
         <div className="p-4 space-y-6 flex-1">
+          {/* ── Asignación de número para líneas NUEVA-XX ─────────────── */}
+          {isNueva && drawerTab !== "numtemp" && (
+            <div className="rounded-xl border-2 border-amber-400 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-600 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="flex h-2.5 w-2.5 relative">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+                </span>
+                <p className="text-sm font-bold text-amber-800 dark:text-amber-300">Línea sin número asignado</p>
+                <span className="ml-auto font-mono text-xs bg-amber-200 dark:bg-amber-800 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full">{linea.telefono}</span>
+              </div>
+              <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">
+                {linea.usuario_linea} · {linea.gb_solicitado || "Sin plan asignado"}
+              </p>
+              {linea.portabilidad && linea.portabilidad !== "Nuevo" ? (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mb-3 flex items-center gap-1.5">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  El número que asignes será <strong>temporal</strong> — portabilidad desde {linea.portabilidad} pendiente
+                </p>
+              ) : linea.portabilidad === "Nuevo" ? (
+                <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-3 flex items-center gap-1.5">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  Número nuevo definitivo (sin portabilidad)
+                </p>
+              ) : null}
+              <div className="flex gap-2">
+                <select
+                  value={nuevoNum}
+                  onChange={e => setNuevoNum(e.target.value)}
+                  className="flex-1 font-mono border border-amber-300 dark:border-amber-600 bg-white dark:bg-slate-800 text-slate-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                >
+                  <option value="">— Seleccionar número —</option>
+                  {numerosAlticeStock
+                    .filter(n => !n.linea_id || n.linea_id === linea.id)
+                    .map(n => (
+                      <option key={n.id} value={n.numero}>
+                        {n.numero} · {n.plan}
+                      </option>
+                    ))}
+                </select>
+                <button
+                  onClick={asignarNumero}
+                  disabled={asignando || !nuevoNum.trim()}
+                  className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white text-sm font-bold transition-colors whitespace-nowrap"
+                >
+                  {asignando ? "..." : "Asignar"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Pestaña Número Temporal ────────────────────────────────── */}
+          {drawerTab === "numtemp" && (
+            <div className="space-y-4">
+
+              {/* Número actual de la persona — editable */}
+              {!isNueva && (
+                <div>
+                  <label className={labelCls}>Número actual ({form.portabilidad || "actual"})</label>
+                  <input
+                    value={form.telefono ?? ""}
+                    onChange={e => set("telefono", e.target.value)}
+                    className={`${inputCls} font-mono`}
+                    placeholder="Ej: 809-991-3764"
+                  />
+                </div>
+              )}
+
+              {/* Número Altice provisionado (temporal) */}
+              <div className={`rounded-2xl border-2 p-5 ${
+                isNueva
+                  ? "border-amber-400 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-600"
+                  : form.numero_altice
+                    ? "border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 dark:border-emerald-600"
+                    : "border-amber-400 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-600"
+              }`}>
+                <p className="text-[10px] font-bold uppercase tracking-widest mb-2 text-slate-500">
+                  {isNueva ? "Número Altice (nuevo)" : "Número Altice (temporal — portabilidad pendiente)"}
+                </p>
+                {isNueva ? (
+                  /* NUEVA-XX: aún no tiene número */
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="flex h-2.5 w-2.5 relative shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500" />
+                    </span>
+                    <span className="font-mono text-base font-semibold text-amber-700 dark:text-amber-300">{linea.telefono}</span>
+                    <span className="text-xs bg-amber-200 dark:bg-amber-800 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full font-semibold">sin número asignado</span>
+                  </div>
+                ) : form.numero_altice ? (
+                  /* Ya tiene número Altice */
+                  <div className="flex items-center gap-2 mb-3">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-600 dark:text-emerald-400 shrink-0"><polyline points="20 6 9 17 4 12"/></svg>
+                    <span className="font-mono text-xl font-bold text-emerald-700 dark:text-emerald-300 tracking-wide">{form.numero_altice}</span>
+                  </div>
+                ) : (
+                  /* Tiene portabilidad pero sin número Altice aún */
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="flex h-2.5 w-2.5 relative shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500" />
+                    </span>
+                    <span className="text-sm text-amber-700 dark:text-amber-300 font-semibold">Pendiente de asignación</span>
+                  </div>
+                )}
+                {form.portabilidad && (
+                  <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
+                    {form.portabilidad === "Nuevo" ? "Número nuevo definitivo (sin portabilidad)" : `Portabilidad desde ${form.portabilidad}`}
+                  </p>
+                )}
+              </div>
+
+              {/* Campo para asignar / actualizar el número Altice */}
+              <div>
+                <label className={labelCls}>
+                  {isNueva ? "Asignar número Altice" : form.numero_altice ? "Actualizar número Altice" : "Ingresar número Altice provisional"}
+                </label>
+                <div className="flex gap-2">
+                  <select
+                    value={nuevoNum}
+                    onChange={e => setNuevoNum(e.target.value)}
+                    className="flex-1 font-mono border border-amber-300 dark:border-amber-600 bg-white dark:bg-slate-800 text-slate-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  >
+                    <option value="">— Seleccionar número —</option>
+                    {numerosAlticeStock
+                      .filter(n => !n.linea_id || n.linea_id === linea.id)
+                      .map(n => (
+                        <option key={n.id} value={n.numero}>
+                          {n.numero}{n.linea_id === linea.id ? " (actual)" : ""} · {n.plan}
+                        </option>
+                      ))}
+                  </select>
+                  <button
+                    onClick={asignarNumero}
+                    disabled={asignando || !nuevoNum.trim()}
+                    className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white text-sm font-bold transition-colors whitespace-nowrap"
+                  >
+                    {asignando ? "..." : "Guardar"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Portabilidad */}
+              <div>
+                <label className={labelCls}>Portabilidad</label>
+                <select value={form.portabilidad ?? ""} onChange={e => set("portabilidad", e.target.value)}
+                  className={`${inputCls} font-semibold ${PORTABILIDAD_COLORS[form.portabilidad ?? ""] ?? ""}`}>
+                  <option value="">(sin portabilidad)</option>
+                  {(PORTABILIDAD_CFG.length ? PORTABILIDAD_CFG : ["Altice","Claro","Nuevo","Baja"]).map(v => (
+                    <option key={v} value={v}>{v}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Info del usuario */}
+              <div className="rounded-xl bg-slate-100 dark:bg-slate-700/50 px-4 py-3 space-y-1">
+                <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">{linea.usuario_linea || "Sin nombre"}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{linea.titular_responsable}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{linea.gb_solicitado || "Sin plan asignado"} · {linea.tipo || "Sin tipo"}</p>
+              </div>
+            </div>
+          )}
+
+          {/* ── Casilla número asignado (tab Rápido) ── */}
+          {drawerTab === "resumen" && !isNueva && (
+            <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-4 py-3 space-y-3">
+              {/* Número del usuario */}
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Número del usuario</p>
+                <p className="font-mono text-lg font-bold text-slate-800 dark:text-white tracking-wide">{form.telefono || "—"}</p>
+              </div>
+              {/* Número temporal Altice — dropdown del stock Altice */}
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">
+                  N.° temporal Altice
+                </label>
+                <select
+                  value={form.numero_altice ?? ""}
+                  onChange={e => set("numero_altice", e.target.value)}
+                  className="w-full font-mono border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                >
+                  <option value="">— Pendiente —</option>
+                  {numerosAlticeStock
+                    .filter(n => !n.linea_id || n.linea_id === linea.id)
+                    .map(n => (
+                      <option key={n.id} value={n.numero}>
+                        {n.numero}{n.linea_id === linea.id ? " (actual)" : ""} · {n.plan}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            </div>
+          )}
+
           {/* Panel de respuesta del formulario */}
           {drawerTab === "avanzado" && (
             <FormularioPanel
@@ -433,49 +723,74 @@ function EditModal({ linea, onClose, onSave, onDelete, session, upsertLocal, tit
             </div>
           </section>}
 
-          {/* Tareas del titular — solo en área rápida */}
+          {/* Próximas acciones del titular — solo en área rápida */}
           {drawerTab === "resumen" && (() => {
-            const tareas = (titularLineas ?? [linea])
+            const VALORES_ESTANDAR = ["LLAMAR", "CARTA", "COTIZAR", "CANCELAR"];
+            // Normaliza valores legacy: si el texto libre empieza con un valor estándar, extrae ese prefijo
+            function normalizarAccion(raw: string): { etiqueta: string; detalle: string | null } {
+              const v = raw.trim().toUpperCase();
+              const match = VALORES_ESTANDAR.find(s => v.startsWith(s));
+              if (match) return { etiqueta: match, detalle: raw.trim() !== match ? raw.trim() : null };
+              return { etiqueta: "ACCIÓN", detalle: raw.trim() };
+            }
+            const acciones = (titularLineas ?? [linea])
               .filter(l => l.proxima_accion?.trim())
               .sort((a, b) => {
                 const ord: Record<string, number> = { LLAMAR: 0, COTIZAR: 1, CARTA: 2, CANCELAR: 3 };
-                return (ord[a.proxima_accion!] ?? 9) - (ord[b.proxima_accion!] ?? 9);
+                const ea = normalizarAccion(a.proxima_accion!).etiqueta;
+                const eb = normalizarAccion(b.proxima_accion!).etiqueta;
+                return (ord[ea] ?? 9) - (ord[eb] ?? 9);
               });
-            if (tareas.length === 0) return null;
+            if (acciones.length === 0) return null;
             const clsAccion: Record<string, string> = {
-              LLAMAR: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
-              COTIZAR: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
-              CARTA: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
-              CANCELAR: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300",
+              LLAMAR:  "bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800",
+              COTIZAR: "bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800",
+              CARTA:   "bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-800",
+              CANCELAR:"bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-900/20 dark:text-rose-300 dark:border-rose-800",
+              ACCIÓN:  "bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600",
             };
+            async function marcarHecho(l: LineaAltice) {
+              const ok = await supabase.from("lineas_altice").update({ proxima_accion: "" }).eq("id", l.id);
+              if (!ok.error) upsertLocal({ ...l, proxima_accion: "" });
+            }
             return (
               <section>
                 <p className={`${sectionTitleCls} flex items-center gap-1.5`}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
-                  Tareas pendientes ({tareas.length})
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  Próximas acciones del titular ({acciones.length})
                 </p>
                 <div className="space-y-2">
-                  {tareas.map(l => (
-                    <div key={l.id} className={`rounded-xl px-3 py-2.5 flex items-start gap-2.5 ${clsAccion[l.proxima_accion!] ?? "bg-slate-100 text-slate-600"}`}>
-                      <span className="mt-0.5 shrink-0">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-bold leading-none">{l.proxima_accion}</p>
-                        <p className="text-[11px] mt-0.5 opacity-75 truncate">{l.usuario_linea || l.telefono}</p>
-                        {l.nota_resolucion?.trim() && (
-                          <p className="text-[11px] mt-1 opacity-60 italic line-clamp-2">{l.nota_resolucion}</p>
-                        )}
+                  {acciones.map(l => {
+                    const { etiqueta, detalle } = normalizarAccion(l.proxima_accion!);
+                    const cls = clsAccion[etiqueta] ?? clsAccion["ACCIÓN"];
+                    return (
+                      <div key={l.id} className={`rounded-xl px-3 py-2.5 flex items-start gap-2.5 ${cls}`}>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-xs font-bold leading-none">{etiqueta}</span>
+                            <span className="text-[10px] font-mono opacity-50">{l.telefono}</span>
+                          </div>
+                          <p className="text-[11px] mt-0.5 opacity-75 truncate">{l.usuario_linea || l.telefono}</p>
+                          {detalle && (
+                            <p className="text-[11px] mt-1 opacity-60 italic line-clamp-2">{detalle}</p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => marcarHecho(l)}
+                          title="Marcar como hecho"
+                          className="shrink-0 mt-0.5 rounded-lg p-1 hover:bg-white/50 dark:hover:bg-black/20 transition-colors opacity-60 hover:opacity-100"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        </button>
                       </div>
-                      <span className="text-[10px] font-mono opacity-60 shrink-0">{l.telefono}</span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </section>
             );
           })()}
 
-          <section>
+          {drawerTab !== "numtemp" && <section>
             <p className={`${sectionTitleCls} flex items-center gap-1.5`}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> Plan solicitado</p>
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
@@ -494,9 +809,9 @@ function EditModal({ linea, onClose, onSave, onDelete, session, upsertLocal, tit
                 <input value={form.min_solicitados} onChange={e => set("min_solicitados", e.target.value)} className={inputCls} placeholder="Ej: 500" />
               </div>
             </div>
-          </section>
+          </section>}
 
-          <section>
+          {drawerTab !== "numtemp" && <section>
             <p className={`${sectionTitleCls} flex items-center gap-1.5`}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg> Dispositivo y Costo</p>
             <div className="space-y-3">
               <div>
@@ -552,7 +867,7 @@ function EditModal({ linea, onClose, onSave, onDelete, session, upsertLocal, tit
                   placeholder="Ej: RD$1,200" className={inputCls} />
               </div>
             </div>
-          </section>
+          </section>}
 
           {drawerTab === "avanzado" && <section>
             <p className={`${sectionTitleCls} flex items-center gap-1.5`}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg> IMEI y SIM</p>
@@ -703,7 +1018,7 @@ function EditModal({ linea, onClose, onSave, onDelete, session, upsertLocal, tit
             session={session}
           />
 
-          <section>
+          {drawerTab !== "numtemp" && <section>
             <p className={`${sectionTitleCls} flex items-center gap-1.5`}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> Estatus</p>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -748,7 +1063,7 @@ function EditModal({ linea, onClose, onSave, onDelete, session, upsertLocal, tit
                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Esta nota te ayuda a documentar el seguimiento sin perder la alerta original.</p>
               </div>
             </div>
-          </section>
+          </section>}
 
           {drawerTab === "avanzado" && <section>
             <p className={`${sectionTitleCls} flex items-center gap-1.5`}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.1 9 11.1"/></svg> Revisión</p>
@@ -886,7 +1201,17 @@ function LineaRow({ linea, onEdit, dimmed, onMutate, selected, onToggleSelect }:
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-1">
             <span className="font-semibold text-sm text-slate-800 dark:text-white">{linea.usuario_linea || "Sin nombre"}</span>
-            <span className="font-mono text-xs text-slate-400 bg-slate-100 dark:bg-slate-700 px-1.5 rounded">{linea.telefono}</span>
+            {(linea.telefono?.toUpperCase().startsWith("NUEVA") || linea.telefono?.toUpperCase().startsWith("NUEVO")) ? (
+              <span className="inline-flex items-center gap-1.5 font-mono text-xs bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full border border-amber-300 dark:border-amber-700">
+                <span className="flex h-1.5 w-1.5 relative">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500"></span>
+                </span>
+                {linea.telefono} · sin número
+              </span>
+            ) : (
+              <span className="font-mono text-xs text-slate-400 bg-slate-100 dark:bg-slate-700 px-1.5 rounded">{linea.telefono}</span>
+            )}
             {linea.tipo && <span className="text-xs text-slate-400">{linea.tipo}</span>}
           </div>
           <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400 mt-1">
@@ -964,6 +1289,29 @@ function LineaRow({ linea, onEdit, dimmed, onMutate, selected, onToggleSelect }:
 
 export default function PerfilesTab() {
   const { lineas: all, loading, mutate, upsertLocal, removeLocal, patchLocal } = useLineas();
+
+  // Wrapper que auto-crea tarea cuando proxima_accion cambia a un valor no vacío
+  async function handleMutate(id: string, patch: Partial<LineaAltice>) {
+    const accionNueva = (patch.proxima_accion ?? "").trim();
+    const lineaActual = all.find(l => l.id === id);
+    const accionAnterior = (lineaActual?.proxima_accion ?? "").trim();
+    const ok = await mutate(id, patch);
+    if (ok && accionNueva && accionNueva !== accionAnterior && lineaActual) {
+      const prefijo = ACCION_TITULO[accionNueva] ?? accionNueva;
+      const nombre = lineaActual.titular_responsable?.trim() || lineaActual.usuario_linea?.trim() || lineaActual.telefono;
+      await supabase.from("tareas").insert({
+        titulo: `${prefijo} ${nombre}`,
+        descripcion: `Línea ${lineaActual.telefono} — creada automáticamente desde perfil`,
+        titular: lineaActual.titular_responsable?.trim() ?? "",
+        linea_id: id,
+        prioridad: "normal",
+        estado: "pendiente",
+        completada: false,
+        updated_at: new Date().toISOString(),
+      });
+    }
+  }
+
   const { consumeFilter } = useNav();
   const { getList } = useConfigListas();
 
@@ -988,6 +1336,13 @@ export default function PerfilesTab() {
     if (f.sinMonto)            setChipSinMonto(true);
     if (f.sinPortabilidad)     setChipSinPortabilidad(true);
     if (f.dispositivoContains) setFilterDispositivoContains(f.dispositivoContains);
+    if (f.tipo)                setFilterTipo(f.tipo);
+    if (f.portabilidad)        setFilterPortabilidad(f.portabilidad);
+    if (f.gbContains)          setFilterGbContains(f.gbContains);
+    if (f.sinGb)               setChipSinGb(true);
+    if (f.estadoIn?.length)    setFilterEstadoIn(f.estadoIn);
+    if (f.sinTitular)          setChipSinTitular(true);
+    if (f.sinTipo)             setChipSinTipo(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [session] = useState<{ id: string; nombre: string } | null>(() => {
@@ -1011,6 +1366,11 @@ export default function PerfilesTab() {
   const [filterRevisadoPor, setFilterRevisadoPor] = useState("");
   const [filterPortabilidad, setFilterPortabilidad] = useState("");
   const [filterDispositivoContains, setFilterDispositivoContains] = useState("");
+  const [filterGbContains, setFilterGbContains] = useState("");
+  const [chipSinGb, setChipSinGb] = useState(false);
+  const [chipSinTitular, setChipSinTitular] = useState(false);
+  const [chipSinTipo, setChipSinTipo] = useState(false);
+  const [filterEstadoIn, setFilterEstadoIn] = useState<string[]>([]);
   const [expandedTitular, setExpandedTitular] = useState<string | null>(null);
   const [editingLinea, setEditingLinea] = useState<LineaAltice | null>(null);
   const [vinculandoTitular, setVinculandoTitular] = useState<string | null>(null);
@@ -1156,7 +1516,7 @@ export default function PerfilesTab() {
   const opcionesGb = [...new Set(all.map(r => r.gb_solicitado?.trim() || r.gb_antes?.trim()).filter(Boolean))].sort((a, b) => parseFloat(a!) - parseFloat(b!)) as string[];
   const opcionesMin = [...new Set(all.map(r => r.min_solicitados?.trim() || r.min_antes?.trim()).filter(Boolean))].sort((a, b) => parseFloat(a!) - parseFloat(b!)) as string[];
 
-  const hayFiltros = !!(search || filterDispositivo || filterGb || filterMin || filterProximaAccion || filterAccion || filterEstado || filterTipo || filterPortabilidad || chipSinDispositivo || chipSinMonto || chipConSeguimiento || chipSinRevisar || filterRevisadoPor || chipSinPortabilidad || filterDispositivoContains);
+  const hayFiltros = !!(search || filterDispositivo || filterGb || filterMin || filterProximaAccion || filterAccion || filterEstado || filterEstadoIn.length || filterTipo || filterPortabilidad || chipSinDispositivo || chipSinMonto || chipConSeguimiento || chipSinRevisar || filterRevisadoPor || chipSinPortabilidad || filterDispositivoContains || filterGbContains || chipSinGb || chipSinTitular || chipSinTipo);
 
   // Vista plana: líneas individuales que cumplen los filtros (se usa cuando hayFiltros)
   const lineasFiltradas = hayFiltros
@@ -1168,13 +1528,16 @@ export default function PerfilesTab() {
           l.telefono?.includes(q) ||
           l.seguimiento?.toLowerCase().includes(q)
         )) return false;
-        if (filterAccion && l.accion_2026 !== filterAccion) return false;
-        if (filterEstado && l.estado !== filterEstado) return false;
-        if (filterTipo && l.tipo !== filterTipo) return false;
+        if (filterAccion && l.accion_2026?.trim() !== filterAccion) return false;
+        if (filterEstadoIn.length && !filterEstadoIn.includes(l.estado?.trim() ?? "")) return false;
+        if (!filterEstadoIn.length && filterEstado && l.estado?.trim() !== filterEstado) return false;
+        if (filterTipo && l.tipo?.trim() !== filterTipo) return false;
         if (filterDispositivo && l.dispositivo_2026?.trim() !== filterDispositivo) return false;
         if (filterGb) { const gb = l.gb_solicitado?.trim() || l.gb_antes?.trim(); if (gb !== filterGb) return false; }
+        if (filterGbContains) { const gb = (l.gb_solicitado || l.gb_antes || "").toLowerCase(); if (!gb.includes(filterGbContains.toLowerCase())) return false; }
+        if (chipSinGb && (l.gb_solicitado?.trim())) return false;
         if (filterMin) { const mn = l.min_solicitados?.trim() || l.min_antes?.trim(); if (mn !== filterMin) return false; }
-        if (filterProximaAccion && l.proxima_accion !== filterProximaAccion) return false;
+        if (filterProximaAccion && l.proxima_accion?.trim() !== filterProximaAccion) return false;
         if (chipSinDispositivo && l.dispositivo_2026?.trim() && l.dispositivo_2026.trim() !== "SIN CAMBIO" && l.dispositivo_2026.trim() !== "—") return false;
         if (chipSinMonto && l.monto_mensual?.trim() && parseFloat(l.monto_mensual.replace(/[^0-9.]/g, "")) > 0) return false;
         if (chipConSeguimiento && !l.seguimiento?.trim()) return false;
@@ -1184,6 +1547,8 @@ export default function PerfilesTab() {
         if (filterPortabilidad && filterPortabilidad !== "__VACIO__" && l.portabilidad !== filterPortabilidad) return false;
         if (chipSinPortabilidad && l.portabilidad?.trim()) return false;
         if (filterDispositivoContains && !l.dispositivo_2026?.toLowerCase().includes(filterDispositivoContains.toLowerCase())) return false;
+        if (chipSinTitular && l.titular_responsable?.trim() && !l.titular_responsable.trim().toUpperCase().includes("SIN TITULAR")) return false;
+        if (chipSinTipo && l.tipo?.trim()) return false;
         return true;
       })
     : [];
@@ -1200,13 +1565,16 @@ export default function PerfilesTab() {
 
     // Al menos una línea del grupo debe cumplir todos los filtros activos
     const tieneAlgunaLinea = g.lineas.some(l => {
-      if (filterAccion && l.accion_2026 !== filterAccion) return false;
-      if (filterEstado && l.estado !== filterEstado) return false;
-      if (filterTipo && l.tipo !== filterTipo) return false;
+      if (filterAccion && l.accion_2026?.trim() !== filterAccion) return false;
+      if (filterEstadoIn.length && !filterEstadoIn.includes(l.estado?.trim() ?? "")) return false;
+      if (!filterEstadoIn.length && filterEstado && l.estado?.trim() !== filterEstado) return false;
+      if (filterTipo && l.tipo?.trim() !== filterTipo) return false;
       if (filterDispositivo && l.dispositivo_2026?.trim() !== filterDispositivo) return false;
       if (filterGb) { const gb = l.gb_solicitado?.trim() || l.gb_antes?.trim(); if (gb !== filterGb) return false; }
+      if (filterGbContains) { const gb = (l.gb_solicitado || l.gb_antes || "").toLowerCase(); if (!gb.includes(filterGbContains.toLowerCase())) return false; }
+      if (chipSinGb && (l.gb_solicitado?.trim())) return false;
       if (filterMin) { const mn = l.min_solicitados?.trim() || l.min_antes?.trim(); if (mn !== filterMin) return false; }
-      if (filterProximaAccion && l.proxima_accion !== filterProximaAccion) return false;
+      if (filterProximaAccion && l.proxima_accion?.trim() !== filterProximaAccion) return false;
       if (chipSinDispositivo && l.dispositivo_2026?.trim() && l.dispositivo_2026.trim() !== "SIN CAMBIO" && l.dispositivo_2026.trim() !== "—") return false;
       if (chipSinMonto && l.monto_mensual?.trim() && parseFloat(l.monto_mensual.replace(/[^0-9.]/g, "")) > 0) return false;
       if (chipConSeguimiento && !l.seguimiento?.trim()) return false;
@@ -1216,10 +1584,12 @@ export default function PerfilesTab() {
       if (filterPortabilidad && filterPortabilidad !== "__VACIO__" && l.portabilidad !== filterPortabilidad) return false;
       if (chipSinPortabilidad && l.portabilidad?.trim()) return false;
       if (filterDispositivoContains && !l.dispositivo_2026?.toLowerCase().includes(filterDispositivoContains.toLowerCase())) return false;
+      if (chipSinTitular && l.titular_responsable?.trim() && !l.titular_responsable.trim().toUpperCase().includes("SIN TITULAR")) return false;
+      if (chipSinTipo && l.tipo?.trim()) return false;
       return true;
     });
 
-    if (filterAccion || filterEstado || filterTipo || filterDispositivo || filterGb || filterMin || filterProximaAccion || filterPortabilidad || chipSinDispositivo || chipSinMonto || chipConSeguimiento || chipSinRevisar || filterRevisadoPor || chipSinPortabilidad || filterDispositivoContains) {
+    if (filterAccion || filterEstado || filterEstadoIn.length || filterTipo || filterDispositivo || filterGb || filterGbContains || chipSinGb || filterMin || filterProximaAccion || filterPortabilidad || chipSinDispositivo || chipSinMonto || chipConSeguimiento || chipSinRevisar || filterRevisadoPor || chipSinPortabilidad || filterDispositivoContains || chipSinTitular || chipSinTipo) {
       return tieneAlgunaLinea;
     }
     return true;
@@ -1340,13 +1710,18 @@ export default function PerfilesTab() {
         <div>
           <h2 className="text-lg font-bold text-slate-800 dark:text-white">Perfiles por Titular</h2>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            {gruposFiltrados.length} titulares · {allActivas.length} líneas
+            {hayFiltros
+              ? <><span className="font-semibold text-blue-600 dark:text-blue-400">{lineasFiltradas.length} líneas</span> coinciden · {allActivas.length} total</>
+              : <>{gruposFiltrados.length} titulares · {allActivas.length} líneas</>
+            }
             {totalArchivadas > 0 && <span className="ml-2 text-amber-600 dark:text-amber-400">· {totalArchivadas} archivadas</span>}
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
           {(() => {
-            const allVisibleIds = gruposFiltrados.flatMap(g => g.lineas.map(l => l.id));
+            const allVisibleIds = hayFiltros
+              ? lineasFiltradas.map(l => l.id)
+              : gruposFiltrados.flatMap(g => g.lineas.map(l => l.id));
             const allSelected = allVisibleIds.length > 0 && allVisibleIds.every(id => selectedIds.has(id));
             return (
               <button
@@ -1483,7 +1858,7 @@ export default function PerfilesTab() {
               {lineasFiltradas
                 .sort((a, b) => ACCIONES_ORDEN.indexOf(a.accion_2026) - ACCIONES_ORDEN.indexOf(b.accion_2026))
                 .map(linea => (
-                  <LineaRow key={linea.id} linea={linea} onEdit={() => setEditingLinea(linea)} onMutate={mutate} selected={selectedIds.has(linea.id)} onToggleSelect={toggleSelect} />
+                  <LineaRow key={linea.id} linea={linea} onEdit={() => setEditingLinea(linea)} onMutate={handleMutate} selected={selectedIds.has(linea.id)} onToggleSelect={toggleSelect} />
                 ))}
             </div>
           )}
@@ -1523,11 +1898,11 @@ export default function PerfilesTab() {
                 <button className="flex items-center gap-3 flex-1 text-left min-w-0"
                   onClick={() => setExpandedTitular(isOpen ? null : g.nombre)}>
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${tieneProblema ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"}`}>
-                    {tieneProblema ? "?" : g.nombre.charAt(0).toUpperCase()}
+                    {tieneProblema ? "?" : toProperCase(g.nombre).charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className={`font-bold text-sm truncate ${tieneProblema ? "text-amber-700 dark:text-amber-400" : "text-slate-800 dark:text-white"}`}>
-                      {g.nombre}
+                      {toProperCase(g.nombre)}
                     </p>
                     <p className="text-xs text-slate-400 flex flex-wrap items-center gap-x-2 gap-y-0.5">
                       <span>{g.lineas.length} línea{g.lineas.length !== 1 ? "s" : ""}</span>
@@ -1623,7 +1998,7 @@ export default function PerfilesTab() {
                     {g.lineas
                       .sort((a, b) => ACCIONES_ORDEN.indexOf(a.accion_2026) - ACCIONES_ORDEN.indexOf(b.accion_2026))
                       .map(linea => (
-                        <LineaRow key={linea.id} linea={linea} onEdit={() => setEditingLinea(linea)} onMutate={mutate} selected={selectedIds.has(linea.id)} onToggleSelect={toggleSelect} />
+                        <LineaRow key={linea.id} linea={linea} onEdit={() => setEditingLinea(linea)} onMutate={handleMutate} selected={selectedIds.has(linea.id)} onToggleSelect={toggleSelect} />
                       ))}
                   </div>
 
@@ -1649,7 +2024,7 @@ export default function PerfilesTab() {
                         {lineasVinculadas
                           .sort((a, b) => ACCIONES_ORDEN.indexOf(a.accion_2026) - ACCIONES_ORDEN.indexOf(b.accion_2026))
                           .map(linea => (
-                            <LineaRow key={linea.id} linea={linea} onEdit={() => setEditingLinea(linea)} dimmed onMutate={mutate} selected={selectedIds.has(linea.id)} onToggleSelect={toggleSelect} />
+                            <LineaRow key={linea.id} linea={linea} onEdit={() => setEditingLinea(linea)} dimmed onMutate={handleMutate} selected={selectedIds.has(linea.id)} onToggleSelect={toggleSelect} />
                           ))}
                       </div>
                     </div>
