@@ -242,6 +242,9 @@ export default function SimuladorTab() {
     const [consultaEquipo, setConsultaEquipo] = useState(EQUIPOS_CONOCIDOS[0]);
     const [consultaPlan, setConsultaPlan] = useState("*");
 
+    // Resetear cantidades manuales
+    const [reseteando, setReseteando] = useState(false);
+
     const load = useCallback(async () => {
         setLoading(true);
         const [r1, r2, r3, r4] = await Promise.all([
@@ -399,6 +402,25 @@ export default function SimuladorTab() {
         setShowNewEspecial(false);
         setSavingNewEspecial(false);
         toast.success("Regla especial agregada");
+    }
+
+    // ── Usar datos reales de lineas_altice ────────────────────────────────────
+    async function usarDatosReales() {
+        const conOverride = reglas.filter(r => r.cantidad_override !== null);
+        if (conOverride.length === 0) {
+            toast("Ya estás usando los datos reales de los empleados.", { icon: "ℹ️" });
+            return;
+        }
+        if (!confirm(`Esto eliminará los ${conOverride.length} valor(es) manuales de cantidad y usará los datos reales de los empleados. ¿Continuar?`)) return;
+        setReseteando(true);
+        await Promise.all(
+            conOverride.map(r =>
+                supabase.from("sim_reglas").update({ cantidad_override: null }).eq("id", r.id)
+            )
+        );
+        setReglas(prev => prev.map(r => ({ ...r, cantidad_override: null })));
+        setReseteando(false);
+        toast.success("Cantidades actualizadas con los datos reales de los empleados");
     }
 
     // ── Guardar snapshot ──────────────────────────────────────────────────────
@@ -593,18 +615,35 @@ export default function SimuladorTab() {
 
             {/* ── Reglas estándar ─────────────────────────────────────────── */}
             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-                <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between gap-3 flex-wrap">
                     <div>
                         <h3 className="text-sm font-bold text-slate-900 dark:text-white">Reglas estándar por equipo y plan</h3>
-                        <p className="text-xs text-slate-400 mt-0.5">Usa el botón <strong>Editar</strong> en cada fila para modificar precio, porcentaje o cantidad.</p>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                            Usa el botón <strong>Editar</strong> en cada fila para modificar precio, porcentaje o cantidad.
+                            {reglas.some(r => r.cantidad_override !== null) && (
+                                <span className="ml-2 inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 font-semibold">
+                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                    {reglas.filter(r => r.cantidad_override !== null).length} cantidad(s) manual(es)
+                                </span>
+                            )}
+                        </p>
                     </div>
-                    <button onClick={() => { setShowNewRegla(v => !v); setEditingReglaId(null); }}
+                    <div className="flex items-center gap-2">
+                        <button onClick={usarDatosReales} disabled={reseteando}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors disabled:opacity-50">
+                            {reseteando
+                                ? <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                                : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg>}
+                            Usar datos reales
+                        </button>
+                        <button onClick={() => { setShowNewRegla(v => !v); setEditingReglaId(null); }}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${showNewRegla ? "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200" : "bg-blue-600 hover:bg-blue-500 text-white"}`}>
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                             {showNewRegla ? <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></> : <><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>}
                         </svg>
                         {showNewRegla ? "Cancelar" : "Agregar regla"}
-                    </button>
+                        </button>
+                    </div>
                 </div>
 
                 {/* Formulario nueva regla */}
