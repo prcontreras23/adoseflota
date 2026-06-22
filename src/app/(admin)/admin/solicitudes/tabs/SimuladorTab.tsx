@@ -131,8 +131,9 @@ function countLineas(lineas: LineaAltice[], equipo: string, plan: string): numbe
     return lineas.filter(l => {
         if (!l.dispositivo_2026) return false;
         if (normalizeDevice(l.dispositivo_2026) !== equipo) return false;
-        if (plan === "*") return true;
-        return extractPlan(l.gb_solicitado ?? "") === plan;
+        const linePlan = extractPlan(l.gb_solicitado ?? "");
+        if (plan === "*") return linePlan === "sin_datos";
+        return linePlan === plan;
     }).length;
 }
 
