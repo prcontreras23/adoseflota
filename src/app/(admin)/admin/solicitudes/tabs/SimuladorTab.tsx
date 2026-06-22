@@ -507,9 +507,9 @@ export default function SimuladorTab() {
                 <div className="px-5 py-4 border-b border-blue-200/60 dark:border-blue-800/60">
                     <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-blue-600"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                        ¿Cuánto le sale a un empleado?
+                        "Mira, tú vas a pagar…" — Consulta por empleado
                     </h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Selecciona equipo y plan para ver el desglose de costos.</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Selecciona el equipo y plan del empleado para ver exactamente cuánto le corresponde pagar.</p>
                 </div>
                 <div className="px-5 py-4">
                     <div className="flex flex-wrap gap-3 mb-4">
@@ -708,7 +708,7 @@ export default function SimuladorTab() {
                     <table className="w-full text-xs">
                         <thead>
                             <tr className="bg-slate-50 dark:bg-slate-900/50">
-                                {["Equipo", "Plan", "Precio base", "% Subsidio", "Subsidio/u.", "ADOSE/u.", "Empleado/u.", "Cantidad", "Total subsidio", "Total empleado", ""].map(h => (
+                                {["Equipo", "Plan", "Precio base", "% Subsidio", "Altice cubre", "ADOSE aporta", "1 empleado paga", "Cantidad", "Total subsidio", "Total empleados", ""].map(h => (
                                     <th key={h} className="text-left px-3 py-2.5 font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">{h}</th>
                                 ))}
                             </tr>
@@ -917,7 +917,7 @@ export default function SimuladorTab() {
                     <table className="w-full text-xs">
                         <thead>
                             <tr className="bg-slate-50 dark:bg-slate-900/50">
-                                {["Descripción", "Equipo", "Cant.", "Precio base", "Subsidio Altice/u.", "ADOSE/u.", "Empleado/u.", "Total subsidio", "Total empleado", ""].map(h => (
+                                {["Descripción", "Equipo", "Cant.", "Precio base", "Altice cubre", "ADOSE aporta", "1 empleado paga", "Total subsidio", "Total empleados", ""].map(h => (
                                     <th key={h} className="text-left px-3 py-2.5 font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">{h}</th>
                                 ))}
                             </tr>
