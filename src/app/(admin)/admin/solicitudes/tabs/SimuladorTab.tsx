@@ -198,7 +198,7 @@ function calcularResumen(
 
 const PLAN_ORDER: Record<string, number> = { "50GB": 0, "25GB": 1, "15GB": 2, "10GB": 3, "5GB": 4, "sin_datos": 5, "*": 6 };
 function planLabel(plan: string) {
-    if (plan === "*") return "Cualquier plan";
+    if (plan === "*") return "No deseo internet";
     if (plan === "sin_datos") return "No desea internet";
     return plan;
 }
