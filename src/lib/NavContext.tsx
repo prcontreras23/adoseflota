@@ -22,12 +22,14 @@ export interface NavFilter {
 interface NavContextValue {
     goToPerfiles: (filter?: NavFilter) => void;
     goToAlmacen: () => void;
+    goToSimulador: () => void;
     consumeFilter: () => NavFilter | null;
 }
 
 const NavContext = createContext<NavContextValue>({
     goToPerfiles: () => {},
     goToAlmacen: () => {},
+    goToSimulador: () => {},
     consumeFilter: () => null,
 });
 
@@ -43,6 +45,10 @@ export function NavProvider({ children, onNavigate }: { children: React.ReactNod
         onNavigate("almacen");
     }
 
+    function goToSimulador() {
+        onNavigate("simulador");
+    }
+
     function consumeFilter() {
         const f = pendingFilter;
         setPendingFilter(null);
@@ -50,7 +56,7 @@ export function NavProvider({ children, onNavigate }: { children: React.ReactNod
     }
 
     return (
-        <NavContext.Provider value={{ goToPerfiles, goToAlmacen, consumeFilter }}>
+        <NavContext.Provider value={{ goToPerfiles, goToAlmacen, goToSimulador, consumeFilter }}>
             {children}
         </NavContext.Provider>
     );

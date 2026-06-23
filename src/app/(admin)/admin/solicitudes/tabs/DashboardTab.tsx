@@ -527,7 +527,7 @@ export default function DashboardTab() {
     const lastUpdatedLabel = lastUpdated
         ? `Hace ${Math.max(0, Math.floor((Date.now() - lastUpdated.getTime()) / 60000))} min`
         : null;
-    const { goToPerfiles, goToAlmacen } = useNav();
+    const { goToPerfiles, goToAlmacen, goToSimulador } = useNav();
     const { getList } = useConfigListas();
     const lineas = useMemo(() => todasLineas.filter(r => !r.archivada), [todasLineas]);
     const stats = useMemo(() => calcStats(lineas), [lineas]);
@@ -993,6 +993,9 @@ export default function DashboardTab() {
                                     </button>
                                     <button onClick={() => goToAlmacen()} className="flex-1 text-center text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline">
                                         Stock disponible en Almacén →
+                                    </button>
+                                    <button onClick={() => goToSimulador()} className="flex-1 text-center text-xs text-emerald-600 dark:text-emerald-400 font-semibold hover:underline">
+                                        Simular subsidio →
                                     </button>
                                 </div>
                             )}
