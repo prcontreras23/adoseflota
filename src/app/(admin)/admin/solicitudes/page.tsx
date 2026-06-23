@@ -95,8 +95,16 @@ export default function AdminDashboard() {
         if (!raw) { router.push("/login"); return; }
         try {
             const session = JSON.parse(raw);
-            setUser({ nombre: session.nombre, es_admin: session.es_admin ?? false, permisos: session.permisos ?? [] });
-            if (!session.es_admin && session.permisos?.length > 0) setActiveTab(session.permisos[0]);
+            const esAdmin = session.es_admin ?? false;
+            const permisos: string[] = session.permisos ?? [];
+            setUser({ nombre: session.nombre, es_admin: esAdmin, permisos });
+            const allTabIds = TABS.map(t => t.id);
+            const savedTab = localStorage.getItem("flota_active_tab");
+            if (savedTab && allTabIds.includes(savedTab) && (esAdmin || permisos.includes(savedTab))) {
+                setActiveTab(savedTab);
+            } else if (!esAdmin && permisos.length > 0) {
+                setActiveTab(permisos[0]);
+            }
         } catch { router.push("/login"); return; }
         setLoading(false);
     }, [router]);
@@ -149,6 +157,7 @@ export default function AdminDashboard() {
 
     function navigate(tabId: string) {
         setActiveTab(tabId);
+        localStorage.setItem("flota_active_tab", tabId);
         setSidebarOpen(false);
     }
 
