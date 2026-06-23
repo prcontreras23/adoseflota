@@ -14,6 +14,7 @@ interface SimRegla {
     precio_base: number;
     pct_subsidio: number;
     inst_paga: number;
+    descuento: number;
     cantidad_override: number | null;
     orden: number;
 }
@@ -39,6 +40,8 @@ interface SimSnapshot {
     subsidio_disponible: number;
     resumen_json: ResumenSnapshot;
     created_at: string;
+    aprobado: boolean;
+    aprobado_at: string | null;
 }
 
 interface ResumenSnapshot {
@@ -87,6 +90,7 @@ const REGLA_NUEVA_INIT = {
     precio_base: 0,
     pct_subsidio: 0,
     inst_paga: 0,
+    descuento: 0,
 };
 
 const ESPECIAL_NUEVA_INIT = {
@@ -151,7 +155,7 @@ function calcularResumen(
         const cantidad_calc = r.cantidad_override ?? cantidad_real;
         const subsidio_unit = r.precio_base * r.pct_subsidio;
         const inst_unit = r.inst_paga;
-        const usuario_unit = Math.max(0, r.precio_base - subsidio_unit - inst_unit);
+        const usuario_unit = Math.max(0, r.precio_base - subsidio_unit - inst_unit - (r.descuento ?? 0));
         return {
             ...r,
             cantidad_calc,
@@ -231,7 +235,7 @@ function planLabel(plan: string) {
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 export default function SimuladorTab() {
-    const { lineas } = useLineas();
+    const { lineas, patchLocal } = useLineas();
 
     const [reglas, setReglas] = useState<SimRegla[]>([]);
     const [especiales, setEspeciales] = useState<SimEspecial[]>([]);
@@ -279,6 +283,10 @@ export default function SimuladorTab() {
 
     // Dispositivos desde almacén
     const [equiposAlmacen, setEquiposAlmacen] = useState<string[]>([]);
+
+    // Aplicar precios a empleados
+    const [showAplicarModal, setShowAplicarModal] = useState(false);
+    const [aplicando, setAplicando] = useState(false);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -357,6 +365,7 @@ export default function SimuladorTab() {
             precio_base: Number(reglaEdit.precio_base) || 0,
             pct_subsidio: Math.min(1, Math.max(0, Number(reglaEdit.pct_subsidio) || 0)),
             inst_paga: Number(reglaEdit.inst_paga) || 0,
+            descuento: Number(reglaEdit.descuento) || 0,
             cantidad_override: (reglaEdit.cantidad_override === null || reglaEdit.cantidad_override === undefined)
                 ? null : (Number(reglaEdit.cantidad_override) || null),
         };
@@ -388,6 +397,7 @@ export default function SimuladorTab() {
             precio_base: Number(newRegla.precio_base),
             pct_subsidio: Math.min(1, Math.max(0, Number(newRegla.pct_subsidio))),
             inst_paga: Number(newRegla.inst_paga) || 0,
+            descuento: Number(newRegla.descuento) || 0,
             cantidad_override: null,
             orden: maxOrden + 1,
         }).select().single();
@@ -520,6 +530,53 @@ export default function SimuladorTab() {
         toast.success("Escenario eliminado");
     }
 
+    // ─── Aplicar precios a empleados ─────────────────────────────────────────
+    async function aplicarPrecios() {
+        setAplicando(true);
+        let count = 0;
+        const actualizaciones: { id: string; monto: string }[] = [];
+
+        for (const regla of reglaRows) {
+            const matching = lineas.filter(l => {
+                if (!l.dispositivo_2026) return false;
+                if (normalizeDevice(l.dispositivo_2026) !== regla.equipo) return false;
+                const lPlan = extractPlan(l.gb_solicitado ?? "");
+                return regla.plan === "*" ? lPlan === "sin_datos" : lPlan === regla.plan;
+            });
+            if (!matching.length) continue;
+            const monto = regla.usuario_unit.toFixed(2);
+            const ids = matching.map(l => l.id);
+            const { error } = await supabase.from("lineas_altice").update({ monto_mensual: monto }).in("id", ids);
+            if (!error) {
+                count += ids.length;
+                ids.forEach(id => actualizaciones.push({ id, monto }));
+            }
+        }
+
+        patchLocal(prev => prev.map(l => {
+            const u = actualizaciones.find(a => a.id === l.id);
+            return u ? { ...l, monto_mensual: u.monto } : l;
+        }));
+
+        setAplicando(false);
+        setShowAplicarModal(false);
+        toast.success(`Precios asignados a ${count} empleado${count !== 1 ? "s" : ""}`);
+    }
+
+    // ─── Aprobar escenario ────────────────────────────────────────────────────
+    async function aprobarSnapshot(snap: SimSnapshot) {
+        const now = new Date().toISOString();
+        await supabase.from("sim_snapshots").update({ aprobado: false, aprobado_at: null }).neq("id", "00000000-0000-0000-0000-000000000000");
+        const { error } = await supabase.from("sim_snapshots").update({ aprobado: true, aprobado_at: now }).eq("id", snap.id);
+        if (error) { toast.error("Error al aprobar"); return; }
+        setSnapshots(prev => prev.map(s => ({
+            ...s,
+            aprobado: s.id === snap.id,
+            aprobado_at: s.id === snap.id ? now : null,
+        })));
+        toast.success(`"${snap.nombre}" marcado como escenario aprobado`);
+    }
+
     // ─── Exportar Excel ──────────────────────────────────────────────────────
     function exportarExcel() {
         const wb = XLSX.utils.book_new();
@@ -601,7 +658,13 @@ export default function SimuladorTab() {
                         Modifica precios, porcentajes y cantidades — los totales se actualizan en tiempo real.
                     </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                        onClick={() => setShowAplicarModal(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-400 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                        Aplicar precios
+                    </button>
                     <button
                         onClick={exportarExcel}
                         className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm">
@@ -818,6 +881,12 @@ export default function SimuladorTab() {
                                     onChange={e => setNewRegla(p => ({ ...p, inst_paga: parseFloat(e.target.value) || 0 }))}
                                     className="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
                             </div>
+                            <div>
+                                <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Descuento empleado (RD$)</label>
+                                <input type="number" placeholder="0" value={newRegla.descuento || ""}
+                                    onChange={e => setNewRegla(p => ({ ...p, descuento: parseFloat(e.target.value) || 0 }))}
+                                    className="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                            </div>
                             <div className="flex items-end">
                                 <button onClick={addRegla} disabled={savingNewRegla}
                                     className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-50">
@@ -866,7 +935,15 @@ export default function SimuladorTab() {
                                                         </td>
                                                         <td className="px-3 py-2 text-blue-700 dark:text-blue-400 font-semibold">{formatRD((reglaEdit.precio_base ?? 0) * (reglaEdit.pct_subsidio ?? 0))}</td>
                                                         <td className="px-2 py-1.5"><input type="number" value={reglaEdit.inst_paga ?? ""} onChange={e => setReglaEdit(p => ({ ...p, inst_paga: parseFloat(e.target.value) }))} onClick={e => e.stopPropagation()} className="w-24 border border-blue-400 rounded px-1.5 py-0.5 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none" /></td>
-                                                        <td className="px-3 py-2 text-slate-500">{formatRD(Math.max(0, (reglaEdit.precio_base ?? 0) - (reglaEdit.precio_base ?? 0) * (reglaEdit.pct_subsidio ?? 0) - (reglaEdit.inst_paga ?? 0)))}</td>
+                                                        <td className="px-2 py-1.5">
+                                                            <div className="flex flex-col gap-1" onClick={e => e.stopPropagation()}>
+                                                                <div className="flex items-center gap-1">
+                                                                    <span className="text-[10px] text-slate-400 shrink-0">Dto:</span>
+                                                                    <input type="number" placeholder="0" value={reglaEdit.descuento ?? ""} onChange={e => setReglaEdit(p => ({ ...p, descuento: parseFloat(e.target.value) || 0 }))} className="w-16 border border-purple-400 rounded px-1.5 py-0.5 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none" />
+                                                                </div>
+                                                                <span className="text-[10px] text-slate-500">{formatRD(Math.max(0, (reglaEdit.precio_base ?? 0) - (reglaEdit.precio_base ?? 0) * (reglaEdit.pct_subsidio ?? 0) - (reglaEdit.inst_paga ?? 0) - (reglaEdit.descuento ?? 0)))}</span>
+                                                            </div>
+                                                        </td>
                                                         <td className="px-2 py-1.5"><input type="number" placeholder="auto" value={reglaEdit.cantidad_override ?? ""} onChange={e => setReglaEdit(p => ({ ...p, cantidad_override: e.target.value === "" ? null : parseInt(e.target.value) }))} onClick={e => e.stopPropagation()} className="w-16 border border-blue-400 rounded px-1.5 py-0.5 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none placeholder-slate-300" /></td>
                                                         <td className="px-3 py-2 text-blue-700 dark:text-blue-400 font-bold">—</td>
                                                         <td className="px-3 py-2 text-slate-400">—</td>
@@ -886,7 +963,12 @@ export default function SimuladorTab() {
                                                         </td>
                                                         <td className="px-3 py-2 text-blue-700 dark:text-blue-400 font-semibold">{formatRD(r.subsidio_unit)}</td>
                                                         <td className="px-3 py-2 text-amber-600 dark:text-amber-400">{formatRD(r.inst_unit)}</td>
-                                                        <td className="px-3 py-2 text-slate-500 dark:text-slate-400">{formatRD(r.usuario_unit)}</td>
+                                                        <td className="px-3 py-2">
+                                                            <span className="text-slate-500 dark:text-slate-400">{formatRD(r.usuario_unit)}</span>
+                                                            {(r.descuento ?? 0) > 0 && (
+                                                                <span className="ml-1 text-[10px] text-purple-600 dark:text-purple-400 font-semibold">−{formatRD(r.descuento)}</span>
+                                                            )}
+                                                        </td>
                                                         <td className="px-3 py-2">
                                                             <div className="flex flex-col gap-0.5">
                                                                 <span className={`font-bold ${r.cantidad_override !== null && r.cantidad_override > r.cantidad_real ? "text-rose-600 dark:text-rose-400" : r.cantidad_override !== null && r.cantidad_override < r.cantidad_real ? "text-amber-600 dark:text-amber-400" : "text-slate-700 dark:text-slate-200"}`}>
@@ -1163,9 +1245,10 @@ export default function SimuladorTab() {
                             return (
                                 <div key={snap.id} className="flex items-start gap-4 px-5 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
                                     <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 flex-wrap">
                                             <p className="text-sm font-semibold text-slate-800 dark:text-white truncate">{snap.nombre}</p>
                                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${overB ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400" : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"}`}>{overB ? "Excede" : "OK"}</span>
+                                            {snap.aprobado && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">✓ Aprobado</span>}
                                         </div>
                                         {snap.descripcion && <p className="text-xs text-slate-400 mt-0.5">{snap.descripcion}</p>}
                                         <div className="flex flex-wrap items-center gap-3 mt-1">
@@ -1175,7 +1258,8 @@ export default function SimuladorTab() {
                                             <span className="text-[10px] text-slate-400">{new Date(snap.created_at).toLocaleDateString("es-DO", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2 shrink-0">
+                                    <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                                        <button onClick={() => aprobarSnapshot(snap)} className={`text-xs font-medium px-2 py-1 rounded-lg transition-colors ${snap.aprobado ? "text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20" : "text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"}`}>{snap.aprobado ? "✓ Aprobado" : "Aprobar"}</button>
                                         <button onClick={() => setViewingSnapshot(viewingSnapshot?.id === snap.id ? null : snap)} className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline px-2 py-1 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">{viewingSnapshot?.id === snap.id ? "Ocultar" : "Ver"}</button>
                                         <button onClick={() => restaurarSnapshot(snap)} disabled={saving} className="text-xs font-medium text-amber-600 dark:text-amber-400 hover:underline px-2 py-1 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors disabled:opacity-40">Restaurar</button>
                                         <button onClick={() => eliminarSnapshot(snap.id, snap.nombre)} className="text-xs font-medium text-rose-500 dark:text-rose-400 hover:underline px-2 py-1 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors">Eliminar</button>
@@ -1206,6 +1290,60 @@ export default function SimuladorTab() {
                     </div>
                 )}
             </div>
+
+            {/* ── Modal Aplicar precios ──────────────────────────────────── */}
+            {showAplicarModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-2xl border border-slate-200 dark:border-slate-700 max-h-[90vh] flex flex-col">
+                        <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-800">
+                            <h2 className="text-base font-bold text-slate-900 dark:text-white">Aplicar precios a empleados</h2>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                Esto actualizará el campo <strong>Monto mensual</strong> de cada empleado en Perfiles según su dispositivo y plan configurado.
+                            </p>
+                        </div>
+                        <div className="overflow-y-auto flex-1 px-6 py-4">
+                            <table className="w-full text-xs">
+                                <thead>
+                                    <tr className="border-b border-slate-200 dark:border-slate-700">
+                                        {["Equipo", "Plan", "Descuento", "Empleado paga", "Empleados"].map(h => (
+                                            <th key={h} className="text-left pb-2 font-semibold text-slate-500 dark:text-slate-400 pr-4">{h}</th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {reglaRows.map(r => (
+                                        <tr key={r.id} className="border-t border-slate-100 dark:border-slate-700/50">
+                                            <td className="py-2 pr-4 font-medium text-slate-700 dark:text-slate-300">{r.equipo}</td>
+                                            <td className="py-2 pr-4">
+                                                <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-[10px]">{planLabel(r.plan)}</span>
+                                            </td>
+                                            <td className="py-2 pr-4 text-purple-600 dark:text-purple-400">{(r.descuento ?? 0) > 0 ? `−${formatRD(r.descuento)}` : "—"}</td>
+                                            <td className="py-2 pr-4 font-bold text-slate-800 dark:text-white">{formatRD(r.usuario_unit)}</td>
+                                            <td className="py-2 text-slate-600 dark:text-slate-300">{r.cantidad_real}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                                <tfoot>
+                                    <tr className="border-t-2 border-slate-300 dark:border-slate-600">
+                                        <td colSpan={4} className="pt-3 font-semibold text-slate-700 dark:text-slate-300">Total empleados a actualizar</td>
+                                        <td className="pt-3 font-bold text-orange-600 dark:text-orange-400">{reglaRows.reduce((s, r) => s + r.cantidad_real, 0)}</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                        <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
+                            <p className="text-xs text-slate-400">Los empleados en reglas especiales no se modifican aquí — edítalos directamente en Perfiles.</p>
+                            <div className="flex gap-2 shrink-0">
+                                <button onClick={() => setShowAplicarModal(false)} className="px-4 py-2 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 transition-all">Cancelar</button>
+                                <button onClick={aplicarPrecios} disabled={aplicando} className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-400 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50">
+                                    {aplicando ? <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> : null}
+                                    {aplicando ? "Aplicando…" : "Confirmar y aplicar"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* ── Modal guardar escenario ─────────────────────────────────── */}
             {showSaveModal && (
