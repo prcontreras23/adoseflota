@@ -657,6 +657,18 @@ function EditModal({ linea, onClose, onSave, onDelete, session, upsertLocal, tit
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Número del usuario</p>
                 <p className="font-mono text-lg font-bold text-slate-800 dark:text-white tracking-wide">{form.telefono || "—"}</p>
               </div>
+              {/* Titular responsable — editable */}
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">
+                  Titular responsable
+                </label>
+                <input
+                  value={form.titular_responsable ?? ""}
+                  onChange={e => set("titular_responsable", e.target.value)}
+                  placeholder="Nombre del titular..."
+                  className="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
               {/* Número temporal Altice — dropdown del stock Altice */}
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">
