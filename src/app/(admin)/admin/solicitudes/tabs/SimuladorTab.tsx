@@ -277,6 +277,9 @@ export default function SimuladorTab() {
     // Resetear cantidades manuales
     const [reseteando, setReseteando] = useState(false);
 
+    // Dispositivos desde almacén
+    const [equiposAlmacen, setEquiposAlmacen] = useState<string[]>([]);
+
     const load = useCallback(async () => {
         setLoading(true);
         const [r1, r2, r3, r4] = await Promise.all([
@@ -293,6 +296,23 @@ export default function SimuladorTab() {
     }, []);
 
     useEffect(() => { load(); }, [load]);
+
+    useEffect(() => {
+        const cargarAlmacen = async () => {
+            const { data } = await supabase.from("almacen_dispositivos").select("dispositivo").order("dispositivo");
+            if (data && data.length > 0) {
+                const nombres = data.map((d: { dispositivo: string }) => d.dispositivo);
+                setEquiposAlmacen(nombres);
+                setConsultaEquipo(eq => eq === EQUIPOS_CONOCIDOS[0] ? nombres[0] : eq);
+                setNewRegla(r => r.equipo === EQUIPOS_CONOCIDOS[0] ? { ...r, equipo: nombres[0] } : r);
+            }
+        };
+        cargarAlmacen();
+        const ch = supabase.channel("almacen_sim_sync")
+            .on("postgres_changes", { event: "*", schema: "public", table: "almacen_dispositivos" }, cargarAlmacen)
+            .subscribe();
+        return () => { supabase.removeChannel(ch); };
+    }, []);
 
     const { reglaRows, especialRows, totales, gaps } = useMemo(
         () => calcularResumen(reglas, especiales, subsidioDisponible, lineas),
@@ -566,6 +586,7 @@ export default function SimuladorTab() {
     );
 
     const pct = Math.min(100, (totales.totalSubsidioAltice / totales.subsidio_disponible) * 100);
+    const equiposOpciones = equiposAlmacen.length > 0 ? equiposAlmacen : EQUIPOS_CONOCIDOS;
     const overBudget = totales.diferencia < 0;
     const equipos = [...new Set(reglaRows.map(r => r.equipo))];
 
@@ -612,7 +633,7 @@ export default function SimuladorTab() {
                             <select value={consultaEquipo}
                                 onChange={e => { setConsultaEquipo(e.target.value); setConsultaPlan("*"); }}
                                 className="w-full border border-blue-200 dark:border-blue-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm">
-                                {EQUIPOS_CONOCIDOS.map(eq => <option key={eq} value={eq}>{eq}</option>)}
+                                {equiposOpciones.map(eq => <option key={eq} value={eq}>{eq}</option>)}
                             </select>
                         </div>
                         <div className="w-40">
@@ -762,7 +783,7 @@ export default function SimuladorTab() {
                                 <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Equipo</label>
                                 <select value={newRegla.equipo} onChange={e => setNewRegla(p => ({ ...p, equipo: e.target.value }))}
                                     className="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                    {EQUIPOS_CONOCIDOS.map(eq => <option key={eq} value={eq}>{eq}</option>)}
+                                    {equiposOpciones.map(eq => <option key={eq} value={eq}>{eq}</option>)}
                                     <option value="otro">Otro (escribir)...</option>
                                 </select>
                                 {newRegla.equipo === "otro" && (
@@ -993,7 +1014,7 @@ export default function SimuladorTab() {
                                 <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Equipo</label>
                                 <select value={newEspecial.equipo} onChange={e => setNewEspecial(p => ({ ...p, equipo: e.target.value }))}
                                     className="w-full border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                                    {EQUIPOS_CONOCIDOS.map(eq => <option key={eq} value={eq}>{eq}</option>)}
+                                    {equiposOpciones.map(eq => <option key={eq} value={eq}>{eq}</option>)}
                                     <option value="otro">Otro (escribir)...</option>
                                 </select>
                                 {newEspecial.equipo === "otro" && (
