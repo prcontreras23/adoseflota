@@ -3,6 +3,7 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { supabase, formatRD, type LineaAltice } from "@/lib/supabase";
 import { useLineas } from "@/lib/LineasContext";
 import toast from "react-hot-toast";
+import * as XLSX from "xlsx";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -499,6 +500,63 @@ export default function SimuladorTab() {
         toast.success("Escenario eliminado");
     }
 
+    // ─── Exportar Excel ──────────────────────────────────────────────────────
+    function exportarExcel() {
+        const wb = XLSX.utils.book_new();
+
+        // Hoja 1 — Reglas estándar
+        const std = [
+            ["Equipo", "Plan", "Precio base", "% Subsidio", "Altice cubre", "ADOSE aporta", "1 empleado paga", "Cantidad config.", "Cantidad portal", "Total subsidio", "Total empleados"],
+            ...reglaRows.map(r => [
+                r.equipo,
+                planLabel(r.plan),
+                r.precio_base,
+                (r.pct_subsidio * 100).toFixed(0) + "%",
+                r.subsidio_unit,
+                r.inst_unit,
+                r.usuario_unit,
+                r.cantidad_calc,
+                r.cantidad_real,
+                r.total_subsidio,
+                r.total_usuario,
+            ]),
+        ];
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(std), "Reglas estándar");
+
+        // Hoja 2 — Reglas especiales
+        const esp = [
+            ["Descripción", "Equipo", "Cantidad", "Precio base", "Altice cubre", "ADOSE aporta", "1 empleado paga", "Total subsidio", "Total empleados"],
+            ...especialRows.map(e => [
+                e.nombre,
+                e.equipo ?? "",
+                e.cantidad,
+                e.precio_base,
+                e.subsidio_altice,
+                e.inst_paga,
+                e.usuario_paga,
+                e.total_subsidio,
+                e.total_usuario,
+            ]),
+        ];
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(esp), "Reglas especiales");
+
+        // Hoja 3 — Resumen
+        const res = [
+            ["Concepto", "Monto (RD$)"],
+            ["Total equipos", totales.totalEquipos],
+            ["Subsidio Altice", totales.totalSubsidioAltice],
+            ["Aporte ADOSE", totales.totalInstPaga],
+            ["Total empleados", totales.totalUsuarioPaga],
+            ["Subsidio disponible", totales.subsidio_disponible],
+            ["Diferencia", totales.diferencia],
+        ];
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(res), "Resumen");
+
+        const fecha = new Date().toISOString().slice(0, 10);
+        XLSX.writeFile(wb, `Simulador ADOSE ${fecha}.xlsx`);
+        toast.success("Excel exportado");
+    }
+
     // ─── Renderizado ──────────────────────────────────────────────────────────
 
     if (loading) return (
@@ -522,12 +580,20 @@ export default function SimuladorTab() {
                         Modifica precios, porcentajes y cantidades — los totales se actualizan en tiempo real.
                     </p>
                 </div>
-                <button
-                    onClick={() => { setSnapNombre(""); setSnapDesc(""); setShowSaveModal(true); }}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                    Guardar escenario
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={exportarExcel}
+                        className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                        Exportar Excel
+                    </button>
+                    <button
+                        onClick={() => { setSnapNombre(""); setSnapDesc(""); setShowSaveModal(true); }}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                        Guardar escenario
+                    </button>
+                </div>
             </div>
 
             {/* ── Consulta rápida por empleado ───────────────────────────── */}
