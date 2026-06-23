@@ -87,9 +87,8 @@ export default function AdminDashboard() {
 
     useEffect(() => {
         if (typeof window !== "undefined") {
-            const isDark = document.documentElement.classList.contains("dark") || window.matchMedia("(prefers-color-scheme: dark)").matches;
-            setDarkMode(isDark);
-            if (isDark) document.documentElement.classList.add("dark");
+            document.documentElement.classList.add("dark");
+            setDarkMode(true);
         }
         const raw = typeof window !== "undefined" ? localStorage.getItem("flota_session") : null;
         if (!raw) { router.push("/login"); return; }
