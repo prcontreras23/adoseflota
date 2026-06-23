@@ -857,14 +857,22 @@ function EditModal({ linea, onClose, onSave, onDelete, session, upsertLocal, tit
                 })()}
               </div>
               <div>
-                <label className={labelCls}>Cotización</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className={labelCls} style={{marginBottom: 0}}>Cotización</label>
+                  {form.monto_mensual && parseFloat(form.monto_mensual) > 0 && (
+                    <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+                      Simulado: {form.monto_mensual}
+                    </span>
+                  )}
+                </div>
                 <input value={form.cotizacion} onChange={e => set("cotizacion", e.target.value)}
                   placeholder="Ej: Pendiente, RD$45,000, Aprobado..." className={inputCls} />
               </div>
               <div>
-                <label className={labelCls}>Monto mensual</label>
+                <label className={labelCls}>Precio dispositivo</label>
                 <input value={form.monto_mensual} onChange={e => set("monto_mensual", e.target.value)}
-                  placeholder="Ej: RD$1,200" className={inputCls} />
+                  placeholder="Ej: RD$1,209" className={inputCls} />
               </div>
             </div>
           </section>}
@@ -1218,7 +1226,7 @@ function LineaRow({ linea, onEdit, dimmed, onMutate, selected, onToggleSelect }:
             <span className="flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> <strong>{linea.gb_antes || "—"}</strong> → <strong className="text-blue-600 dark:text-blue-400">{linea.gb_solicitado || "—"}</strong> GB</span>
             <span className="flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg> <strong>{linea.min_antes || "—"}</strong> → <strong className="text-blue-600 dark:text-blue-400">{linea.min_solicitados || "—"}</strong> min</span>
             {linea.dispositivo_2026 && <span className="flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg> {linea.dispositivo_2026}</span>}
-            {linea.monto_mensual && <span className="text-green-600 dark:text-green-400 font-semibold flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg> {linea.monto_mensual}</span>}
+            {linea.monto_mensual && parseFloat(linea.monto_mensual) > 0 && <span className="text-green-600 dark:text-green-400 font-semibold flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg> {linea.monto_mensual}</span>}
             {linea.cotizacion && <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> {linea.cotizacion}</span>}
           </div>
           {linea.seguimiento && (
