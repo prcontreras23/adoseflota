@@ -170,7 +170,6 @@ export default function EntregasLineasTab() {
     // ── Registrar entrega ─────────────────────────────────────────────────────
     async function registrarEntrega() {
         if (!modalLinea) return;
-        if (!signed) { toast.error("Se requiere firma digital"); return; }
         setSaving(true);
         const ok = await mutate(modalLinea.id, { entregado: true, fecha_entrega: fechaEntrega });
         if (ok) {
@@ -194,7 +193,7 @@ export default function EntregasLineasTab() {
 
     // ── Imprimir acta ─────────────────────────────────────────────────────────
     function imprimirActa(linea: LineaAltice) {
-        const firma = canvasRef.current?.toDataURL("image/png") ?? "";
+        const firma = "";
         const html = `<html><head><title>Acta de Entrega</title>
         <style>
           body{font-family:Arial,sans-serif;padding:40px;max-width:620px;margin:0 auto;color:#1e293b}
@@ -230,7 +229,7 @@ export default function EntregasLineasTab() {
           </p>
           <div class="firma-box">
             <p class="firma-label">Firma del beneficiario:</p>
-            ${firma ? `<img src="${firma}" style="width:260px;height:80px;border:1px solid #e2e8f0;border-radius:8px"/>` : ""}
+            <div style="width:300px;height:70px;border-bottom:1px solid #334155;margin-top:40px"></div>
             <p class="firma-nombre">${linea.usuario_linea || "—"}</p>
           </div>
           <div class="footer">Generado por ADOSE Flota 2026 · ${new Date().toLocaleString("es-DO")}</div>
@@ -455,16 +454,9 @@ export default function EntregasLineasTab() {
                                     <input type="date" value={fechaEntrega} onChange={e => setFechaEntrega(e.target.value)} className={inputCls} />
                                 </div>
 
-                                <div>
-                                    <div className="flex items-center justify-between mb-1">
-                                        <label className={labelCls}>Firma digital del beneficiario <span className="text-red-500">*</span></label>
-                                        <button onClick={clearSign} className="text-xs text-red-500 hover:underline">Limpiar</button>
-                                    </div>
-                                    <canvas ref={canvasRef} width={460} height={100}
-                                        onMouseDown={startDraw} onMouseMove={draw}
-                                        onMouseUp={() => setDrawing(false)} onMouseLeave={() => setDrawing(false)}
-                                        className="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl cursor-crosshair bg-slate-50 dark:bg-slate-700 w-full touch-none" />
-                                    {!signed && <p className="text-xs text-slate-400 mt-1">Dibuja la firma con el mouse o dedo</p>}
+                                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-3 text-xs text-amber-700 dark:text-amber-400 flex items-center gap-2">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                    Se imprimirá el acta para firma física del beneficiario.
                                 </div>
 
                                 <div className="flex gap-2 pt-1">
@@ -472,7 +464,7 @@ export default function EntregasLineasTab() {
                                         className="flex-1 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm font-semibold">
                                         Cancelar
                                     </button>
-                                    <button onClick={registrarEntrega} disabled={saving || !signed}
+                                    <button onClick={registrarEntrega} disabled={saving}
                                         className="flex-1 py-2.5 rounded-xl bg-green-600 hover:bg-green-500 text-white text-sm font-semibold disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
                                         {saving
                                             ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Guardando...</>
