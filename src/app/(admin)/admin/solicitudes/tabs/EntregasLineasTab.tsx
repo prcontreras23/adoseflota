@@ -168,7 +168,7 @@ export default function EntregasLineasTab() {
     }
 
     // ── Registrar entrega ─────────────────────────────────────────────────────
-    async function registrarEntrega() {
+    async function registrarEntrega(postAction?: "whatsapp" | "imprimir") {
         if (!modalLinea) return;
         if (!modalLinea.sim?.trim()) {
             toast.error("Debes asignar un número de SIM antes de registrar la entrega");
@@ -195,7 +195,9 @@ export default function EntregasLineasTab() {
                 }
             } catch (_) { /* historial no crítico */ }
             toast.success("Entrega registrada");
-            setTimeout(() => enviarWhatsApp({ ...lineaSnapshot, fecha_entrega: fechaSnapshot }), 300);
+            const snap = { ...lineaSnapshot, fecha_entrega: fechaSnapshot };
+            if (postAction === "whatsapp") setTimeout(() => enviarWhatsApp(snap), 300);
+            else if (postAction === "imprimir") setTimeout(() => imprimirActa(snap), 300);
         } else {
             toast.error("Error al registrar la entrega");
         }
@@ -231,6 +233,53 @@ _Unión Adventista Sureste_`;
 
         const url = `https://wa.me/${numWA}?text=${encodeURIComponent(mensaje)}`;
         window.open(url, "_blank");
+    }
+
+    // ── Imprimir acta ─────────────────────────────────────────────────────────
+    function imprimirActa(linea: LineaAltice & { fecha_entrega?: string | null }) {
+        const fechaImpresion = linea.fecha_entrega || fechaEntrega;
+        const html = `<html><head><title>Acta de Entrega</title>
+        <style>
+          body{font-family:Arial,sans-serif;padding:40px;max-width:620px;margin:0 auto;color:#1e293b}
+          h1{color:#2563eb;font-size:18px;margin-bottom:4px}
+          h2{font-size:13px;color:#64748b;font-weight:normal;margin-bottom:20px}
+          table{width:100%;border-collapse:collapse;margin:16px 0}
+          td,th{padding:9px 12px;border:1px solid #e2e8f0;font-size:13px}
+          th{background:#f8fafc;font-weight:600;width:40%}
+          .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;background:#dcfce7;color:#16a34a}
+          .footer{margin-top:36px;padding-top:16px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8}
+          .firma-box{margin-top:28px}
+          .firma-label{font-size:12px;font-weight:600;color:#334155;margin-bottom:6px}
+          .firma-nombre{margin-top:8px;border-top:1px solid #334155;padding-top:4px;font-size:12px;width:280px}
+        </style></head>
+        <body>
+          <h1>Acta de Entrega de Dispositivo</h1>
+          <h2>Renovación Flota Claro 2026 — ADOSE / Unión Adventista Sureste</h2>
+          <span class="badge">ENTREGADO</span>
+          <table>
+            <tr><th>Beneficiario</th><td><strong>${linea.usuario_linea || "—"}</strong></td></tr>
+            <tr><th>Titular responsable</th><td>${linea.titular_responsable || "—"}</td></tr>
+            <tr><th>Tipo</th><td>${linea.tipo || "—"}</td></tr>
+            <tr><th>Número de línea</th><td>${linea.telefono}</td></tr>
+            <tr><th>Dispositivo asignado</th><td>${linea.dispositivo_2026 || "—"}</td></tr>
+            <tr><th>IMEI</th><td><strong>${linea.imei || "—"}</strong></td></tr>
+            <tr><th>SIM / ICC</th><td>${linea.sim || "—"}</td></tr>
+            <tr><th>Plan de datos</th><td>${linea.gb_solicitado || linea.gb_antes || "—"}</td></tr>
+            <tr><th>Fecha de entrega</th><td><strong>${new Date(fechaImpresion).toLocaleDateString("es-DO", { year: "numeric", month: "long", day: "numeric" })}</strong></td></tr>
+          </table>
+          <p style="font-size:12px;color:#475569;line-height:1.6">
+            Al firmar este documento, el beneficiario confirma haber recibido el dispositivo en perfectas condiciones
+            y acepta las políticas de uso institucional establecidas por la ADOSE.
+          </p>
+          <div class="firma-box">
+            <p class="firma-label">Firma del beneficiario:</p>
+            <div style="width:300px;height:70px;border-bottom:1px solid #334155;margin-top:40px"></div>
+            <p class="firma-nombre">${linea.usuario_linea || "—"}</p>
+          </div>
+          <div class="footer">Generado por ADOSE Flota 2026 · ${new Date().toLocaleString("es-DO")}</div>
+        </body></html>`;
+        const w = window.open("", "_blank");
+        if (w) { w.document.write(html); w.document.close(); setTimeout(() => w.print(), 600); }
     }
 
     // ── Importar Excel masivo ─────────────────────────────────────────────────
@@ -456,16 +505,22 @@ _Unión Adventista Sureste_`;
                                     </span>
                                 </div>
 
-                                <div className="flex gap-2 pt-1">
+                                <div className="flex gap-2 pt-1 flex-wrap">
                                     <button onClick={() => setModalLinea(null)}
-                                        className="flex-1 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm font-semibold">
+                                        className="py-2.5 px-4 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm font-semibold">
                                         Cancelar
                                     </button>
-                                    <button onClick={registrarEntrega} disabled={saving}
-                                        className="flex-1 py-2.5 rounded-xl bg-green-600 hover:bg-green-500 text-white text-sm font-semibold disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
+                                    <button onClick={() => registrarEntrega("whatsapp")} disabled={saving}
+                                        className="flex-1 py-2.5 rounded-xl bg-green-600 hover:bg-green-500 text-white text-sm font-semibold disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5">
                                         {saving
                                             ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Guardando...</>
-                                            : <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> Registrar + Enviar WhatsApp</>}
+                                            : <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> Registrar + WA</>}
+                                    </button>
+                                    <button onClick={() => registrarEntrega("imprimir")} disabled={saving}
+                                        className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5">
+                                        {saving
+                                            ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Guardando...</>
+                                            : <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> Registrar + Imprimir</>}
                                     </button>
                                 </div>
                             </>
@@ -622,10 +677,16 @@ _Unión Adventista Sureste_`;
                                         </td>
                                         <td className="p-3">
                                             {linea.entregado ? (
-                                                <button onClick={() => enviarWhatsApp(linea)}
-                                                    className="text-xs px-3 py-1.5 rounded-lg bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 hover:bg-green-100 transition-colors font-medium flex items-center gap-1">
-                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> Enviar WA
-                                                </button>
+                                                <div className="flex gap-1">
+                                                    <button onClick={() => enviarWhatsApp(linea)}
+                                                        className="text-xs px-2.5 py-1.5 rounded-lg bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 hover:bg-green-100 transition-colors font-medium flex items-center gap-1">
+                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> WA
+                                                    </button>
+                                                    <button onClick={() => imprimirActa(linea)}
+                                                        className="text-xs px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition-colors font-medium flex items-center gap-1">
+                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> Imprimir
+                                                    </button>
+                                                </div>
                                             ) : (
                                                 <div className="flex gap-1">
                                                     <button onClick={() => abrirImei(linea)}
