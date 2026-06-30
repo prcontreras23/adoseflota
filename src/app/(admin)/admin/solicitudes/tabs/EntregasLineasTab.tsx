@@ -255,6 +255,16 @@ _Francis Contreras_`;
     // ── Imprimir acta ─────────────────────────────────────────────────────────
     function imprimirActa(linea: LineaAltice & { fecha_entrega?: string | null }) {
         const fechaImpresion = linea.fecha_entrega || fechaEntrega;
+        const noDeseabaInternet = linea.gb_solicitado?.trim() === "No deseo internet";
+        const internetRow = noDeseabaInternet
+            ? `<tr><th>Internet</th><td>Logramos incluirte 5GB de internet en tu dispositivo 🎉</td></tr>`
+            : (linea.gb_solicitado?.trim() && linea.gb_solicitado !== "No aplica"
+                ? `<tr><th>Plan de datos</th><td>${linea.gb_solicitado.replace(/\s*\(RD\$[^)]+\)/g, "").trim()}</td></tr>`
+                : "");
+        const monto = parseFloat(linea.monto_mensual || "0");
+        const montoRow = monto > 0
+            ? `<tr><th>Pago único por el equipo</th><td><strong>RD$ ${monto.toLocaleString("es-DO", { minimumFractionDigits: 2 })}</strong></td></tr>`
+            : "";
         const html = `<html><head><title>Acta de Entrega</title>
         <style>
           body{font-family:Arial,sans-serif;padding:40px;max-width:620px;margin:0 auto;color:#1e293b}
@@ -282,8 +292,9 @@ _Francis Contreras_`;
             <tr><th>Dispositivo asignado</th><td>${linea.dispositivo_2026 || "—"}</td></tr>
             <tr><th>IMEI</th><td><strong>${linea.imei || "—"}</strong></td></tr>
             <tr><th>SIM / ICC</th><td>${linea.sim || "—"}</td></tr>
-            <tr><th>Plan de datos</th><td>${linea.gb_solicitado || linea.gb_antes || "—"}</td></tr>
+            ${internetRow}
             <tr><th>Fecha de entrega</th><td><strong>${new Date(fechaImpresion).toLocaleDateString("es-DO", { year: "numeric", month: "long", day: "numeric" })}</strong></td></tr>
+            ${montoRow}
           </table>
           <p style="font-size:12px;color:#475569;line-height:1.6">
             Al firmar este documento, el beneficiario confirma haber recibido el dispositivo en perfectas condiciones
