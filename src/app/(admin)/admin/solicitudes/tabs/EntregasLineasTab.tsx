@@ -14,7 +14,7 @@ interface InventarioItem {
     linea_id: string | null;
 }
 
-type Vista = "pendientes" | "entregadas" | "sin_sim";
+type Vista = "pendientes" | "entregadas" | "sin_sim" | "con_sim";
 
 function modelKey(s: string): string {
     const l = s.toLowerCase();
@@ -80,6 +80,7 @@ export default function EntregasLineasTab() {
         if (vista === "pendientes") return !l.entregado;
         if (vista === "entregadas") return l.entregado;
         if (vista === "sin_sim") return !l.entregado && !l.sim?.trim();
+        if (vista === "con_sim") return !l.entregado && !!l.sim?.trim();
         return true;
     });
 
@@ -610,10 +611,11 @@ _Francis Contreras_`;
                 <input value={search} onChange={e => setSearch(e.target.value)}
                     placeholder="Buscar por nombre, teléfono, IMEI..."
                     className="flex-1 min-w-[200px] border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-800 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                {(["pendientes", "sin_sim", "entregadas"] as Vista[]).map(v => (
+                {(["pendientes", "con_sim", "sin_sim", "entregadas"] as Vista[]).map(v => (
                     <button key={v} onClick={() => setVista(v)}
                         className={`px-4 py-2 rounded-full text-sm font-semibold transition-all flex items-center gap-1.5 ${vista === v ? "bg-blue-600 text-white" : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50"}`}>
                         {v === "pendientes" ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Pendientes ({kpis.total - kpis.entregados})</>
+                            : v === "con_sim" ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg> Con SIM ({kpis.conSim})</>
                             : v === "sin_sim" ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Sin SIM ({kpis.sinSim})</>
                                 : <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.1 9 11.1"/></svg> Entregadas ({kpis.entregados})</>}
                     </button>
