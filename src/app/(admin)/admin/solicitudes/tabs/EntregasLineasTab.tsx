@@ -229,7 +229,7 @@ Hola${linea.usuario_linea ? ` *${linea.usuario_linea}*` : ""}, te confirmamos qu
 📅 *Fecha de entrega:* ${fechaFormateada}
 
 Ante cualquier inconveniente comunícate con la secretaría ejecutiva de ADOSE.
-_Unión Adventista Sureste_`;
+_Francis Contreras_`;
 
         const url = `https://wa.me/${numWA}?text=${encodeURIComponent(mensaje)}`;
         window.open(url, "_blank");
