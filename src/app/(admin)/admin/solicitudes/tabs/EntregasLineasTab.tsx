@@ -170,6 +170,10 @@ export default function EntregasLineasTab() {
     // ── Registrar entrega ─────────────────────────────────────────────────────
     async function registrarEntrega() {
         if (!modalLinea) return;
+        if (!modalLinea.sim?.trim()) {
+            toast.error("Debes asignar un número de SIM antes de registrar la entrega");
+            return;
+        }
         setSaving(true);
         const lineaSnapshot = { ...modalLinea };
         const fechaSnapshot = fechaEntrega;
