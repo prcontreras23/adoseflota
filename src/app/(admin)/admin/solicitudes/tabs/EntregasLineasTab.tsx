@@ -221,7 +221,7 @@ export default function EntregasLineasTab() {
 
         const monto = parseFloat(linea.monto_mensual || "0");
         const montoLinea = monto > 0
-            ? `\n💰 *Monto mensual a pagar:* RD$ ${monto.toLocaleString("es-DO", { minimumFractionDigits: 2 })}`
+            ? `\n💰 *Pago único por el equipo:* RD$ ${monto.toLocaleString("es-DO", { minimumFractionDigits: 2 })}`
             : "";
 
         const mensaje =
