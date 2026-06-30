@@ -599,6 +599,10 @@ export default function EntregasLineasTab() {
                                                     </span>
                                                     {linea.fecha_entrega && <p className="text-xs text-slate-400 mt-1">{formatDate(linea.fecha_entrega)}</p>}
                                                 </div>
+                                            ) : linea.sim_instalado ? (
+                                                <span className="text-xs font-semibold px-2 py-1 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 flex items-center gap-1 w-fit">
+                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.1 9 11.1"/></svg> SIM Instalada
+                                                </span>
                                             ) : linea.sim?.trim() ? (
                                                 <span className="text-xs font-semibold px-2 py-1 rounded-full bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 flex items-center gap-1 w-fit">
                                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg> SIM asignada
