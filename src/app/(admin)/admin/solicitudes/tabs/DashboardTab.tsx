@@ -930,61 +930,6 @@ export default function DashboardTab() {
                                 <div className={`h-full rounded-full transition-all duration-700 ${pctGlobal === 100 ? "bg-emerald-500" : "bg-amber-400"}`} style={{ width: `${pctGlobal}%` }} />
                             </div>
 
-                            {/* Desglose por categoría */}
-                            <div className="space-y-3 pt-1 border-t border-slate-100 dark:border-slate-700">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Por tipo de portabilidad</p>
-                                <BarraCategoria label="Líneas ALTA nuevas" ok={altasAsignadas.length} total={altasNuevas.length + altasAsignadas.length} color="bg-blue-400" onClick={() => goToPerfiles({ accion: "ALTA" })} />
-                                <BarraCategoria label="Portabilidad · Claro" ok={portClaroOk.length} total={portClaro.length} color="bg-red-400" onClick={() => goToPerfiles({ portabilidad: "Claro" })} />
-                                <BarraCategoria label="Portabilidad · Altice" ok={portAlticeOk.length} total={portAltice.length} color="bg-indigo-400" onClick={() => goToPerfiles({ portabilidad: "Altice" })} />
-                                <BarraCategoria label="Número nuevo · Nuevo" ok={portNuevoOk.length} total={portNuevo.length} color="bg-emerald-400" onClick={() => goToPerfiles({ portabilidad: "Nuevo" })} />
-                            </div>
-
-                            {/* Distribución por plan */}
-                            {(() => {
-                                const todasLasLineas = lineas.filter(r => !r.archivada);
-                                const tieneNumero = (r: LineaAltice) => !!(r.numero_altice && r.numero_altice.trim());
-                                const planes = [...new Set(todasLasLineas.map(r => r.gb_solicitado?.trim()).filter(Boolean))].sort();
-                                if (planes.length === 0) return null;
-                                const filas = planes.map(plan => {
-                                    const grupo = todasLasLineas.filter(r => r.gb_solicitado?.trim() === plan);
-                                    const asig = grupo.filter(tieneNumero).length;
-                                    const pend = grupo.length - asig;
-                                    const pct = grupo.length > 0 ? Math.round((asig / grupo.length) * 100) : 0;
-                                    return { plan, total: grupo.length, asig, pend, pct };
-                                }).filter(f => f.total > 0).sort((a, b) => b.total - a.total);
-                                const totales = filas.reduce((acc, f) => ({ total: acc.total + f.total, asig: acc.asig + f.asig, pend: acc.pend + f.pend }), { total: 0, asig: 0, pend: 0 });
-                                return (
-                                    <div className="pt-1 border-t border-slate-100 dark:border-slate-700 space-y-3">
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Distribución por plan (GB)</p>
-                                        <div className="space-y-2">
-                                            {filas.map(f => (
-                                                <div key={f.plan} role="button" tabIndex={0} onClick={() => goToPerfiles({ gbContains: f.plan })} onKeyDown={e => { if (e.key === "Enter" || e.key === " ") goToPerfiles({ gbContains: f.plan }); }} className="rounded-xl bg-slate-50 dark:bg-slate-700/40 px-4 py-3 space-y-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
-                                                    <div className="flex items-center justify-between gap-2">
-                                                        <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">{f.plan}</span>
-                                                        <div className="flex items-center gap-2 shrink-0">
-                                                            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">{f.asig} ✓</span>
-                                                            {f.pend > 0 && <span className="text-xs font-bold text-amber-500">{f.pend} ⏳</span>}
-                                                            <span className="text-[10px] text-slate-400 font-mono">{f.total} total</span>
-                                                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${f.pct === 100 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-slate-200 text-slate-500 dark:bg-slate-600 dark:text-slate-300"}`}>{f.pct}%</span>
-                                                        </div>
-                                                    </div>
-                                                    <div className="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-600 overflow-hidden">
-                                                        <div className={`h-full rounded-full transition-all duration-700 ${f.pct === 100 ? "bg-emerald-500" : "bg-amber-400"}`} style={{ width: `${f.pct}%` }} />
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <div className="flex items-center justify-between px-1 pt-1 border-t border-slate-100 dark:border-slate-700">
-                                            <span className="text-xs font-bold text-slate-500 dark:text-slate-400">TOTAL</span>
-                                            <div className="flex items-center gap-3">
-                                                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">{totales.asig} asignados</span>
-                                                {totales.pend > 0 && <span className="text-xs font-bold text-amber-500">{totales.pend} pendientes</span>}
-                                                <span className="text-xs text-slate-400 font-mono">{totales.total} líneas</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })()}
 
                             {totalPendientes > 0 && (
                                 <div className="flex gap-2">
