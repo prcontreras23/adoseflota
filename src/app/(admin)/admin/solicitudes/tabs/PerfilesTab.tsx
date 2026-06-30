@@ -615,7 +615,7 @@ function EditModal({ linea, onClose, onSave, onDelete, session, upsertLocal, tit
                       .filter(n => !n.linea_id || n.linea_id === linea.id)
                       .map(n => (
                         <option key={n.id} value={n.numero}>
-                          {n.numero}{n.linea_id === linea.id ? " (actual)" : ""} · {n.plan}
+                          {n.numero}{n.linea_id === linea.id ? " (actual)" : ""}
                         </option>
                       ))}
                   </select>
@@ -685,7 +685,7 @@ function EditModal({ linea, onClose, onSave, onDelete, session, upsertLocal, tit
                     .filter(n => !n.linea_id || n.linea_id === linea.id)
                     .map(n => (
                       <option key={n.id} value={n.numero}>
-                        {n.numero}{n.linea_id === linea.id ? " (actual)" : ""} · {n.plan}
+                        {n.numero}{n.linea_id === linea.id ? " (actual)" : ""}
                       </option>
                     ))}
                 </select>
