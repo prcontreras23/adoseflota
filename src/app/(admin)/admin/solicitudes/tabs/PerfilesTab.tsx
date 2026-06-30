@@ -1304,6 +1304,12 @@ function LineaRow({ linea, onEdit, dimmed, onMutate, selected, onToggleSelect }:
             {linea.dispositivo_2026 && <span className="flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg> {linea.dispositivo_2026}</span>}
             {linea.monto_mensual && parseFloat(linea.monto_mensual) > 0 && <span className="text-green-600 dark:text-green-400 font-semibold flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg> {linea.monto_mensual}</span>}
             {linea.cotizacion && <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> {linea.cotizacion}</span>}
+            {linea.sim?.trim() && (
+              <span className="font-mono text-violet-500 dark:text-violet-400 flex items-center gap-1">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                {linea.sim}
+              </span>
+            )}
           </div>
           {linea.seguimiento && (
             <p className="mt-1.5 text-xs text-slate-400 dark:text-slate-500 italic line-clamp-1 flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> {linea.seguimiento}</p>
