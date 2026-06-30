@@ -171,28 +171,35 @@ export default function EntregasLineasTab() {
     async function registrarEntrega() {
         if (!modalLinea) return;
         setSaving(true);
+        const lineaSnapshot = { ...modalLinea };
+        const fechaSnapshot = fechaEntrega;
         const ok = await mutate(modalLinea.id, { entregado: true, fecha_entrega: fechaEntrega });
-        if (ok) {
-            if (session) {
-                await supabase.from("historial_cambios").insert([{
-                    linea_id: modalLinea.id,
-                    usuario_id: session.id,
-                    usuario_nombre: session.nombre,
-                    campo: "Entregado",
-                    valor_anterior: "No",
-                    valor_nuevo: `Sí — ${fechaEntrega}`,
-                }]);
-            }
-            imprimirActa(modalLinea);
-            toast.success("Entrega registrada");
-        }
         setSaving(false);
         setModalLinea(null);
         setSigned(false);
+        if (ok) {
+            try {
+                if (session) {
+                    await supabase.from("historial_cambios").insert([{
+                        linea_id: lineaSnapshot.id,
+                        usuario_id: session.id,
+                        usuario_nombre: session.nombre,
+                        campo: "Entregado",
+                        valor_anterior: "No",
+                        valor_nuevo: `Sí — ${fechaSnapshot}`,
+                    }]);
+                }
+            } catch (_) { /* historial no crítico */ }
+            toast.success("Entrega registrada");
+            setTimeout(() => imprimirActa({ ...lineaSnapshot, fecha_entrega: fechaSnapshot }), 300);
+        } else {
+            toast.error("Error al registrar la entrega");
+        }
     }
 
     // ── Imprimir acta ─────────────────────────────────────────────────────────
-    function imprimirActa(linea: LineaAltice) {
+    function imprimirActa(linea: LineaAltice & { fecha_entrega?: string | null }) {
+        const fechaImpresion = linea.fecha_entrega || fechaEntrega;
         const firma = "";
         const html = `<html><head><title>Acta de Entrega</title>
         <style>
@@ -221,7 +228,7 @@ export default function EntregasLineasTab() {
             <tr><th>IMEI</th><td><strong>${linea.imei || "—"}</strong></td></tr>
             <tr><th>SIM / ICC</th><td>${linea.sim || "—"}</td></tr>
             <tr><th>Plan de datos</th><td>${linea.gb_solicitado || linea.gb_antes || "—"}</td></tr>
-            <tr><th>Fecha de entrega</th><td><strong>${new Date(fechaEntrega).toLocaleDateString("es-DO", { year: "numeric", month: "long", day: "numeric" })}</strong></td></tr>
+            <tr><th>Fecha de entrega</th><td><strong>${new Date(fechaImpresion).toLocaleDateString("es-DO", { year: "numeric", month: "long", day: "numeric" })}</strong></td></tr>
           </table>
           <p style="font-size:12px;color:#475569;line-height:1.6">
             Al firmar este documento, el beneficiario confirma haber recibido el dispositivo en perfectas condiciones
