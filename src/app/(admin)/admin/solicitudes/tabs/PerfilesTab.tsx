@@ -1627,7 +1627,9 @@ export default function PerfilesTab() {
           l.titular_responsable?.toLowerCase().includes(q) ||
           l.usuario_linea?.toLowerCase().includes(q) ||
           l.telefono?.includes(q) ||
-          l.seguimiento?.toLowerCase().includes(q)
+          l.seguimiento?.toLowerCase().includes(q) ||
+          l.sim?.includes(q) ||
+          l.imei?.includes(q)
         )) return false;
         if (filterAccion && l.accion_2026?.trim() !== filterAccion) return false;
         if (filterEstadoIn.length && !filterEstadoIn.includes(l.estado?.trim() ?? "")) return false;
@@ -1660,7 +1662,9 @@ export default function PerfilesTab() {
       g.lineas.some(l =>
         l.usuario_linea.toLowerCase().includes(q) ||
         l.telefono.includes(q) ||
-        l.seguimiento.toLowerCase().includes(q)
+        l.seguimiento.toLowerCase().includes(q) ||
+        l.sim?.includes(q) ||
+        l.imei?.includes(q)
       );
     if (!coincideTexto) return false;
 
