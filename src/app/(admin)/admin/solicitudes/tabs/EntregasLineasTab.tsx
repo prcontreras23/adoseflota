@@ -191,58 +191,42 @@ export default function EntregasLineasTab() {
                 }
             } catch (_) { /* historial no crítico */ }
             toast.success("Entrega registrada");
-            setTimeout(() => imprimirActa({ ...lineaSnapshot, fecha_entrega: fechaSnapshot }), 300);
+            setTimeout(() => enviarWhatsApp({ ...lineaSnapshot, fecha_entrega: fechaSnapshot }), 300);
         } else {
             toast.error("Error al registrar la entrega");
         }
     }
 
-    // ── Imprimir acta ─────────────────────────────────────────────────────────
-    function imprimirActa(linea: LineaAltice & { fecha_entrega?: string | null }) {
-        const fechaImpresion = linea.fecha_entrega || fechaEntrega;
-        const firma = "";
-        const html = `<html><head><title>Acta de Entrega</title>
-        <style>
-          body{font-family:Arial,sans-serif;padding:40px;max-width:620px;margin:0 auto;color:#1e293b}
-          h1{color:#2563eb;font-size:18px;margin-bottom:4px}
-          h2{font-size:13px;color:#64748b;font-weight:normal;margin-bottom:20px}
-          table{width:100%;border-collapse:collapse;margin:16px 0}
-          td,th{padding:9px 12px;border:1px solid #e2e8f0;font-size:13px}
-          th{background:#f8fafc;font-weight:600;width:40%}
-          .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;background:#dcfce7;color:#16a34a}
-          .footer{margin-top:36px;padding-top:16px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8}
-          .firma-box{margin-top:28px}
-          .firma-label{font-size:12px;font-weight:600;color:#334155;margin-bottom:6px}
-          .firma-nombre{margin-top:8px;border-top:1px solid #334155;padding-top:4px;font-size:12px;width:280px}
-        </style></head>
-        <body>
-          <h1>Acta de Entrega de Dispositivo</h1>
-          <h2>Renovación Flota Claro 2026 — ADOSE / Unión Adventista Sureste</h2>
-          <span class="badge">ENTREGADO</span>
-          <table>
-            <tr><th>Beneficiario</th><td><strong>${linea.usuario_linea || "—"}</strong></td></tr>
-            <tr><th>Titular responsable</th><td>${linea.titular_responsable || "—"}</td></tr>
-            <tr><th>Tipo</th><td>${linea.tipo || "—"}</td></tr>
-            <tr><th>Número de línea</th><td>${linea.telefono}</td></tr>
-            <tr><th>Dispositivo asignado</th><td>${linea.dispositivo_2026 || "—"}</td></tr>
-            <tr><th>IMEI</th><td><strong>${linea.imei || "—"}</strong></td></tr>
-            <tr><th>SIM / ICC</th><td>${linea.sim || "—"}</td></tr>
-            <tr><th>Plan de datos</th><td>${linea.gb_solicitado || linea.gb_antes || "—"}</td></tr>
-            <tr><th>Fecha de entrega</th><td><strong>${new Date(fechaImpresion).toLocaleDateString("es-DO", { year: "numeric", month: "long", day: "numeric" })}</strong></td></tr>
-          </table>
-          <p style="font-size:12px;color:#475569;line-height:1.6">
-            Al firmar este documento, el beneficiario confirma haber recibido el dispositivo en perfectas condiciones
-            y acepta las políticas de uso institucional establecidas por la ADOSE.
-          </p>
-          <div class="firma-box">
-            <p class="firma-label">Firma del beneficiario:</p>
-            <div style="width:300px;height:70px;border-bottom:1px solid #334155;margin-top:40px"></div>
-            <p class="firma-nombre">${linea.usuario_linea || "—"}</p>
-          </div>
-          <div class="footer">Generado por ADOSE Flota 2026 · ${new Date().toLocaleString("es-DO")}</div>
-        </body></html>`;
-        const w = window.open("", "_blank");
-        if (w) { w.document.write(html); w.document.close(); setTimeout(() => w.print(), 600); }
+    // ── Enviar WhatsApp ───────────────────────────────────────────────────────
+    function enviarWhatsApp(linea: LineaAltice & { fecha_entrega?: string | null }) {
+        const fechaEntregaStr = linea.fecha_entrega || fechaEntrega;
+        const fechaFormateada = new Date(fechaEntregaStr).toLocaleDateString("es-DO", {
+            year: "numeric", month: "long", day: "numeric",
+        });
+
+        // Número real: para ALTA (línea nueva) usamos numero_altice, para el resto telefono
+        const esNueva = linea.accion_2026 === "ALTA";
+        const rawNum = esNueva
+            ? (linea.numero_altice || linea.telefono)
+            : linea.telefono;
+        const numLimpio = rawNum?.replace(/\D/g, "") ?? "";
+        // Agregar código de país 1 (RD) si el número tiene 10 dígitos
+        const numWA = numLimpio.length === 10 ? `1${numLimpio}` : numLimpio;
+
+        const mensaje =
+`✅ *Entrega de dispositivo ADOSE Flota 2026*
+
+Hola${linea.usuario_linea ? ` *${linea.usuario_linea}*` : ""}, te confirmamos que hemos registrado la entrega de tu dispositivo.
+
+📱 *Dispositivo:* ${linea.dispositivo_2026 || "—"}
+📞 *Número de línea:* ${linea.telefono}${linea.numero_altice ? `\n🔄 *N.° Altice (temporal):* ${linea.numero_altice}` : ""}
+📅 *Fecha de entrega:* ${fechaFormateada}
+
+Ante cualquier inconveniente comunícate con la secretaría ejecutiva de ADOSE.
+_Unión Adventista Sureste_`;
+
+        const url = `https://wa.me/${numWA}?text=${encodeURIComponent(mensaje)}`;
+        window.open(url, "_blank");
     }
 
     // ── Importar Excel masivo ─────────────────────────────────────────────────
@@ -461,9 +445,11 @@ export default function EntregasLineasTab() {
                                     <input type="date" value={fechaEntrega} onChange={e => setFechaEntrega(e.target.value)} className={inputCls} />
                                 </div>
 
-                                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-3 text-xs text-amber-700 dark:text-amber-400 flex items-center gap-2">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                                    Se imprimirá el acta para firma física del beneficiario.
+                                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-3 text-xs text-green-700 dark:text-green-400 flex items-start gap-2">
+                                    <svg className="flex-shrink-0 mt-0.5" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                                    <span>Al registrar se abrirá WhatsApp para notificar al beneficiario
+                                    {modalLinea && (<> al número <strong>{modalLinea.accion_2026 === "ALTA" ? (modalLinea.numero_altice || modalLinea.telefono) : modalLinea.telefono}</strong>{modalLinea.accion_2026 === "ALTA" ? " (número nuevo)" : " (número real)"}</>)}.
+                                    </span>
                                 </div>
 
                                 <div className="flex gap-2 pt-1">
@@ -475,7 +461,7 @@ export default function EntregasLineasTab() {
                                         className="flex-1 py-2.5 rounded-xl bg-green-600 hover:bg-green-500 text-white text-sm font-semibold disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
                                         {saving
                                             ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Guardando...</>
-                                            : <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg> Registrar + Imprimir Acta</>}
+                                            : <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> Registrar + Enviar WhatsApp</>}
                                     </button>
                                 </div>
                             </>
@@ -632,9 +618,9 @@ export default function EntregasLineasTab() {
                                         </td>
                                         <td className="p-3">
                                             {linea.entregado ? (
-                                                <button onClick={() => { setModalLinea(linea); setModalMode("entrega"); imprimirActa(linea); }}
-                                                    className="text-xs px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition-colors font-medium flex items-center gap-1">
-                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> Reimprimir
+                                                <button onClick={() => enviarWhatsApp(linea)}
+                                                    className="text-xs px-3 py-1.5 rounded-lg bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 hover:bg-green-100 transition-colors font-medium flex items-center gap-1">
+                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> Enviar WA
                                                 </button>
                                             ) : (
                                                 <div className="flex gap-1">
