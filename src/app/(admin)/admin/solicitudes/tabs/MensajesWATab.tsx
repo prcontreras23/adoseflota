@@ -56,6 +56,7 @@ export default function MensajesWATab() {
     const [busqueda, setBusqueda] = useState("");
     const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
     const [previsualizando, setPrevisualizando] = useState<LineaAltice | null>(null);
+    const [delaySegundos, setDelaySegundos] = useState(8);
 
     const lineas = useMemo(() => all.filter(l =>
         ["CAMBIO SOLICITADO", "ALTA", "SE MANTIENE"].includes(l.accion_2026)
@@ -105,7 +106,7 @@ export default function MensajesWATab() {
     function enviarATodos() {
         const dest = filtradas.filter(l => seleccionados.has(l.id));
         dest.forEach((linea, i) => {
-            setTimeout(() => abrirWA(linea), i * 800);
+            setTimeout(() => abrirWA(linea), i * delaySegundos * 1000);
         });
     }
 
@@ -223,11 +224,21 @@ export default function MensajesWATab() {
                             </button>
                         </div>
 
+                        <div>
+                            <p className="text-xs text-slate-500 mb-1">Segundos entre mensaje y mensaje</p>
+                            <div className="flex items-center gap-3">
+                                <input type="range" min={3} max={60} step={1} value={delaySegundos}
+                                    onChange={e => setDelaySegundos(Number(e.target.value))}
+                                    className="flex-1 accent-green-600" />
+                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200 w-14 text-right">{delaySegundos} seg</span>
+                            </div>
+                        </div>
+
                         {destinatariosSeleccionados.length > 0 && (
                             <button onClick={enviarATodos}
                                 className="w-full py-3 rounded-xl bg-green-600 hover:bg-green-500 text-white text-sm font-bold transition-colors flex items-center justify-center gap-2">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-                                Enviar a {destinatariosSeleccionados.length} persona{destinatariosSeleccionados.length !== 1 ? "s" : ""}
+                                Enviar a {destinatariosSeleccionados.length} persona{destinatariosSeleccionados.length !== 1 ? "s" : ""} · {delaySegundos}s entre c/u
                             </button>
                         )}
                     </div>
