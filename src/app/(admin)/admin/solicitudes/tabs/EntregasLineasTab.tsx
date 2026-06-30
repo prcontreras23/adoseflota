@@ -35,6 +35,7 @@ export default function EntregasLineasTab() {
     const [useManual, setUseManual] = useState(false);
     const [manualImei, setManualImei] = useState("");
     const [manualSim, setManualSim] = useState("");
+    const [manualNumeroAltice, setManualNumeroAltice] = useState("");
     const [fechaEntrega, setFechaEntrega] = useState(new Date().toISOString().split("T")[0]);
     const [saving, setSaving] = useState(false);
     const [importing, setImporting] = useState(false);
@@ -149,7 +150,10 @@ export default function EntregasLineasTab() {
                 .eq("id", selectedInvId);
         }
 
-        const ok = await mutate(modalLinea.id, { imei, sim });
+        const updates: Partial<LineaAltice> = { imei, sim };
+        if (manualNumeroAltice.trim()) updates.numero_altice = manualNumeroAltice.trim();
+
+        const ok = await mutate(modalLinea.id, updates);
         await loadInventario();
 
         if (ok && session) {
@@ -277,6 +281,7 @@ export default function EntregasLineasTab() {
         setSelectedInvId(currentInv?.id || "");
         setManualSim(currentInv ? "" : (linea.sim || ""));
         setManualImei(currentInv ? "" : (linea.imei || ""));
+        setManualNumeroAltice(linea.numero_altice || "");
         setUseManual(!currentInv && !!linea.sim);
     }
     function abrirEntrega(linea: LineaAltice) {
@@ -416,6 +421,14 @@ export default function EntregasLineasTab() {
                                         </div>
                                     </div>
                                 )}
+
+                                <div>
+                                    <label className={labelCls}>N.° Altice (número temporal) <span className="text-slate-400 font-normal">(opcional)</span></label>
+                                    <input value={manualNumeroAltice}
+                                        onChange={e => setManualNumeroAltice(e.target.value)}
+                                        placeholder="ej: 8093100502"
+                                        className={inputCls} />
+                                </div>
 
                                 <div className="flex gap-2 pt-1">
                                     <button onClick={() => setModalLinea(null)}
@@ -558,7 +571,7 @@ export default function EntregasLineasTab() {
                         <table className="w-full text-sm">
                             <thead className="bg-slate-50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-700">
                                 <tr>
-                                    {["Beneficiario", "Titular", "Teléfono", "Dispositivo", "N.° SIM", "SIM Instalada", "Estado", "Acciones"].map(h => (
+                                    {["Beneficiario", "Titular", "Teléfono", "Dispositivo", "N.° Altice", "N.° SIM", "SIM Instalada", "Estado", "Acciones"].map(h => (
                                         <th key={h} className="p-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">{h}</th>
                                     ))}
                                 </tr>
@@ -576,6 +589,11 @@ export default function EntregasLineasTab() {
                                         <td className="p-3 font-mono text-slate-600 dark:text-slate-300 whitespace-nowrap">{linea.telefono}</td>
                                         <td className="p-3 text-xs text-slate-600 dark:text-slate-300 max-w-[130px]">
                                             {linea.dispositivo_2026 || <span className="text-slate-300 italic">—</span>}
+                                        </td>
+                                        <td className="p-3">
+                                            {linea.numero_altice?.trim()
+                                                ? <span className="font-mono text-xs text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-900/20 px-2 py-1 rounded-lg">{linea.numero_altice}</span>
+                                                : <span className="text-slate-300 text-xs">—</span>}
                                         </td>
                                         <td className="p-3">
                                             {linea.sim?.trim()
