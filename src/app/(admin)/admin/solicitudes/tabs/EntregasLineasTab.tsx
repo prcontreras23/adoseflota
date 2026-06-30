@@ -725,7 +725,7 @@ _Francis Contreras_`;
                                                             const primerNombre = linea.usuario_linea?.trim().split(" ")[0] || "";
                                                             const alticeLinea = linea.numero_altice?.trim() ? `\n*N.° temporal Altice:* ${linea.numero_altice}` : "";
                                                             const mensaje =
-`Hola *Pastor ${primerNombre}*, te informamos que tu dispositivo ya está preparado y puedes pasar a retirarlo.
+`Hola *Pastor ${primerNombre}*, le informamos que su dispositivo ya está preparado y puede pasar a retirarlo.
 
 *Dispositivo:* ${linea.dispositivo_2026 || "—"}
 *Número de línea:* ${linea.telefono}${alticeLinea}`;
