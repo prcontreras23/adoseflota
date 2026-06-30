@@ -219,6 +219,11 @@ export default function EntregasLineasTab() {
         // Agregar código de país 1 (RD) si el número tiene 10 dígitos
         const numWA = numLimpio.length === 10 ? `1${numLimpio}` : numLimpio;
 
+        const monto = parseFloat(linea.monto_mensual || "0");
+        const montoLinea = monto > 0
+            ? `\n💰 *Monto mensual a pagar:* RD$ ${monto.toLocaleString("es-DO", { minimumFractionDigits: 2 })}`
+            : "";
+
         const mensaje =
 `✅ *Entrega de dispositivo ADOSE Flota 2026*
 
@@ -226,7 +231,7 @@ Hola${linea.usuario_linea ? ` *${linea.usuario_linea}*` : ""}, te confirmamos qu
 
 📱 *Dispositivo:* ${linea.dispositivo_2026 || "—"}
 📞 *Número de línea:* ${linea.telefono}${linea.numero_altice ? `\n🔄 *N.° Altice (temporal):* ${linea.numero_altice}` : ""}
-📅 *Fecha de entrega:* ${fechaFormateada}
+📅 *Fecha de entrega:* ${fechaFormateada}${montoLinea}
 
 Ante cualquier inconveniente comunícate con la secretaría ejecutiva de ADOSE.
 _Francis Contreras_`;
