@@ -949,100 +949,6 @@ export default function DashboardTab() {
                 );
             })()}
 
-            {/* ── ALERTAS (dinámicas y descartables) ───────────────────── */}
-            <div>
-                {/* Header con contador + botón de políticas */}
-                <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                        Advertencias
-                        {alertasVisibles.length > 0 && (
-                            <span className="ml-1 bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{alertasVisibles.length}</span>
-                        )}
-                    </h3>
-                    <button
-                        onClick={() => setMostrarPoliticas(true)}
-                        className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors px-2 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M6.34 6.34l-1.41-1.41M4.93 19.07l1.41-1.41M17.66 17.66l1.41 1.41M1 12h3m16 0h3M12 1v3m0 16v3"/></svg>
-                        Políticas
-                        {disabled.size > 0 && <span className="bg-slate-300 dark:bg-slate-600 text-slate-600 dark:text-slate-300 text-[10px] font-bold px-1 rounded">{disabled.size} off</span>}
-                    </button>
-                </div>
-
-                {/* Alertas activas */}
-                {alertasVisibles.length === 0 ? (
-                    <div className="flex items-center gap-3 p-4 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-2xl text-emerald-700 dark:text-emerald-400 text-sm font-medium">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.1 9 11.1"/></svg>
-                        No hay advertencias activas. ¡Todo está en orden!
-                    </div>
-                ) : (
-                    <div className="space-y-2.5">
-                        {alertasVisibles.map(a => (
-                            <div key={a.id}
-                                className={`border rounded-2xl p-4 flex gap-3 ${clsBorder[a.nivel]} group relative`}>
-                                {/* Icono */}
-                                <span className={clsTitle[a.nivel]}>{iconAlerta[a.nivel]}</span>
-                                {/* Contenido */}
-                                <div className={`flex-1 min-w-0 pr-7 ${a.accion ? "cursor-pointer" : ""}`}
-                                    role={a.accion ? "button" : undefined}
-                                    tabIndex={a.accion ? 0 : undefined}
-                                    onClick={a.accion}
-                                    onKeyDown={a.accion ? e => { if (e.key === "Enter" || e.key === " ") a.accion?.(); } : undefined}>
-                                    <p className={`text-sm font-bold mb-0.5 ${clsTitle[a.nivel]}`}>{a.titulo}</p>
-                                    <p className={`text-xs leading-relaxed ${clsDesc[a.nivel]}`}>{a.desc}</p>
-                                    {a.ctaLabel && (
-                                        <span className={`inline-block mt-2 text-xs font-semibold underline underline-offset-2 opacity-70 hover:opacity-100 transition-opacity ${clsTitle[a.nivel]}`}>
-                                            {a.ctaLabel}
-                                        </span>
-                                    )}
-                                </div>
-                                {/* Botón descartar */}
-                                <button
-                                    onClick={() => dismiss(a.id, a.count)}
-                                    title="Descartar alerta (reaparece si los datos cambian)"
-                                    className={`absolute top-3 right-3 p-1 rounded-lg opacity-40 hover:opacity-100 transition-opacity ${clsTitle[a.nivel]} hover:bg-black/10`}>
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                )}
-
-                {/* Alertas descartadas (colapsable) */}
-                {alertasDescartadas.length > 0 && (
-                    <div className="mt-3">
-                        <button
-                            onClick={() => setMostrarDescartadas(v => !v)}
-                            className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                                className={`transition-transform ${mostrarDescartadas ? "rotate-90" : ""}`}>
-                                <polyline points="9 18 15 12 9 6"/>
-                            </svg>
-                            {alertasDescartadas.length} alerta{alertasDescartadas.length > 1 ? "s" : ""} descartada{alertasDescartadas.length > 1 ? "s" : ""} (haz clic para ver)
-                        </button>
-                        {mostrarDescartadas && (
-                            <div className="space-y-2 mt-2">
-                                {alertasDescartadas.map(a => (
-                                    <div key={a.id}
-                                        className="border border-slate-200 dark:border-slate-700 rounded-2xl p-3 flex gap-3 bg-slate-50 dark:bg-slate-800 opacity-60">
-                                        <span className="text-slate-400 shrink-0 mt-0.5">{iconAlerta[a.nivel]}</span>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 line-through">{a.titulo}</p>
-                                        </div>
-                                        <button
-                                            onClick={() => restore(a.id)}
-                                            title="Restaurar alerta"
-                                            className="text-xs text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors shrink-0 font-medium px-2">
-                                            Restaurar
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
-
             {/* ── TABLA PROPUESTA VS LEVANTAMIENTO ─────────────────────── */}
             {showPropuestaModal && (
                 <PropuestaModal
@@ -1349,6 +1255,100 @@ export default function DashboardTab() {
                     </div>
                 );
             })()}
+
+            {/* ── ALERTAS (dinámicas y descartables) ───────────────────── */}
+            <div>
+                {/* Header con contador + botón de políticas */}
+                <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                        Advertencias
+                        {alertasVisibles.length > 0 && (
+                            <span className="ml-1 bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{alertasVisibles.length}</span>
+                        )}
+                    </h3>
+                    <button
+                        onClick={() => setMostrarPoliticas(true)}
+                        className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors px-2 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M6.34 6.34l-1.41-1.41M4.93 19.07l1.41-1.41M17.66 17.66l1.41 1.41M1 12h3m16 0h3M12 1v3m0 16v3"/></svg>
+                        Políticas
+                        {disabled.size > 0 && <span className="bg-slate-300 dark:bg-slate-600 text-slate-600 dark:text-slate-300 text-[10px] font-bold px-1 rounded">{disabled.size} off</span>}
+                    </button>
+                </div>
+
+                {/* Alertas activas */}
+                {alertasVisibles.length === 0 ? (
+                    <div className="flex items-center gap-3 p-4 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-2xl text-emerald-700 dark:text-emerald-400 text-sm font-medium">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.1 9 11.1"/></svg>
+                        No hay advertencias activas. ¡Todo está en orden!
+                    </div>
+                ) : (
+                    <div className="space-y-2.5">
+                        {alertasVisibles.map(a => (
+                            <div key={a.id}
+                                className={`border rounded-2xl p-4 flex gap-3 ${clsBorder[a.nivel]} group relative`}>
+                                {/* Icono */}
+                                <span className={clsTitle[a.nivel]}>{iconAlerta[a.nivel]}</span>
+                                {/* Contenido */}
+                                <div className={`flex-1 min-w-0 pr-7 ${a.accion ? "cursor-pointer" : ""}`}
+                                    role={a.accion ? "button" : undefined}
+                                    tabIndex={a.accion ? 0 : undefined}
+                                    onClick={a.accion}
+                                    onKeyDown={a.accion ? e => { if (e.key === "Enter" || e.key === " ") a.accion?.(); } : undefined}>
+                                    <p className={`text-sm font-bold mb-0.5 ${clsTitle[a.nivel]}`}>{a.titulo}</p>
+                                    <p className={`text-xs leading-relaxed ${clsDesc[a.nivel]}`}>{a.desc}</p>
+                                    {a.ctaLabel && (
+                                        <span className={`inline-block mt-2 text-xs font-semibold underline underline-offset-2 opacity-70 hover:opacity-100 transition-opacity ${clsTitle[a.nivel]}`}>
+                                            {a.ctaLabel}
+                                        </span>
+                                    )}
+                                </div>
+                                {/* Botón descartar */}
+                                <button
+                                    onClick={() => dismiss(a.id, a.count)}
+                                    title="Descartar alerta (reaparece si los datos cambian)"
+                                    className={`absolute top-3 right-3 p-1 rounded-lg opacity-40 hover:opacity-100 transition-opacity ${clsTitle[a.nivel]} hover:bg-black/10`}>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Alertas descartadas (colapsable) */}
+                {alertasDescartadas.length > 0 && (
+                    <div className="mt-3">
+                        <button
+                            onClick={() => setMostrarDescartadas(v => !v)}
+                            className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                                className={`transition-transform ${mostrarDescartadas ? "rotate-90" : ""}`}>
+                                <polyline points="9 18 15 12 9 6"/>
+                            </svg>
+                            {alertasDescartadas.length} alerta{alertasDescartadas.length > 1 ? "s" : ""} descartada{alertasDescartadas.length > 1 ? "s" : ""} (haz clic para ver)
+                        </button>
+                        {mostrarDescartadas && (
+                            <div className="space-y-2 mt-2">
+                                {alertasDescartadas.map(a => (
+                                    <div key={a.id}
+                                        className="border border-slate-200 dark:border-slate-700 rounded-2xl p-3 flex gap-3 bg-slate-50 dark:bg-slate-800 opacity-60">
+                                        <span className="text-slate-400 shrink-0 mt-0.5">{iconAlerta[a.nivel]}</span>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 line-through">{a.titulo}</p>
+                                        </div>
+                                        <button
+                                            onClick={() => restore(a.id)}
+                                            title="Restaurar alerta"
+                                            className="text-xs text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors shrink-0 font-medium px-2">
+                                            Restaurar
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
