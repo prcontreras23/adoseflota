@@ -39,6 +39,7 @@ export default function EntregasLineasTab() {
     const [fechaEntrega, setFechaEntrega] = useState(new Date().toISOString().split("T")[0]);
     const [saving, setSaving] = useState(false);
     const [importing, setImporting] = useState(false);
+    const [modalWA, setModalWA] = useState<{ numWA: string; mensaje: string } | null>(null);
     const importRef = useRef<HTMLInputElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [signed, setSigned] = useState(false);
@@ -177,7 +178,11 @@ export default function EntregasLineasTab() {
         setSaving(true);
         const lineaSnapshot = { ...modalLinea };
         const fechaSnapshot = fechaEntrega;
-        const ok = await mutate(modalLinea.id, { entregado: true, fecha_entrega: fechaEntrega });
+        const ok = await mutate(modalLinea.id, {
+            entregado: true,
+            fecha_entrega: fechaEntrega,
+            entregado_por: session?.nombre ?? null,
+        });
         setSaving(false);
         setModalLinea(null);
         setSigned(false);
@@ -243,8 +248,7 @@ Hola${linea.usuario_linea ? ` *${linea.usuario_linea}*` : ""}, te confirmamos qu
 Ante cualquier inconveniente comunícate con la secretaría ejecutiva de ADOSE.
 _Francis Contreras_`;
 
-        const url = `https://wa.me/${numWA}?text=${encodeURIComponent(mensaje)}`;
-        window.open(url, "_blank");
+        setModalWA({ numWA, mensaje });
     }
 
     // ── Imprimir acta ─────────────────────────────────────────────────────────
@@ -273,6 +277,7 @@ _Francis Contreras_`;
             <tr><th>Titular responsable</th><td>${linea.titular_responsable || "—"}</td></tr>
             <tr><th>Tipo</th><td>${linea.tipo || "—"}</td></tr>
             <tr><th>Número de línea</th><td>${linea.telefono}</td></tr>
+            ${linea.numero_altice?.trim() ? `<tr><th>N.° temporal Altice</th><td>${linea.numero_altice}</td></tr>` : ""}
             <tr><th>Dispositivo asignado</th><td>${linea.dispositivo_2026 || "—"}</td></tr>
             <tr><th>IMEI</th><td><strong>${linea.imei || "—"}</strong></td></tr>
             <tr><th>SIM / ICC</th><td>${linea.sim || "—"}</td></tr>
@@ -360,7 +365,7 @@ _Francis Contreras_`;
     );
 
     return (
-        <div className="space-y-5">
+        <><div className="space-y-5">
 
             {/* ── MODAL ──────────────────────────────────────────────── */}
             {modalLinea && (
@@ -627,7 +632,7 @@ _Francis Contreras_`;
                         <table className="w-full text-sm">
                             <thead className="bg-slate-50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-700">
                                 <tr>
-                                    {["Beneficiario", "Titular", "Teléfono", "Dispositivo", "N.° Altice", "N.° SIM", "SIM Instalada", "Estado", "Acciones"].map(h => (
+                                    {["Beneficiario", "Titular", "Teléfono", "Dispositivo", "N.° Altice", "N.° SIM", "SIM Instalada", "Estado", "Entregó", "Acciones"].map(h => (
                                         <th key={h} className="p-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">{h}</th>
                                     ))}
                                 </tr>
@@ -687,6 +692,9 @@ _Francis Contreras_`;
                                                 </span>
                                             )}
                                         </td>
+                                        <td className="p-3 text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                                            {linea.entregado_por || <span className="text-slate-300">—</span>}
+                                        </td>
                                         <td className="p-3">
                                             {linea.entregado ? (
                                                 <div className="flex gap-1">
@@ -700,10 +708,35 @@ _Francis Contreras_`;
                                                     </button>
                                                 </div>
                                             ) : (
-                                                <div className="flex gap-1">
+                                                <div className="flex flex-wrap gap-1">
                                                     <button onClick={() => abrirImei(linea)}
                                                         className="text-xs px-2.5 py-1.5 rounded-lg bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-400 hover:bg-violet-100 transition-colors font-medium whitespace-nowrap flex items-center gap-1">
                                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg> {linea.sim?.trim() ? "Cambiar SIM" : "Asignar SIM"}
+                                                    </button>
+                                                    <button
+                                                        disabled={!linea.sim?.trim()}
+                                                        onClick={() => {
+                                                            const esNueva = linea.accion_2026 === "ALTA";
+                                                            const rawNum = esNueva ? (linea.numero_altice || linea.telefono) : linea.telefono;
+                                                            const numLimpio = rawNum?.replace(/\D/g, "") ?? "";
+                                                            const numWA = numLimpio.length === 10 ? `1${numLimpio}` : numLimpio;
+                                                            const alticeLinea = linea.numero_altice?.trim() ? `\n📞 *N.° temporal Altice:* ${linea.numero_altice}` : "";
+                                                            const mensaje =
+`📦 *Tu equipo ADOSE Flota 2026 está listo*
+
+Hola${linea.usuario_linea ? ` *${linea.usuario_linea}*` : ""}, te informamos que tu dispositivo ya está preparado y puedes pasar a retirarlo.
+
+📱 *Dispositivo:* ${linea.dispositivo_2026 || "—"}
+📞 *Número de línea:* ${linea.telefono}${alticeLinea}
+
+Por favor preséntate con tu cédula de identidad para completar la entrega.
+
+_Francis Contreras_`;
+                                                            setModalWA({ numWA, mensaje });
+                                                        }}
+                                                        title={linea.sim?.trim() ? "Avisar por WhatsApp que puede retirar su equipo" : "Asigna una SIM primero"}
+                                                        className="text-xs px-2.5 py-1.5 rounded-lg font-medium whitespace-nowrap flex items-center gap-1 transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 hover:bg-amber-100 disabled:hover:bg-amber-50">
+                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.8a19.79 19.79 0 01-3.07-8.67A2 2 0 012 .84h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 8.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg> Avisar
                                                     </button>
                                                     {linea.sim?.trim() && (
                                                         <button onClick={() => abrirEntrega(linea)}
@@ -722,5 +755,39 @@ _Francis Contreras_`;
                 )}
             </div>
         </div>
+
+        {/* Modal edición mensaje WhatsApp */}
+        {modalWA && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setModalWA(null)}>
+                <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg flex flex-col gap-4 p-6" onClick={e => e.stopPropagation()}>
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">Mensaje de WhatsApp</h3>
+                        <button onClick={() => setModalWA(null)} className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Puedes editar el mensaje antes de enviarlo.</p>
+                    <textarea
+                        className="w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-slate-100 text-sm p-3 resize-none focus:outline-none focus:ring-2 focus:ring-green-400"
+                        rows={14}
+                        value={modalWA.mensaje}
+                        onChange={e => setModalWA(prev => prev ? { ...prev, mensaje: e.target.value } : null)}
+                    />
+                    <div className="flex gap-2 justify-end">
+                        <button onClick={() => setModalWA(null)} className="px-4 py-2 rounded-lg text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">Cancelar</button>
+                        <button
+                            onClick={() => {
+                                const url = `https://wa.me/${modalWA.numWA}?text=${encodeURIComponent(modalWA.mensaje)}`;
+                                window.open(url, "_blank");
+                                setModalWA(null);
+                            }}
+                            className="px-4 py-2 rounded-lg text-sm font-semibold bg-green-500 hover:bg-green-600 text-white flex items-center gap-2"
+                        >
+                            <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.122.554 4.118 1.524 5.849L0 24l6.34-1.503A11.95 11.95 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.897 0-3.671-.497-5.207-1.367l-.374-.222-3.864.916.977-3.768-.243-.388A9.96 9.96 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+                            Enviar por WhatsApp
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+        </>
     );
 }

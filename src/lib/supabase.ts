@@ -198,6 +198,7 @@ export interface LineaAltice {
     entregado: boolean;
     sim_instalado: boolean;
     numero_altice?: string;
+    entregado_por?: string | null;
 }
 
 export interface InventarioAltice {

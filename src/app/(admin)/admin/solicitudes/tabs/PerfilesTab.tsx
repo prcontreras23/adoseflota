@@ -655,8 +655,22 @@ function EditModal({ linea, onClose, onSave, onDelete, session, upsertLocal, tit
             <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-4 py-3 space-y-3">
               {/* Número del usuario */}
               <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Número del usuario</p>
-                <p className="font-mono text-lg font-bold text-slate-800 dark:text-white tracking-wide">{form.telefono || "—"}</p>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Número del usuario</label>
+                <input
+                  value={form.telefono ?? ""}
+                  onChange={e => set("telefono", e.target.value)}
+                  className="w-full font-mono border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              {/* Nombre del usuario — editable */}
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Nombre del usuario</label>
+                <input
+                  value={form.usuario_linea ?? ""}
+                  onChange={e => set("usuario_linea", e.target.value)}
+                  placeholder="Nombre del usuario..."
+                  className="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
               {/* Titular responsable — editable */}
               <div>
