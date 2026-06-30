@@ -228,7 +228,7 @@ export default function EntregasLineasTab() {
         const internetLinea = noDeseabaInternet
             ? `\n🌐 *Internet:* Logramos incluirte 5GB de internet en tu dispositivo 🎉`
             : (linea.gb_solicitado?.trim() && linea.gb_solicitado !== "No aplica"
-                ? `\n🌐 *Plan de datos:* ${linea.gb_solicitado}`
+                ? `\n🌐 *Plan de datos:* ${linea.gb_solicitado.replace(/\s*\(RD\$[^)]+\)/g, "").trim()}`
                 : "");
 
         const mensaje =
