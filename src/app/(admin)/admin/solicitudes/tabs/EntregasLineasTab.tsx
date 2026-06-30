@@ -80,7 +80,7 @@ export default function EntregasLineasTab() {
         if (vista === "pendientes") return !l.entregado;
         if (vista === "entregadas") return l.entregado;
         if (vista === "sin_sim") return !l.entregado && !l.sim?.trim();
-        if (vista === "con_sim") return !l.entregado && !!l.sim?.trim();
+        if (vista === "con_sim") return !l.entregado && !!l.sim_instalado;
         return true;
     });
 
@@ -615,7 +615,7 @@ _Francis Contreras_`;
                     <button key={v} onClick={() => setVista(v)}
                         className={`px-4 py-2 rounded-full text-sm font-semibold transition-all flex items-center gap-1.5 ${vista === v ? "bg-blue-600 text-white" : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50"}`}>
                         {v === "pendientes" ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Pendientes ({kpis.total - kpis.entregados})</>
-                            : v === "con_sim" ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg> Con SIM ({kpis.conSim})</>
+                            : v === "con_sim" ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.1 9 11.1"/></svg> SIM Instalada ({kpis.simInstalado})</>
                             : v === "sin_sim" ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Sin SIM ({kpis.sinSim})</>
                                 : <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.1 9 11.1"/></svg> Entregadas ({kpis.entregados})</>}
                     </button>
@@ -716,7 +716,7 @@ _Francis Contreras_`;
                                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg> {linea.sim?.trim() ? "Cambiar SIM" : "Asignar SIM"}
                                                     </button>
                                                     <button
-                                                        disabled={!linea.sim?.trim()}
+                                                        disabled={!linea.sim_instalado}
                                                         onClick={() => {
                                                             const esNueva = linea.accion_2026 === "ALTA";
                                                             const rawNum = esNueva ? (linea.numero_altice || linea.telefono) : linea.telefono;
@@ -736,7 +736,7 @@ Por favor preséntate con tu cédula de identidad para completar la entrega.
 _Francis Contreras_`;
                                                             setModalWA({ numWA, mensaje });
                                                         }}
-                                                        title={linea.sim?.trim() ? "Avisar por WhatsApp que puede retirar su equipo" : "Asigna una SIM primero"}
+                                                        title={linea.sim_instalado ? "Avisar por WhatsApp que puede retirar su equipo" : "Instala la SIM primero"}
                                                         className="text-xs px-2.5 py-1.5 rounded-lg font-medium whitespace-nowrap flex items-center gap-1 transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 hover:bg-amber-100 disabled:hover:bg-amber-50">
                                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.8a19.79 19.79 0 01-3.07-8.67A2 2 0 012 .84h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 8.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg> Avisar
                                                     </button>
