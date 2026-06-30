@@ -224,13 +224,20 @@ export default function EntregasLineasTab() {
             ? `\n💰 *Pago único por el equipo:* RD$ ${monto.toLocaleString("es-DO", { minimumFractionDigits: 2 })}`
             : "";
 
+        const noDeseabaInternet = linea.gb_solicitado?.trim() === "No deseo internet";
+        const internetLinea = noDeseabaInternet
+            ? `\n🌐 *Internet:* Logramos incluirte 5GB de internet en tu dispositivo 🎉`
+            : (linea.gb_solicitado?.trim() && linea.gb_solicitado !== "No aplica"
+                ? `\n🌐 *Plan de datos:* ${linea.gb_solicitado}`
+                : "");
+
         const mensaje =
 `✅ *Entrega de dispositivo ADOSE Flota 2026*
 
 Hola${linea.usuario_linea ? ` *${linea.usuario_linea}*` : ""}, te confirmamos que hemos registrado la entrega de tu dispositivo.
 
 📱 *Dispositivo:* ${linea.dispositivo_2026 || "—"}
-📞 *Número de línea:* ${linea.telefono}${linea.numero_altice ? `\n🔄 *N.° Altice (temporal):* ${linea.numero_altice}` : ""}
+📞 *Número de línea:* ${linea.telefono}${linea.numero_altice ? `\n🔄 *N.° Altice (temporal):* ${linea.numero_altice}` : ""}${internetLinea}
 📅 *Fecha de entrega:* ${fechaFormateada}${montoLinea}
 
 Ante cualquier inconveniente comunícate con la secretaría ejecutiva de ADOSE.
