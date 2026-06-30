@@ -14,7 +14,7 @@ interface InventarioItem {
     linea_id: string | null;
 }
 
-type Vista = "pendientes" | "entregadas" | "sin_imei";
+type Vista = "pendientes" | "entregadas" | "sin_sim";
 
 function modelKey(s: string): string {
     const l = s.toLowerCase();
@@ -72,20 +72,20 @@ export default function EntregasLineasTab() {
         const ok = !q || l.usuario_linea?.toLowerCase().includes(q)
             || l.titular_responsable?.toLowerCase().includes(q)
             || l.telefono?.includes(q)
-            || l.imei?.includes(q)
+            || l.sim?.includes(q)
             || l.dispositivo_2026?.toLowerCase().includes(q);
         if (!ok) return false;
         if (vista === "pendientes") return !l.entregado;
         if (vista === "entregadas") return l.entregado;
-        if (vista === "sin_imei") return !l.entregado && !l.imei?.trim();
+        if (vista === "sin_sim") return !l.entregado && !l.sim?.trim();
         return true;
     });
 
     const kpis = {
         total: lineas.length,
-        conImei: lineas.filter(l => l.imei?.trim()).length,
+        conSim: lineas.filter(l => l.sim?.trim()).length,
         entregados: lineas.filter(l => l.entregado).length,
-        sinImei: lineas.filter(l => !l.entregado && !l.imei?.trim()).length,
+        sinSim: lineas.filter(l => !l.entregado && !l.sim?.trim()).length,
         inventarioLibre: inventario.filter(i => !i.asignado).length,
         simInstalado: lineas.filter(l => l.sim_instalado).length,
     };
@@ -118,17 +118,17 @@ export default function EntregasLineasTab() {
         setSigned(false);
     }
 
-    // ── Guardar IMEI/SIM ──────────────────────────────────────────────────────
+    // ── Guardar SIM ───────────────────────────────────────────────────────────
     async function guardarImei() {
         if (!modalLinea) return;
         let imei = "", sim = "";
 
         if (useManual) {
-            imei = manualImei.trim();
             sim = manualSim.trim();
-            if (!imei) { toast.error("El IMEI es obligatorio"); return; }
+            imei = manualImei.trim();
+            if (!sim) { toast.error("El número de SIM es obligatorio"); return; }
         } else {
-            if (!selectedInvId) { toast.error("Selecciona un dispositivo del inventario"); return; }
+            if (!selectedInvId) { toast.error("Selecciona una SIM del inventario"); return; }
             const item = inventario.find(i => i.id === selectedInvId);
             if (!item) return;
             imei = item.imei; sim = item.sim;
@@ -136,7 +136,6 @@ export default function EntregasLineasTab() {
 
         setSaving(true);
 
-        // Un-assign previous inventory item if changing
         const prevItem = inventario.find(i => i.linea_id === modalLinea.id);
         if (prevItem && prevItem.id !== selectedInvId) {
             await supabase.from("inventario_altice")
@@ -144,31 +143,22 @@ export default function EntregasLineasTab() {
                 .eq("id", prevItem.id);
         }
 
-        // Mark new inventory item as assigned
         if (!useManual && selectedInvId) {
             await supabase.from("inventario_altice")
                 .update({ asignado: true, linea_id: modalLinea.id })
                 .eq("id", selectedInvId);
         }
 
-        // Update line — assigning IMEI+SIM marks as delivered automatically
-        const fechaHoy = new Date().toISOString().split("T")[0];
-        const ok = await mutate(modalLinea.id, {
-            imei,
-            sim,
-            entregado: true,
-            fecha_entrega: modalLinea.fecha_entrega || fechaHoy,
-        });
+        const ok = await mutate(modalLinea.id, { imei, sim });
         await loadInventario();
 
         if (ok && session) {
             const registros = [];
-            if (imei !== (modalLinea.imei ?? "")) registros.push({ linea_id: modalLinea.id, usuario_id: session.id, usuario_nombre: session.nombre, campo: "IMEI", valor_anterior: modalLinea.imei || null, valor_nuevo: imei || null });
             if (sim !== (modalLinea.sim ?? "")) registros.push({ linea_id: modalLinea.id, usuario_id: session.id, usuario_nombre: session.nombre, campo: "SIM", valor_anterior: modalLinea.sim || null, valor_nuevo: sim || null });
-            if (!modalLinea.entregado) registros.push({ linea_id: modalLinea.id, usuario_id: session.id, usuario_nombre: session.nombre, campo: "Entregado", valor_anterior: "No", valor_nuevo: "Sí" });
+            if (imei && imei !== (modalLinea.imei ?? "")) registros.push({ linea_id: modalLinea.id, usuario_id: session.id, usuario_nombre: session.nombre, campo: "IMEI", valor_anterior: modalLinea.imei || null, valor_nuevo: imei || null });
             if (registros.length > 0) await supabase.from("historial_cambios").insert(registros);
         }
-        if (ok) toast.success("IMEI/SIM asignados — marcado como entregado");
+        if (ok) toast.success("SIM asignada correctamente");
         setSaving(false);
         setModalLinea(null);
     }
@@ -285,9 +275,9 @@ export default function EntregasLineasTab() {
         setModalMode("imei");
         const currentInv = inventario.find(i => i.linea_id === linea.id);
         setSelectedInvId(currentInv?.id || "");
-        setManualImei(currentInv ? "" : (linea.imei || ""));
         setManualSim(currentInv ? "" : (linea.sim || ""));
-        setUseManual(!currentInv && !!linea.imei);
+        setManualImei(currentInv ? "" : (linea.imei || ""));
+        setUseManual(!currentInv && !!linea.sim);
     }
     function abrirEntrega(linea: LineaAltice) {
         setModalLinea(linea);
@@ -321,7 +311,7 @@ export default function EntregasLineasTab() {
                         <div className="flex items-start justify-between gap-2">
                             <div>
                                 <p className="font-bold text-slate-800 dark:text-white text-base flex items-center gap-1.5">
-                                    {modalMode === "imei" ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg> Asignar dispositivo</> : <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg> Registrar Entrega</>}
+                                    {modalMode === "imei" ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg> Asignar SIM</> : <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg> Registrar Entrega</>}
                                 </p>
                                 <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
                                     {modalLinea.usuario_linea || "—"} · {modalLinea.telefono}
@@ -410,14 +400,15 @@ export default function EntregasLineasTab() {
                                 ) : (
                                     <div className="space-y-3">
                                         <div>
-                                            <label className={labelCls}>SIM / ICC manual</label>
+                                            <label className={labelCls}>Número de SIM / ICC <span className="text-red-500">*</span></label>
                                             <input value={manualSim}
                                                 onChange={e => setManualSim(e.target.value)}
                                                 placeholder="ej: 890101250725747238"
-                                                className={inputCls} />
+                                                className={inputCls}
+                                                autoFocus />
                                         </div>
                                         <div>
-                                            <label className={labelCls}>IMEI del dispositivo <span className="text-red-500">*</span></label>
+                                            <label className={labelCls}>IMEI del dispositivo <span className="text-slate-400 font-normal">(opcional)</span></label>
                                             <input value={manualImei}
                                                 onChange={e => setManualImei(e.target.value)}
                                                 placeholder="15 dígitos — ej: 352099001761481"
@@ -504,10 +495,10 @@ export default function EntregasLineasTab() {
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                 {[
                     { label: "Total a entregar", value: kpis.total, color: "text-slate-700 dark:text-slate-200", bg: "bg-white dark:bg-slate-800" },
-                    { label: "Con IMEI asignado", value: kpis.conImei, color: "text-blue-600", bg: "bg-blue-50 dark:bg-blue-900/20" },
+                    { label: "Con SIM asignada", value: kpis.conSim, color: "text-blue-600", bg: "bg-blue-50 dark:bg-blue-900/20" },
                     { label: "SIM instalada", value: `${kpis.simInstalado} / ${kpis.total}`, color: "text-violet-600", bg: "bg-violet-50 dark:bg-violet-900/20" },
                     { label: "Entregados", value: kpis.entregados, color: "text-green-600", bg: "bg-green-50 dark:bg-green-900/20" },
-                    { label: "Sin IMEI / Pendiente", value: kpis.sinImei, color: kpis.sinImei > 0 ? "text-amber-600" : "text-slate-400", bg: kpis.sinImei > 0 ? "bg-amber-50 dark:bg-amber-900/20" : "bg-white dark:bg-slate-800" },
+                    { label: "Sin SIM / Pendiente", value: kpis.sinSim, color: kpis.sinSim > 0 ? "text-amber-600" : "text-slate-400", bg: kpis.sinSim > 0 ? "bg-amber-50 dark:bg-amber-900/20" : "bg-white dark:bg-slate-800" },
                     { label: "Inventario disponible", value: kpis.inventarioLibre, color: "text-teal-600", bg: "bg-teal-50 dark:bg-teal-900/20" },
                 ].map(k => (
                     <div key={k.label} className={`${k.bg} rounded-2xl border border-slate-200 dark:border-slate-700 p-4`}>
@@ -545,11 +536,11 @@ export default function EntregasLineasTab() {
                 <input value={search} onChange={e => setSearch(e.target.value)}
                     placeholder="Buscar por nombre, teléfono, IMEI..."
                     className="flex-1 min-w-[200px] border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-800 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                {(["pendientes", "sin_imei", "entregadas"] as Vista[]).map(v => (
+                {(["pendientes", "sin_sim", "entregadas"] as Vista[]).map(v => (
                     <button key={v} onClick={() => setVista(v)}
                         className={`px-4 py-2 rounded-full text-sm font-semibold transition-all flex items-center gap-1.5 ${vista === v ? "bg-blue-600 text-white" : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50"}`}>
                         {v === "pendientes" ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Pendientes ({kpis.total - kpis.entregados})</>
-                            : v === "sin_imei" ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Sin IMEI ({kpis.sinImei})</>
+                            : v === "sin_sim" ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Sin SIM ({kpis.sinSim})</>
                                 : <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.1 9 11.1"/></svg> Entregadas ({kpis.entregados})</>}
                     </button>
                 ))}
@@ -567,7 +558,7 @@ export default function EntregasLineasTab() {
                         <table className="w-full text-sm">
                             <thead className="bg-slate-50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-700">
                                 <tr>
-                                    {["Beneficiario", "Titular", "Teléfono", "Dispositivo", "IMEI", "SIM", "SIM Instalada", "Estado", "Acciones"].map(h => (
+                                    {["Beneficiario", "Titular", "Teléfono", "Dispositivo", "N.° SIM", "SIM Instalada", "Estado", "Acciones"].map(h => (
                                         <th key={h} className="p-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">{h}</th>
                                     ))}
                                 </tr>
@@ -587,14 +578,9 @@ export default function EntregasLineasTab() {
                                             {linea.dispositivo_2026 || <span className="text-slate-300 italic">—</span>}
                                         </td>
                                         <td className="p-3">
-                                            {linea.imei
-                                                ? <span className="font-mono text-xs text-slate-700 dark:text-slate-200">{linea.imei}</span>
+                                            {linea.sim?.trim()
+                                                ? <span className="font-mono text-xs text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-900/20 px-2 py-1 rounded-lg">{linea.sim}</span>
                                                 : <span className="text-xs text-amber-600 font-medium">Sin asignar</span>}
-                                        </td>
-                                        <td className="p-3">
-                                            {linea.sim
-                                                ? <span className="font-mono text-xs text-slate-600 dark:text-slate-300">…{linea.sim.slice(-8)}</span>
-                                                : <span className="text-slate-300 text-xs">—</span>}
                                         </td>
                                         <td className="p-3">
                                             <button
@@ -613,9 +599,9 @@ export default function EntregasLineasTab() {
                                                     </span>
                                                     {linea.fecha_entrega && <p className="text-xs text-slate-400 mt-1">{formatDate(linea.fecha_entrega)}</p>}
                                                 </div>
-                                            ) : linea.imei ? (
-                                                <span className="text-xs font-semibold px-2 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 flex items-center gap-1 w-fit">
-                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg> IMEI asignado
+                                            ) : linea.sim?.trim() ? (
+                                                <span className="text-xs font-semibold px-2 py-1 rounded-full bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 flex items-center gap-1 w-fit">
+                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg> SIM asignada
                                                 </span>
                                             ) : (
                                                 <span className="text-xs font-semibold px-2 py-1 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 flex items-center gap-1 w-fit">
@@ -632,10 +618,10 @@ export default function EntregasLineasTab() {
                                             ) : (
                                                 <div className="flex gap-1">
                                                     <button onClick={() => abrirImei(linea)}
-                                                        className="text-xs px-2.5 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 hover:bg-blue-100 transition-colors font-medium whitespace-nowrap flex items-center gap-1">
-                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg> {linea.imei ? "Cambiar" : "Asignar"}
+                                                        className="text-xs px-2.5 py-1.5 rounded-lg bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-400 hover:bg-violet-100 transition-colors font-medium whitespace-nowrap flex items-center gap-1">
+                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg> {linea.sim?.trim() ? "Cambiar SIM" : "Asignar SIM"}
                                                     </button>
-                                                    {linea.imei && (
+                                                    {linea.sim?.trim() && (
                                                         <button onClick={() => abrirEntrega(linea)}
                                                             className="text-xs px-2.5 py-1.5 rounded-lg bg-green-600 hover:bg-green-500 text-white transition-colors font-medium whitespace-nowrap flex items-center gap-1">
                                                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg> Entregar
