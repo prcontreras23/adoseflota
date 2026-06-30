@@ -722,18 +722,13 @@ _Francis Contreras_`;
                                                             const rawNum = esNueva ? (linea.numero_altice || linea.telefono) : linea.telefono;
                                                             const numLimpio = rawNum?.replace(/\D/g, "") ?? "";
                                                             const numWA = numLimpio.length === 10 ? `1${numLimpio}` : numLimpio;
-                                                            const alticeLinea = linea.numero_altice?.trim() ? `\n📞 *N.° temporal Altice:* ${linea.numero_altice}` : "";
+                                                            const primerNombre = linea.usuario_linea?.trim().split(" ")[0] || "";
+                                                            const alticeLinea = linea.numero_altice?.trim() ? `\n*N.° temporal Altice:* ${linea.numero_altice}` : "";
                                                             const mensaje =
-`📦 *Tu equipo ADOSE Flota 2026 está listo*
+`Hola *${primerNombre}*, te informamos que tu dispositivo ya está preparado y puedes pasar a retirarlo.
 
-Hola${linea.usuario_linea ? ` *${linea.usuario_linea}*` : ""}, te informamos que tu dispositivo ya está preparado y puedes pasar a retirarlo.
-
-📱 *Dispositivo:* ${linea.dispositivo_2026 || "—"}
-📞 *Número de línea:* ${linea.telefono}${alticeLinea}
-
-Por favor preséntate con tu cédula de identidad para completar la entrega.
-
-_Francis Contreras_`;
+*Dispositivo:* ${linea.dispositivo_2026 || "—"}
+*Número de línea:* ${linea.telefono}${alticeLinea}`;
                                                             setModalWA({ numWA, mensaje });
                                                         }}
                                                         title={linea.sim_instalado ? "Avisar por WhatsApp que puede retirar su equipo" : "Instala la SIM primero"}
