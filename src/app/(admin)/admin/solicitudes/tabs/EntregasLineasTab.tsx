@@ -87,7 +87,13 @@ export default function EntregasLineasTab() {
         entregados: lineas.filter(l => l.entregado).length,
         sinImei: lineas.filter(l => !l.entregado && !l.imei?.trim()).length,
         inventarioLibre: inventario.filter(i => !i.asignado).length,
+        simInstalado: lineas.filter(l => l.sim_instalado).length,
     };
+
+    async function toggleSimInstalado(linea: LineaAltice) {
+        const nuevo = !linea.sim_instalado;
+        await mutate(linea.id, { sim_instalado: nuevo });
+    }
 
     // ── Canvas firma ──────────────────────────────────────────────────────────
     function startDraw(e: React.MouseEvent<HTMLCanvasElement>) {
@@ -495,10 +501,11 @@ export default function EntregasLineasTab() {
             </div>
 
             {/* ── KPIs ──────────────────────────────────────────────── */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                 {[
                     { label: "Total a entregar", value: kpis.total, color: "text-slate-700 dark:text-slate-200", bg: "bg-white dark:bg-slate-800" },
                     { label: "Con IMEI asignado", value: kpis.conImei, color: "text-blue-600", bg: "bg-blue-50 dark:bg-blue-900/20" },
+                    { label: "SIM instalada", value: `${kpis.simInstalado} / ${kpis.total}`, color: "text-violet-600", bg: "bg-violet-50 dark:bg-violet-900/20" },
                     { label: "Entregados", value: kpis.entregados, color: "text-green-600", bg: "bg-green-50 dark:bg-green-900/20" },
                     { label: "Sin IMEI / Pendiente", value: kpis.sinImei, color: kpis.sinImei > 0 ? "text-amber-600" : "text-slate-400", bg: kpis.sinImei > 0 ? "bg-amber-50 dark:bg-amber-900/20" : "bg-white dark:bg-slate-800" },
                     { label: "Inventario disponible", value: kpis.inventarioLibre, color: "text-teal-600", bg: "bg-teal-50 dark:bg-teal-900/20" },
@@ -560,7 +567,7 @@ export default function EntregasLineasTab() {
                         <table className="w-full text-sm">
                             <thead className="bg-slate-50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-700">
                                 <tr>
-                                    {["Beneficiario", "Titular", "Teléfono", "Dispositivo", "IMEI", "SIM", "Estado", "Acciones"].map(h => (
+                                    {["Beneficiario", "Titular", "Teléfono", "Dispositivo", "IMEI", "SIM", "SIM Instalada", "Estado", "Acciones"].map(h => (
                                         <th key={h} className="p-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">{h}</th>
                                     ))}
                                 </tr>
@@ -588,6 +595,15 @@ export default function EntregasLineasTab() {
                                             {linea.sim
                                                 ? <span className="font-mono text-xs text-slate-600 dark:text-slate-300">…{linea.sim.slice(-8)}</span>
                                                 : <span className="text-slate-300 text-xs">—</span>}
+                                        </td>
+                                        <td className="p-3">
+                                            <button
+                                                onClick={() => toggleSimInstalado(linea)}
+                                                title={linea.sim_instalado ? "SIM instalada — clic para desmarcar" : "Marcar SIM como instalada"}
+                                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${linea.sim_instalado ? "bg-violet-600" : "bg-slate-200 dark:bg-slate-600"}`}
+                                            >
+                                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${linea.sim_instalado ? "translate-x-6" : "translate-x-1"}`} />
+                                            </button>
                                         </td>
                                         <td className="p-3">
                                             {linea.entregado ? (

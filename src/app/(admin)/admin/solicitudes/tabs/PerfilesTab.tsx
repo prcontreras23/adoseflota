@@ -213,6 +213,7 @@ function EditModal({ linea, onClose, onSave, onDelete, session, upsertLocal, tit
   titularLineas?: LineaAltice[];
 }) {
   const { getList } = useConfigListas();
+  const { goToSimulador } = useNav();
   const PLANES_DATA = ["", ...getList("plan_datos")];
   const PORTABILIDAD_CFG = getList("portabilidad");
   const REVISORES_CFG = getList("revisor");
@@ -688,6 +689,59 @@ function EditModal({ linea, onClose, onSave, onDelete, session, upsertLocal, tit
                       </option>
                     ))}
                 </select>
+              </div>
+              {/* IMEI — combobox editable con filtro */}
+              <div className="relative">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">
+                  IMEI del dispositivo
+                </label>
+                <input
+                  value={form.imei || ""}
+                  onChange={e => {
+                    setForm(prev => ({ ...prev, imei: e.target.value.replace(/\D/g, "") }));
+                    setSelectedInvId("");
+                    setImeiDropOpen(true);
+                  }}
+                  onFocus={() => setImeiDropOpen(true)}
+                  onBlur={() => setTimeout(() => setImeiDropOpen(false), 150)}
+                  placeholder="Escribe o busca el IMEI..."
+                  className="w-full font-mono border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  autoComplete="off"
+                  maxLength={20}
+                />
+                {imeiDropOpen && (() => {
+                  const typedImei = (form.imei || "").replace(/\D/g, "");
+                  const sugerenciasImei = inventarioItems.filter(i => {
+                    if (i.asignado && i.linea_id !== linea.id) return false;
+                    if (typedImei && !i.imei.includes(typedImei)) return false;
+                    return true;
+                  });
+                  return sugerenciasImei.length > 0 ? (
+                    <div className="absolute top-full left-0 right-0 z-30 mt-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                      <div className="px-3 pt-2 pb-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest sticky top-0 bg-white dark:bg-slate-800">
+                        {sugerenciasImei.length} resultado{sugerenciasImei.length !== 1 ? "s" : ""}
+                      </div>
+                      {sugerenciasImei.map(item => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onMouseDown={() => {
+                            setForm(prev => ({ ...prev, imei: item.imei, sim: item.sim }));
+                            setSelectedInvId(item.id);
+                            setImeiDropOpen(false);
+                          }}
+                          className="w-full text-left px-3 py-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 flex items-center gap-2 border-t border-slate-100 dark:border-slate-700 first:border-0"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="font-mono text-xs font-semibold text-slate-800 dark:text-white">{item.imei}</p>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">SIM: {item.sim} · {item.marca}</p>
+                          </div>
+                          {item.linea_id === linea.id && <span className="text-teal-600 dark:text-teal-400 text-xs font-bold">✓</span>}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null;
+                })()}
               </div>
             </div>
           )}
@@ -1195,6 +1249,10 @@ function EditModal({ linea, onClose, onSave, onDelete, session, upsertLocal, tit
               className="py-2.5 px-4 rounded-xl bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 text-sm font-semibold hover:bg-rose-100 dark:hover:bg-rose-950/40 disabled:opacity-40 transition-colors border border-rose-200 dark:border-rose-800 flex items-center gap-1.5">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg> Eliminar
             </button>
+            <button onClick={() => { handleSave(); goToSimulador(); }}
+              className="py-2.5 px-4 rounded-xl bg-violet-50 dark:bg-violet-950/20 text-violet-600 dark:text-violet-400 text-sm font-semibold hover:bg-violet-100 dark:hover:bg-violet-950/40 transition-colors border border-violet-200 dark:border-violet-800 flex items-center gap-1.5">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="12 3 20 7.5 20 16.5 12 21 4 16.5 4 7.5 12 3"/><line x1="12" y1="12" x2="20" y2="7.5"/><line x1="12" y1="12" x2="12" y2="21"/><line x1="12" y1="12" x2="4" y2="7.5"/></svg> Ir al Simulador
+            </button>
             <button onClick={onClose}
               className="flex-1 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm font-semibold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
               Cancelar
@@ -1294,15 +1352,32 @@ function LineaRow({ linea, onEdit, dimmed, onMutate, selected, onToggleSelect }:
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg> Sin revisar
             </span>
           )}
-          {linea.entregado ? (
-            <span className="text-xs font-semibold px-2 py-1 rounded-lg bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 flex items-center gap-1">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.1 9 11.1"/></svg> Entregado
-            </span>
-          ) : linea.imei?.trim() ? (
-            <span className="text-xs font-semibold px-2 py-1 rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 flex items-center gap-1">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg> IMEI asig.
-            </span>
-          ) : null}
+          {/* Toggle SIM instalada */}
+          <button
+            onClick={e => { e.stopPropagation(); onMutate(linea.id, { sim_instalado: !linea.sim_instalado }); }}
+            title={linea.sim_instalado ? "SIM instalada — clic para desmarcar" : "Marcar SIM como instalada"}
+            className={`text-xs font-semibold px-2 py-1 rounded-lg flex items-center gap-1 transition-colors ${
+              linea.sim_instalado
+                ? "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400"
+                : "bg-slate-100 text-slate-400 dark:bg-slate-700 dark:text-slate-500 hover:bg-violet-50 dark:hover:bg-violet-900/20"
+            }`}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+            {linea.sim_instalado ? "SIM ✓" : "SIM"}
+          </button>
+          {/* Toggle Entregado */}
+          <button
+            onClick={e => { e.stopPropagation(); onMutate(linea.id, { entregado: !linea.entregado, fecha_entrega: !linea.entregado ? new Date().toISOString().split("T")[0] : null }); }}
+            title={linea.entregado ? "Entregado — clic para desmarcar" : "Marcar como entregado"}
+            className={`text-xs font-semibold px-2 py-1 rounded-lg flex items-center gap-1 transition-colors ${
+              linea.entregado
+                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                : linea.imei?.trim()
+                  ? "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 hover:bg-green-50 dark:hover:bg-green-900/20"
+                  : "bg-slate-100 text-slate-400 dark:bg-slate-700 dark:text-slate-500 hover:bg-green-50 dark:hover:bg-green-900/20"
+            }`}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.1 9 11.1"/></svg>
+            {linea.entregado ? "Entregado ✓" : linea.imei?.trim() ? "IMEI asig." : "Entregar"}
+          </button>
           <button onClick={onEdit}
             className="mt-1 text-xs px-3 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 font-semibold transition-colors flex items-center gap-1">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Editar
