@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef } from "react";
 import { supabase, formatDate, type LineaAltice } from "@/lib/supabase";
 import { useLineas } from "@/lib/LineasContext";
+import { useNav } from "@/lib/NavContext";
 import toast from "react-hot-toast";
 import * as XLSX from "xlsx";
 
@@ -25,6 +26,7 @@ function modelKey(s: string): string {
 }
 
 export default function EntregasLineasTab() {
+    const { goToPerfiles } = useNav();
     const { lineas: all, loading, mutate } = useLineas();
     const [inventario, setInventario] = useState<InventarioItem[]>([]);
     const [vista, setVista] = useState<Vista>("pendientes");
@@ -48,6 +50,14 @@ export default function EntregasLineasTab() {
         if (typeof window === "undefined") return null;
         try { return JSON.parse(localStorage.getItem("flota_session") ?? "null"); } catch { return null; }
     });
+
+    const irAlPerfil = (titular: string) => {
+        if (!titular || titular === "—") {
+            toast.error("No hay titular registrado para esta línea");
+            return;
+        }
+        goToPerfiles({ search: titular });
+    };
 
     // Lines that need delivery (synced via LineasContext — same source as Perfiles)
     const lineas = all.filter(l =>
@@ -654,10 +664,12 @@ _Francis Contreras_`;
                                 {filtered.map(linea => (
                                     <tr key={linea.id} className={`hover:bg-slate-50 dark:hover:bg-slate-700/30 ${linea.entregado ? "opacity-60" : ""}`}>
                                         <td className="p-3">
-                                            <p className="font-semibold text-slate-800 dark:text-white">{linea.usuario_linea || "—"}</p>
+                                            <p className="font-semibold text-slate-800 dark:text-white cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors" onClick={() => irAlPerfil(linea.titular_responsable)}>
+                                                {linea.usuario_linea || "—"}
+                                            </p>
                                             <p className="text-xs text-slate-400">{linea.tipo}</p>
                                         </td>
-                                        <td className="p-3 text-xs text-slate-600 dark:text-slate-300 max-w-[120px]">
+                                        <td className="p-3 text-xs text-slate-600 dark:text-slate-300 max-w-[120px] cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors" onClick={() => irAlPerfil(linea.titular_responsable)}>
                                             <span className="truncate block">{linea.titular_responsable || "—"}</span>
                                         </td>
                                         <td className="p-3 font-mono text-slate-600 dark:text-slate-300 whitespace-nowrap">{linea.telefono}</td>
@@ -711,6 +723,11 @@ _Francis Contreras_`;
                                         <td className="p-3">
                                             {linea.entregado ? (
                                                 <div className="flex gap-1">
+                                                    <button onClick={() => irAlPerfil(linea.titular_responsable)}
+                                                        className="text-xs px-2.5 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 hover:bg-blue-100 transition-colors font-medium flex items-center gap-1"
+                                                        title="Ver perfil del titular">
+                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Perfil
+                                                    </button>
                                                     <button onClick={() => enviarWhatsApp(linea)}
                                                         className="text-xs px-2.5 py-1.5 rounded-lg bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 hover:bg-green-100 transition-colors font-medium flex items-center gap-1">
                                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> WA
@@ -722,6 +739,11 @@ _Francis Contreras_`;
                                                 </div>
                                             ) : (
                                                 <div className="flex flex-wrap gap-1">
+                                                    <button onClick={() => irAlPerfil(linea.titular_responsable)}
+                                                        className="text-xs px-2.5 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 hover:bg-blue-100 transition-colors font-medium whitespace-nowrap flex items-center gap-1"
+                                                        title="Ver perfil del titular">
+                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Perfil
+                                                    </button>
                                                     <button onClick={() => abrirImei(linea)}
                                                         className="text-xs px-2.5 py-1.5 rounded-lg bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-400 hover:bg-violet-100 transition-colors font-medium whitespace-nowrap flex items-center gap-1">
                                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg> {linea.sim?.trim() ? "Cambiar SIM" : "Asignar SIM"}

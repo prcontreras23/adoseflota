@@ -10,6 +10,7 @@ import TareasTab from "./tabs/TareasTab";
 import UsuariosTab from "./tabs/UsuariosTab";
 import AlmacenTab from "./tabs/AlmacenTab";
 import EntregasLineasTab from "./tabs/EntregasLineasTab";
+import LineasTab from "./tabs/LineasTab";
 import NotasTab from "./tabs/NotasTab";
 import ConfiguracionTab from "./tabs/ConfiguracionTab";
 import DocumentosTab from "./tabs/DocumentosTab";
@@ -46,6 +47,7 @@ const Icon = {
 const TABS = [
     { id: "dashboard",  label: "Resumen",       icon: Icon.dashboard,  component: DashboardTab,        group: "principal" },
     { id: "perfiles",   label: "Perfiles",       icon: Icon.perfiles,   component: PerfilesTab,         group: "principal" },
+    { id: "lineas",     label: "Líneas",         icon: Icon.altice,     component: LineasTab,           group: "principal" },
     { id: "tareas",     label: "Tareas",         icon: Icon.tareas,     component: TareasTab,           group: "principal" },
     { id: "altice",     label: "Proceso Altice", icon: Icon.altice,     component: AlticeTab,           group: "altice" },
     { id: "simulador",  label: "Simulador",      icon: Icon.simulador,  component: SimuladorTab,        group: "altice" },

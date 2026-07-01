@@ -432,8 +432,17 @@ export default function LineasTab() {
                                     <tr key={r.id}
                                         className="hover:bg-slate-50 dark:hover:bg-slate-700/30 cursor-pointer"
                                         onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}>
-                                        <td className="p-2.5 font-mono font-medium text-slate-700 dark:text-slate-200 whitespace-nowrap">
-                                            {r.telefono?.startsWith("NUEVA") ? <span className="text-green-600 font-bold">{r.telefono}</span> : <span className="flex items-center gap-1">{r.telefono}<a href={`tel:+1${r.telefono?.replace(/-/g, "")}`} onClick={e => e.stopPropagation()} title="Llamar" className="text-blue-500 hover:text-blue-700 ml-1"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.86 9.11a19.79 19.79 0 01-3.07-8.67A2 2 0 012.77 .5h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 8.34a16 16 0 006.29 6.29l1.1-1.1a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg></a></span>}
+                                        <td className="p-2.5 font-mono font-medium text-slate-700 dark:text-slate-200 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                                            <div className="flex items-center gap-1">
+                                                {r.telefono?.startsWith("NUEVA") ? (
+                                                    <span className="text-green-600 font-bold">{r.telefono}</span>
+                                                ) : (
+                                                    <>
+                                                        <FieldEditable value={r.telefono} onSave={v => updateField(r.id, "telefono", v)} />
+                                                        <a href={`tel:+1${r.telefono?.replace(/-/g, "")}`} onClick={e => e.stopPropagation()} title="Llamar" className="text-blue-500 hover:text-blue-700 flex-shrink-0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.86 9.11a19.79 19.79 0 01-3.07-8.67A2 2 0 012.77 .5h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 8.34a16 16 0 006.29 6.29l1.1-1.1a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg></a>
+                                                    </>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="p-2.5">
                                             <p className="font-medium text-slate-800 dark:text-white">{r.usuario_linea || "—"}</p>
