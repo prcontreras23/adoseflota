@@ -583,7 +583,7 @@ export default function SimuladorTab() {
 
         // Hoja 1 — Reglas estándar
         const std = [
-            ["Equipo", "Plan", "Precio base", "% Subsidio", "Altice cubre", "ADOSE aporta", "1 empleado paga", "Cantidad config.", "Cantidad portal", "Total subsidio", "Total empleados"],
+            ["Equipo", "Plan", "Precio base", "% Subsidio", "Altice cubre", "ADOSE aporta", "1 empleado paga", "Cantidad config.", "Cantidad portal", "Total subsidio", "Total empleados", "Total a pagar Altice"],
             ...reglaRows.map(r => [
                 r.equipo,
                 planLabel(r.plan),
@@ -596,6 +596,7 @@ export default function SimuladorTab() {
                 r.cantidad_real,
                 r.total_subsidio,
                 r.total_usuario,
+                r.precio_base * r.cantidad_calc,
             ]),
         ];
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(std), "Reglas estándar");
@@ -902,7 +903,7 @@ export default function SimuladorTab() {
                     <table className="w-full text-xs">
                         <thead>
                             <tr className="bg-slate-50 dark:bg-slate-900/50">
-                                {["Equipo", "Plan", "Precio base", "% Subsidio", "Altice cubre", "ADOSE aporta", "1 empleado paga", "Cantidad", "Total subsidio", "Total empleados", ""].map(h => (
+                                {["Equipo", "Plan", "Precio base", "% Subsidio", "Altice cubre", "ADOSE aporta", "1 empleado paga", "Cantidad", "Total subsidio", "Total empleados", "Total a pagar Altice", ""].map(h => (
                                     <th key={h} className="text-left px-3 py-2.5 font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">{h}</th>
                                 ))}
                             </tr>
@@ -947,6 +948,7 @@ export default function SimuladorTab() {
                                                         <td className="px-2 py-1.5"><input type="number" placeholder="auto" value={reglaEdit.cantidad_override ?? ""} onChange={e => setReglaEdit(p => ({ ...p, cantidad_override: e.target.value === "" ? null : parseInt(e.target.value) }))} onClick={e => e.stopPropagation()} className="w-16 border border-blue-400 rounded px-1.5 py-0.5 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none placeholder-slate-300" /></td>
                                                         <td className="px-3 py-2 text-blue-700 dark:text-blue-400 font-bold">—</td>
                                                         <td className="px-3 py-2 text-slate-400">—</td>
+                                                        <td className="px-3 py-2 text-slate-700 dark:text-slate-300 font-semibold">{formatRD((reglaEdit.precio_base ?? 0) * (reglaEdit.cantidad_override ?? r.cantidad_real))}</td>
                                                         <td className="px-3 py-2">
                                                             <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
                                                                 <button onClick={() => saveRegla(r.id)} className="text-green-600 hover:text-green-500"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>
@@ -987,6 +989,7 @@ export default function SimuladorTab() {
                                                         </td>
                                                         <td className="px-3 py-2 text-blue-700 dark:text-blue-400 font-bold">{formatRD(r.total_subsidio)}</td>
                                                                         <td className="px-3 py-2 font-semibold text-rose-600 dark:text-rose-400">{r.total_usuario > 0 ? formatRD(r.total_usuario) : <span className="text-slate-300">—</span>}</td>
+                                                        <td className="px-3 py-2 text-slate-700 dark:text-slate-300 font-semibold bg-amber-50/50 dark:bg-amber-900/10">{formatRD(r.precio_base * r.cantidad_calc)}</td>
                                                         <td className="px-3 py-2">
                                                             <button onClick={e => { e.stopPropagation(); startEditRegla(r); }}
                                                                 className="px-2.5 py-1 text-[11px] font-semibold text-blue-600 hover:text-white hover:bg-blue-600 rounded-lg border border-blue-200 dark:border-blue-700 dark:text-blue-400 dark:hover:text-white dark:hover:bg-blue-600 transition-colors whitespace-nowrap">
@@ -1003,6 +1006,7 @@ export default function SimuladorTab() {
                                         <td className="px-3 py-1.5 font-bold text-xs text-slate-700 dark:text-slate-200">{equipoTotalCantidad}</td>
                                         <td className="px-3 py-1.5 text-blue-700 dark:text-blue-400 font-bold text-xs">{formatRD(equipoTotal)}</td>
                                         <td className="px-3 py-1.5 text-rose-600 dark:text-rose-400 font-bold text-xs">{equipoTotalUsuario > 0 ? formatRD(equipoTotalUsuario) : "—"}</td>
+                                        <td className="px-3 py-1.5 text-slate-700 dark:text-slate-300 font-bold text-xs bg-amber-100/50 dark:bg-amber-900/20">{formatRD(rows.reduce((s, r) => s + (r.precio_base * r.cantidad_calc), 0))}</td>
                                         <td />
                                     </tr>,
                                 ];
@@ -1053,6 +1057,7 @@ export default function SimuladorTab() {
                                 <td colSpan={8} className="px-3 py-2 font-bold text-sm">Total — Reglas estándar</td>
                                 <td className="px-3 py-2 font-bold text-sm">{formatRD(reglaRows.reduce((s, r) => s + r.total_subsidio, 0))}</td>
                                 <td className="px-3 py-2 font-bold text-sm">{formatRD(reglaRows.reduce((s, r) => s + r.total_usuario, 0))}</td>
+                                <td className="px-3 py-2 font-bold text-sm">{formatRD(reglaRows.reduce((s, r) => s + (r.precio_base * r.cantidad_calc), 0))}</td>
                                 <td />
                             </tr>
                         </tbody>
