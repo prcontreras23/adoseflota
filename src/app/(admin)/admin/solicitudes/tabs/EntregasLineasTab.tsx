@@ -219,6 +219,33 @@ export default function EntregasLineasTab() {
         }
     }
 
+    // ── Revertir entrega ──────────────────────────────────────────────────────
+    async function revertirEntrega(linea: LineaAltice) {
+        if (!window.confirm(`¿Revertir la entrega de ${linea.usuario_linea || linea.telefono}? Volverá a Pendientes y podrás editar la SIM y el N.° Altice.`)) return;
+        const ok = await mutate(linea.id, {
+            entregado: false,
+            fecha_entrega: null,
+            entregado_por: null,
+        });
+        if (ok) {
+            try {
+                if (session) {
+                    await supabase.from("historial_cambios").insert([{
+                        linea_id: linea.id,
+                        usuario_id: session.id,
+                        usuario_nombre: session.nombre,
+                        campo: "Entregado",
+                        valor_anterior: `Sí — ${linea.fecha_entrega ?? ""}`,
+                        valor_nuevo: "No (revertido)",
+                    }]);
+                }
+            } catch (_) { /* historial no crítico */ }
+            toast.success("Entrega revertida — ahora está en Pendientes");
+        } else {
+            toast.error("Error al revertir la entrega");
+        }
+    }
+
     // ── Enviar WhatsApp ───────────────────────────────────────────────────────
     function enviarWhatsApp(linea: LineaAltice & { fecha_entrega?: string | null }) {
         const fechaEntregaStr = linea.fecha_entrega || fechaEntrega;
@@ -238,7 +265,7 @@ export default function EntregasLineasTab() {
         const monto = parseFloat(linea.monto_mensual || "0");
         const montoLinea = monto > 0
             ? `\n💰 *Pago único por el equipo:* RD$ ${monto.toLocaleString("es-DO", { minimumFractionDigits: 2 })}`
-            : "";
+            : `\n💰 *Equipo:* Libre de costo`;
 
         const noDeseabaInternet = linea.gb_solicitado?.trim() === "No deseo internet";
         const internetLinea = noDeseabaInternet
@@ -274,7 +301,7 @@ _Francis Contreras_`;
         const monto = parseFloat(linea.monto_mensual || "0");
         const montoRow = monto > 0
             ? `<tr><th>Pago único por el equipo</th><td><strong>RD$ ${monto.toLocaleString("es-DO", { minimumFractionDigits: 2 })}</strong></td></tr>`
-            : "";
+            : `<tr><th>Equipo</th><td><strong>Libre de costo</strong></td></tr>`;
         const html = `<html><head><title>Acta de Entrega</title>
         <style>
           body{font-family:Arial,sans-serif;padding:40px;max-width:620px;margin:0 auto;color:#1e293b}
@@ -735,6 +762,11 @@ _Francis Contreras_`;
                                                     <button onClick={() => imprimirActa(linea)}
                                                         className="text-xs px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition-colors font-medium flex items-center gap-1">
                                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> Imprimir
+                                                    </button>
+                                                    <button onClick={() => revertirEntrega(linea)}
+                                                        className="text-xs px-2.5 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 hover:bg-rose-100 transition-colors font-medium flex items-center gap-1"
+                                                        title="Deshacer entrega y volver a Pendientes para poder editar">
+                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg> Revertir
                                                     </button>
                                                 </div>
                                             ) : (

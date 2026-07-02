@@ -23,7 +23,7 @@ function personalizarMensaje(plantilla: string, linea: LineaAltice): string {
         .replace(/{linea}/g, linea.telefono || "")
         .replace(/{altice}/g, linea.numero_altice || "—")
         .replace(/{datos}/g, datos)
-        .replace(/{monto}/g, monto > 0 ? `RD$ ${monto.toLocaleString("es-DO", { minimumFractionDigits: 2 })}` : "—");
+        .replace(/{monto}/g, monto > 0 ? `RD$ ${monto.toLocaleString("es-DO", { minimumFractionDigits: 2 })}` : "Libre de costo");
 }
 
 function numeroWA(linea: LineaAltice): string {
