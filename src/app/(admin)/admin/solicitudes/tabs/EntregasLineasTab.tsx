@@ -348,6 +348,40 @@ _Francis Contreras_`;
         if (w) { w.document.write(html); w.document.close(); setTimeout(() => w.print(), 600); }
     }
 
+    // ── Exportar Excel ────────────────────────────────────────────────────────
+    function entregaRow(l: LineaAltice) {
+        return {
+            "Beneficiario": l.usuario_linea || "",
+            "Tipo": l.tipo || "",
+            "Titular responsable": l.titular_responsable || "",
+            "Teléfono": l.telefono || "",
+            "Dispositivo": l.dispositivo_2026 || "",
+            "N. Altice": l.numero_altice || "",
+            "IMEI": l.imei || "",
+            "N. SIM": l.sim || "",
+            "SIM Instalada": l.sim_instalado ? "Sí" : "No",
+            "Estado": l.entregado ? "Entregado" : l.sim_instalado ? "SIM Instalada" : l.sim?.trim() ? "SIM asignada" : "Pendiente",
+            "Entregó": l.entregado_por || "",
+            "Fecha de entrega": l.fecha_entrega ? formatDate(l.fecha_entrega) : "",
+        };
+    }
+
+    function exportarExcel() {
+        const ws = XLSX.utils.json_to_sheet(filtered.map(entregaRow));
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Entregas");
+        XLSX.writeFile(wb, `Entregas-Flota-${new Date().toISOString().split("T")[0]}.xlsx`);
+        toast.success("Excel exportado correctamente");
+    }
+
+    function exportarExcelCompleto() {
+        const ws = XLSX.utils.json_to_sheet(lineas.map(entregaRow));
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Entregas");
+        XLSX.writeFile(wb, `Entregas-Flota-Completo-${new Date().toISOString().split("T")[0]}.xlsx`);
+        toast.success("Excel completo exportado correctamente");
+    }
+
     // ── Importar Excel masivo ─────────────────────────────────────────────────
     async function handleImportExcel(e: React.ChangeEvent<HTMLInputElement>) {
         const file = e.target.files?.[0]; if (!file) return;
@@ -604,6 +638,14 @@ _Francis Contreras_`;
                     </p>
                 </div>
                 <div className="flex gap-2 flex-wrap">
+                    <button onClick={exportarExcel} title="Exporta solo la vista/filtro actual"
+                        className="text-sm bg-teal-600 hover:bg-teal-500 text-white px-4 py-2 rounded-xl font-semibold transition-colors flex items-center gap-2">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Exportar vista
+                    </button>
+                    <button onClick={exportarExcelCompleto} title="Exporta todas las líneas a entregar, sin filtros"
+                        className="text-sm bg-emerald-700 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl font-semibold transition-colors flex items-center gap-2">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Exportar todo
+                    </button>
                     <input ref={importRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleImportExcel} className="hidden" />
                     <button onClick={() => importRef.current?.click()} disabled={importing}
                         className="text-sm bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white px-4 py-2 rounded-xl font-semibold transition-colors flex items-center gap-2">
