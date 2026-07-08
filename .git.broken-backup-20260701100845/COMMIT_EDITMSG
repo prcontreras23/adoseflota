@@ -1,0 +1,9 @@
+feat: agregar acceso a perfil desde módulo de entregas y edición de teléfono en tabla
+
+- Habilitar edición inline del teléfono/SIM en la tabla de líneas
+- Agregar botón 'Ver perfil' en módulo de entregas (líneas pendientes y entregadas)
+- Hacer clickeables los campos de beneficiario y titular para ir al perfil
+- El perfil se filtra automáticamente por el titular clickeado
+- Agregar tab de Líneas a la navegación principal
+
+Co-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>

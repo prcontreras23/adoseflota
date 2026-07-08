@@ -1,4 +1,5 @@
 {
+    "name": "adose-flota-2026",
     "framework": "nextjs",
     "buildCommand": "npm run build",
     "outputDirectory": ".next",
