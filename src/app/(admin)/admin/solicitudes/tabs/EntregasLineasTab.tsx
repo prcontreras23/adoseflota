@@ -15,7 +15,11 @@ interface InventarioItem {
     linea_id: string | null;
 }
 
-type Vista = "pendientes" | "entregadas" | "sin_sim" | "con_sim";
+type Vista = "pendientes" | "entregadas" | "sin_sim" | "con_sim" | "alertas";
+
+function tieneAlertaActiva(l: LineaAltice): boolean {
+    return !!l.alerta_cambio_sim?.trim() && !l.alerta_resuelta;
+}
 
 function modelKey(s: string): string {
     const l = s.toLowerCase();
@@ -42,6 +46,7 @@ export default function EntregasLineasTab() {
     const [saving, setSaving] = useState(false);
     const [importing, setImporting] = useState(false);
     const [modalWA, setModalWA] = useState<{ numWA: string; mensaje: string } | null>(null);
+    const [highlightId, setHighlightId] = useState<string | null>(null);
     const importRef = useRef<HTMLInputElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [signed, setSigned] = useState(false);
@@ -83,7 +88,7 @@ export default function EntregasLineasTab() {
         const q = search.toLowerCase();
         const ok = !q || l.usuario_linea?.toLowerCase().includes(q)
             || l.titular_responsable?.toLowerCase().includes(q)
-            || l.telefono?.includes(q)
+            || l.telefono?.toLowerCase().includes(q)
             || l.sim?.includes(q)
             || l.dispositivo_2026?.toLowerCase().includes(q);
         if (!ok) return false;
@@ -91,8 +96,38 @@ export default function EntregasLineasTab() {
         if (vista === "entregadas") return l.entregado;
         if (vista === "sin_sim") return !l.entregado && !l.sim?.trim();
         if (vista === "con_sim") return !l.entregado && !!l.sim_instalado;
+        if (vista === "alertas") return tieneAlertaActiva(l);
         return true;
     });
+
+    // Líneas con advertencia de cambio de SIM sin revisar (dentro y fuera del filtro de entregas)
+    const lineasConAlerta = all.filter(tieneAlertaActiva);
+
+    // ── Navegar a una línea (advertencias) ────────────────────────────────────
+    function irALinea(target: LineaAltice | undefined | null) {
+        if (!target) { toast.error("No se encontró la línea relacionada"); return; }
+        const visibleEnEntregas = ["CAMBIO SOLICITADO", "ALTA", "SE MANTIENE"].includes(target.accion_2026);
+        if (!visibleEnEntregas) {
+            goToPerfiles({ search: target.titular_responsable || target.usuario_linea });
+            return;
+        }
+        setVista(target.entregado ? "entregadas" : "pendientes");
+        setSearch(target.telefono || target.usuario_linea || "");
+        setHighlightId(target.id);
+        setTimeout(() => {
+            document.getElementById(`linea-row-${target.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }, 100);
+        setTimeout(() => setHighlightId(null), 5000);
+    }
+
+    function verLineaAfectada(linea: LineaAltice) {
+        irALinea(all.find(l => l.id === linea.alerta_linea_id));
+    }
+
+    async function marcarAlertaRevisada(linea: LineaAltice) {
+        const ok = await mutate(linea.id, { alerta_resuelta: true });
+        if (ok) toast.success("Advertencia marcada como revisada");
+    }
 
     const kpis = {
         total: lineas.length,
@@ -363,6 +398,8 @@ _Francis Contreras_`;
             "Estado": l.entregado ? "Entregado" : l.sim_instalado ? "SIM Instalada" : l.sim?.trim() ? "SIM asignada" : "Pendiente",
             "Entregó": l.entregado_por || "",
             "Fecha de entrega": l.fecha_entrega ? formatDate(l.fecha_entrega) : "",
+            "Nota importante": l.nota_importante || "",
+            "Advertencia cambio de SIM": (l.alerta_cambio_sim && !l.alerta_resuelta) ? l.alerta_cambio_sim : "",
         };
     }
 
@@ -586,6 +623,18 @@ _Francis Contreras_`;
                             </>
                         ) : (
                             <>
+                                {tieneAlertaActiva(modalLinea) && (
+                                    <div className="bg-rose-50 dark:bg-rose-900/20 border-2 border-rose-300 dark:border-rose-800 rounded-xl p-3 flex items-start gap-2">
+                                        <svg className="flex-shrink-0 mt-0.5 text-rose-600 dark:text-rose-400" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                                        <div>
+                                            <p className="text-xs font-bold text-rose-700 dark:text-rose-400 uppercase tracking-wide">Advertencia de cambio de SIM</p>
+                                            <p className="text-xs text-rose-700 dark:text-rose-300 mt-1 leading-snug">{modalLinea.alerta_cambio_sim}</p>
+                                            {modalLinea.nota_importante?.trim() && (
+                                                <p className="text-xs text-amber-700 dark:text-amber-400 mt-1 leading-snug">📌 Nota: {modalLinea.nota_importante}</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
                                 <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 text-sm space-y-1">
                                     <div className="flex gap-2"><span className="text-slate-400 w-20">IMEI:</span><span className="font-mono font-semibold text-slate-700 dark:text-slate-200">{modalLinea.imei || "—"}</span></div>
                                     <div className="flex gap-2"><span className="text-slate-400 w-20">SIM:</span><span className="font-mono text-slate-700 dark:text-slate-200">{modalLinea.sim || "—"}</span></div>
@@ -656,6 +705,30 @@ _Francis Contreras_`;
                 </div>
             </div>
 
+            {/* ── ADVERTENCIAS DE CAMBIO DE SIM ─────────────────────── */}
+            {lineasConAlerta.length > 0 && (
+                <div className="bg-rose-50 dark:bg-rose-900/15 border-2 border-rose-300 dark:border-rose-800 rounded-2xl p-4">
+                    <p className="text-sm font-bold text-rose-700 dark:text-rose-400 uppercase tracking-wide mb-3 flex items-center gap-2">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                        {lineasConAlerta.length} advertencia{lineasConAlerta.length !== 1 ? "s" : ""} de cambio de SIM — revisar antes de entregar
+                    </p>
+                    <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                        {lineasConAlerta.map(l => (
+                            <button key={l.id} onClick={() => irALinea(l)}
+                                className="w-full text-left bg-white dark:bg-slate-800 border border-rose-200 dark:border-rose-800 rounded-xl px-3 py-2 hover:bg-rose-100 dark:hover:bg-rose-900/30 transition-colors">
+                                <p className="text-sm font-semibold text-slate-800 dark:text-white">
+                                    {l.usuario_linea || l.titular_responsable || "—"} <span className="font-mono text-xs text-slate-500">({l.telefono})</span>
+                                </p>
+                                <p className="text-xs text-rose-700 dark:text-rose-400 mt-0.5">{l.alerta_cambio_sim}</p>
+                                {l.nota_importante?.trim() && (
+                                    <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5 font-medium">📌 Nota: {l.nota_importante}</p>
+                                )}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* ── KPIs ──────────────────────────────────────────────── */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                 {[
@@ -701,12 +774,13 @@ _Francis Contreras_`;
                 <input value={search} onChange={e => setSearch(e.target.value)}
                     placeholder="Buscar por nombre, teléfono, IMEI..."
                     className="flex-1 min-w-[200px] border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-800 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                {(["pendientes", "con_sim", "sin_sim", "entregadas"] as Vista[]).map(v => (
+                {(["pendientes", "con_sim", "sin_sim", "alertas", "entregadas"] as Vista[]).map(v => (
                     <button key={v} onClick={() => setVista(v)}
-                        className={`px-4 py-2 rounded-full text-sm font-semibold transition-all flex items-center gap-1.5 ${vista === v ? "bg-blue-600 text-white" : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50"}`}>
+                        className={`px-4 py-2 rounded-full text-sm font-semibold transition-all flex items-center gap-1.5 ${vista === v ? (v === "alertas" ? "bg-rose-600 text-white" : "bg-blue-600 text-white") : v === "alertas" && lineasConAlerta.length > 0 ? "bg-rose-50 dark:bg-rose-900/20 border border-rose-300 dark:border-rose-700 text-rose-700 dark:text-rose-400 hover:bg-rose-100" : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50"}`}>
                         {v === "pendientes" ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Pendientes ({kpis.total - kpis.entregados})</>
                             : v === "con_sim" ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.1 9 11.1"/></svg> SIM Instalada ({kpis.simInstalado})</>
                             : v === "sin_sim" ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Sin SIM ({kpis.sinSim})</>
+                            : v === "alertas" ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Cambios de SIM ({lineasConAlerta.length})</>
                                 : <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.1 9 11.1"/></svg> Entregadas ({kpis.entregados})</>}
                     </button>
                 ))}
@@ -730,13 +804,43 @@ _Francis Contreras_`;
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                                {filtered.map(linea => (
-                                    <tr key={linea.id} className={`hover:bg-slate-50 dark:hover:bg-slate-700/30 ${linea.entregado ? "opacity-60" : ""}`}>
+                                {filtered.map(linea => {
+                                    const conAlerta = tieneAlertaActiva(linea);
+                                    return (
+                                    <tr key={linea.id} id={`linea-row-${linea.id}`}
+                                        className={`transition-colors ${highlightId === linea.id ? "bg-amber-100 dark:bg-amber-900/30 ring-2 ring-amber-400" : conAlerta ? "bg-rose-50/60 dark:bg-rose-900/10 hover:bg-rose-100/70 dark:hover:bg-rose-900/20" : "hover:bg-slate-50 dark:hover:bg-slate-700/30"} ${linea.entregado ? "opacity-60" : ""}`}>
                                         <td className="p-3">
-                                            <p className="font-semibold text-slate-800 dark:text-white cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors" onClick={() => irAlPerfil(linea.titular_responsable)}>
+                                            <p className="font-semibold text-slate-800 dark:text-white cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-1.5" onClick={() => irAlPerfil(linea.titular_responsable)}>
+                                                {conAlerta && (
+                                                    <span title="Cambio de SIM — revisar" className="text-rose-600 dark:text-rose-400 flex-shrink-0">
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                                                    </span>
+                                                )}
                                                 {linea.usuario_linea || "—"}
                                             </p>
                                             <p className="text-xs text-slate-400">{linea.tipo}</p>
+                                            {conAlerta && (
+                                                <div className="mt-1.5 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg px-2 py-1.5 max-w-[280px]">
+                                                    <p className="text-[11px] leading-snug text-rose-700 dark:text-rose-300 font-medium">{linea.alerta_cambio_sim}</p>
+                                                    {linea.nota_importante?.trim() && (
+                                                        <p className="text-[11px] leading-snug text-amber-700 dark:text-amber-400 mt-1">📌 {linea.nota_importante}</p>
+                                                    )}
+                                                    <div className="flex gap-2 mt-1.5">
+                                                        {linea.alerta_linea_id && (
+                                                            <button onClick={(e) => { e.stopPropagation(); verLineaAfectada(linea); }}
+                                                                className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5">
+                                                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                                                                Ver línea afectada
+                                                            </button>
+                                                        )}
+                                                        <button onClick={(e) => { e.stopPropagation(); marcarAlertaRevisada(linea); }}
+                                                            className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 hover:underline flex items-center gap-0.5">
+                                                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                                            Marcar revisada
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </td>
                                         <td className="p-3 text-xs text-slate-600 dark:text-slate-300 max-w-[120px] cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors" onClick={() => irAlPerfil(linea.titular_responsable)}>
                                             <span className="truncate block">{linea.titular_responsable || "—"}</span>
@@ -852,7 +956,8 @@ _Francis Contreras_`;
                                             )}
                                         </td>
                                     </tr>
-                                ))}
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>

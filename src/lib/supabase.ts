@@ -199,6 +199,10 @@ export interface LineaAltice {
     sim_instalado: boolean;
     numero_altice?: string;
     entregado_por?: string | null;
+    nota_importante?: string;
+    alerta_cambio_sim?: string;
+    alerta_linea_id?: string | null;
+    alerta_resuelta?: boolean;
 }
 
 export interface InventarioAltice {
