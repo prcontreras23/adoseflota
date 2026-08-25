@@ -11,7 +11,7 @@ export default function CatalogoAdminTab() {
     const [showNew, setShowNew] = useState(false);
     const [newItem, setNewItem] = useState({ modelo: "", categoria: "Mid-range" as Dispositivo["categoria"], precio_rd: 0, pantalla: "", ram: "", almacenamiento: "", camara: "", bateria: "" });
 
-    const CLARO_PDF_URL = "/Cotización Soluciones Móviles Claro Febrero.pdf";
+    const CLARO_PDF_URL = "/flota/Cotización Soluciones Móviles Claro Febrero.pdf";
 
     const loadData = useCallback(async () => {
         const { data } = await supabase.from("catalogo_dispositivos").select("*").order("categoria").order("precio_rd");

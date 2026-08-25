@@ -171,7 +171,7 @@ export default function AdminDashboard() {
             {/* Brand */}
             <div className="px-4 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-sm overflow-hidden shrink-0">
-                    <Image src="/logo-adose.png" alt="ADOSE" width={28} height={28} className="object-contain" />
+                    <Image src="/flota/logo-adose.png" alt="ADOSE" width={28} height={28} className="object-contain" />
                 </div>
                 <div className="flex flex-col leading-none">
                     <span className="font-bold text-[14px] text-slate-900 dark:text-white tracking-tight">
@@ -296,7 +296,7 @@ export default function AdminDashboard() {
                         {/* Mobile: logo brand */}
                         <div className="lg:hidden flex items-center gap-2">
                             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center overflow-hidden">
-                                <Image src="/logo-adose.png" alt="ADOSE" width={24} height={24} className="object-contain" />
+                                <Image src="/flota/logo-adose.png" alt="ADOSE" width={24} height={24} className="object-contain" />
                             </div>
                         </div>
 

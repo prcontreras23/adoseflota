@@ -114,7 +114,7 @@ export default function LoginPage() {
                     <div className="flex flex-col items-center mb-7">
                         <div className="bg-white rounded-2xl p-3 mb-4 shadow-lg">
                             <img
-                                src="/logo-adose.png"
+                                src="/flota/logo-adose.png"
                                 alt="ADOSE Logo"
                                 className="h-14 w-auto object-contain"
                                 onError={(e) => {

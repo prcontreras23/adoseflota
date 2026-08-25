@@ -9,8 +9,8 @@ export const metadata: Metadata = {
     title: "ADOSE Flota 2026",
     description: "Gestión de flota móvil corporativa - Unión Adventista Sureste",
     icons: {
-        icon: "/logo-adose.png",
-        apple: "/logo-adose.png",
+        icon: "/flota/logo-adose.png",
+        apple: "/flota/logo-adose.png",
     },
 };
 

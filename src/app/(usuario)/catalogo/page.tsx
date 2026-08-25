@@ -5,7 +5,7 @@ import { supabase, formatRD, AREAS, type Dispositivo, type PlanClaro, type Usuar
 import { PROPOSAL_DATA } from "@/lib/proposalData";
 import toast from "react-hot-toast";
 
-const CLARO_PDF_URL = "/Cotización Soluciones Móviles Claro Febrero.pdf";
+const CLARO_PDF_URL = "/flota/Cotización Soluciones Móviles Claro Febrero.pdf";
 
 export default function CatalogoPage() {
     const router = useRouter();
@@ -132,7 +132,7 @@ export default function CatalogoPage() {
             <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-40">
                 <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <img src="/logo-adose.png" alt="ADOSE" className="h-8 w-auto"
+                        <img src="/flota/logo-adose.png" alt="ADOSE" className="h-8 w-auto"
                             onError={e => { e.currentTarget.style.display = "none"; }} />
                         <div>
                             <h1 className="font-bold text-slate-800 dark:text-white text-sm leading-tight">Sistema Flotas 2026</h1>

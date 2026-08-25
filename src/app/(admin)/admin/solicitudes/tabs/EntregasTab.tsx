@@ -89,7 +89,7 @@ export default function EntregasTab() {
       td,th{padding:8px;border:1px solid #ddd;font-size:13px}th{background:#f5f5f5}
       .firma{margin-top:24px}img{border:1px solid #ccc;border-radius:4px}</style></head>
       <body>
-        <img src="/logo-adose.png" style="height:50px;margin-bottom:16px" onerror="this.style.display='none'"/>
+        <img src="/flota/logo-adose.png" style="height:50px;margin-bottom:16px" onerror="this.style.display='none'"/>
         <h1>Acta de Entrega de Dispositivo Claro</h1>
         <h2>Unión Adventista Sureste — Sistema Flotas 2026</h2>
         <table>
