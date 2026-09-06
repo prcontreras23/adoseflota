@@ -510,7 +510,7 @@ export default function DashboardTab() {
             if (data) setPropuestaRows(data as PropuestaRow[]);
         });
         const ch = supabase.channel("propuesta-rt")
-            .on("postgres_changes", { event: "*", schema: "public", table: "propuesta_altice" }, () => {
+            .on("postgres_changes", { event: "*", schema: "flota", table: "propuesta_altice" }, () => {
                 supabase.from("propuesta_altice").select("*").order("orden").then(({ data }) => {
                     if (data) setPropuestaRows(data as PropuestaRow[]);
                 });

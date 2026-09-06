@@ -291,7 +291,7 @@ export default function NotasTab() {
     useEffect(() => {
         const channel = supabase
             .channel("notas-tab-realtime")
-            .on("postgres_changes", { event: "*", schema: "public", table: "notas_perfil" }, () => {
+            .on("postgres_changes", { event: "*", schema: "flota", table: "notas_perfil" }, () => {
                 fetchNotas();
             })
             .subscribe();

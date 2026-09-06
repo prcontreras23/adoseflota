@@ -300,7 +300,7 @@ export default function TareasTab() {
 
     useEffect(() => {
         const ch = supabase.channel("tareas-rt")
-            .on("postgres_changes", { event: "*", schema: "public", table: "tareas" }, () => cargar())
+            .on("postgres_changes", { event: "*", schema: "flota", table: "tareas" }, () => cargar())
             .subscribe();
         return () => { supabase.removeChannel(ch); };
     }, [cargar]);

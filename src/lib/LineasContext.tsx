@@ -70,7 +70,7 @@ export function LineasProvider({ children }: { children: ReactNode }) {
             .channel("lineas_altice_sync")
             .on(
                 "postgres_changes",
-                { event: "*", schema: "public", table: "lineas_altice" },
+                { event: "*", schema: "flota", table: "lineas_altice" },
                 (payload) => {
                     setLineas((prev) => {
                         if (payload.eventType === "INSERT") {

@@ -48,7 +48,7 @@ export function ConfigListasProvider({ children }: { children: React.ReactNode }
     useEffect(() => {
         const ch = supabase
             .channel("config-listas-realtime")
-            .on("postgres_changes", { event: "*", schema: "public", table: "config_listas" }, () => {
+            .on("postgres_changes", { event: "*", schema: "flota", table: "config_listas" }, () => {
                 reload();
             })
             .subscribe();

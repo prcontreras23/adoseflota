@@ -317,7 +317,7 @@ export default function SimuladorTab() {
         };
         cargarAlmacen();
         const ch = supabase.channel("almacen_sim_sync")
-            .on("postgres_changes", { event: "*", schema: "public", table: "almacen_dispositivos" }, cargarAlmacen)
+            .on("postgres_changes", { event: "*", schema: "flota", table: "almacen_dispositivos" }, cargarAlmacen)
             .subscribe();
         return () => { supabase.removeChannel(ch); };
     }, []);

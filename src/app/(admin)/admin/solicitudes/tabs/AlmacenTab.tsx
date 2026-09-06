@@ -103,7 +103,7 @@ export default function AlmacenTab() {
             .channel("almacen_dispositivos_sync")
             .on(
                 "postgres_changes",
-                { event: "*", schema: "public", table: "almacen_dispositivos" },
+                { event: "*", schema: "flota", table: "almacen_dispositivos" },
                 (payload) => {
                     setRawStock((prev) => {
                         if (payload.eventType === "INSERT") {
