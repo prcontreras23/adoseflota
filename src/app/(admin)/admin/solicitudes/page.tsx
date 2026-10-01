@@ -1,9 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { cargarSesion, cerrarSesion } from "@/lib/sesion";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import toast from "react-hot-toast";
 import DashboardTab from "./tabs/DashboardTab";
 import PerfilesTab from "./tabs/PerfilesTab";
 import TareasTab from "./tabs/TareasTab";
@@ -83,25 +82,16 @@ export default function AdminDashboard() {
     const [darkMode, setDarkMode] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
-    // Settings modal
-    const [showSettings, setShowSettings] = useState(false);
-    const [pinActual, setPinActual] = useState("");
-    const [pinNuevo, setPinNuevo] = useState("");
-    const [pinConfirm, setPinConfirm] = useState("");
-    const [savingPin, setSavingPin] = useState(false);
-
     useEffect(() => {
         if (typeof window !== "undefined") {
             document.documentElement.classList.add("dark");
             setDarkMode(true);
         }
-        const raw = typeof window !== "undefined" ? localStorage.getItem("flota_session") : null;
-        if (!raw) { router.push("/login"); return; }
-        try {
-            const session = JSON.parse(raw);
-            const esAdmin = session.es_admin ?? false;
-            const permisos: string[] = session.permisos ?? [];
-            setUser({ nombre: session.nombre, es_admin: esAdmin, permisos });
+        // La sesión es la de SIGA (Supabase Auth); las pestañas salen de flota.accesos.
+        cargarSesion().then(r => {
+            if (r.estado !== "ok") { router.push("/login"); return; }
+            const { es_admin: esAdmin, permisos } = r.sesion;
+            setUser({ nombre: r.sesion.nombre, es_admin: esAdmin, permisos });
             const allTabIds = TABS.map(t => t.id);
             const savedTab = localStorage.getItem("flota_active_tab");
             if (savedTab && allTabIds.includes(savedTab) && (esAdmin || permisos.includes(savedTab))) {
@@ -109,12 +99,12 @@ export default function AdminDashboard() {
             } else if (!esAdmin && permisos.length > 0) {
                 setActiveTab(permisos[0]);
             }
-        } catch { router.push("/login"); return; }
-        setLoading(false);
+            setLoading(false);
+        });
     }, [router]);
 
     async function handleLogout() {
-        localStorage.removeItem("flota_session");
+        await cerrarSesion();
         router.push("/login");
     }
 
@@ -123,22 +113,6 @@ export default function AdminDashboard() {
         setDarkMode(isDark);
         if (isDark) document.documentElement.classList.add("dark");
         else document.documentElement.classList.remove("dark");
-    }
-
-    async function handleSavePin() {
-        if (pinNuevo.length !== 6 || !/^\d{6}$/.test(pinNuevo)) { toast.error("El PIN nuevo debe ser exactamente 6 dígitos"); return; }
-        if (pinNuevo !== pinConfirm) { toast.error("Los PINs nuevos no coinciden"); return; }
-        setSavingPin(true);
-        const raw = localStorage.getItem("flota_session");
-        if (!raw) { router.push("/login"); return; }
-        const session = JSON.parse(raw);
-        const { data: pinData, error: verifyError } = await supabase.from("access_pins").select("id").eq("id", session.id).eq("pin", pinActual).eq("activo", true).single();
-        if (verifyError || !pinData) { toast.error("PIN actual incorrecto"); setSavingPin(false); return; }
-        const { error: updateError } = await supabase.from("access_pins").update({ pin: pinNuevo }).eq("id", session.id);
-        if (updateError) { toast.error("Error al actualizar el PIN"); setSavingPin(false); return; }
-        toast.success("PIN actualizado");
-        setSavingPin(false);
-        setShowSettings(false);
     }
 
     if (loading) return (
@@ -225,12 +199,6 @@ export default function AdminDashboard() {
 
                 {/* Action buttons */}
                 <div className="flex gap-1.5">
-                    <button onClick={() => { setShowSettings(true); setPinActual(""); setPinNuevo(""); setPinConfirm(""); }}
-                        title="Cambiar PIN"
-                        className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 text-xs font-medium transition-colors">
-                        {Icon.gear}
-                        <span className="hidden sm:inline">PIN</span>
-                    </button>
                     <button onClick={toggleDarkMode}
                         title={darkMode ? "Modo claro" : "Modo oscuro"}
                         className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 text-xs font-medium transition-colors">
@@ -316,45 +284,6 @@ export default function AdminDashboard() {
                 </main>
             </div>
 
-            {/* ── SETTINGS MODAL ────────────────────────────────────────────── */}
-            {showSettings && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-sm border border-slate-200 dark:border-slate-700">
-                        <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-800">
-                            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Cambiar PIN</h2>
-                            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                                {user?.nombre} &middot; <span className="text-blue-500">{user?.es_admin ? "Administrador" : "Usuario"}</span>
-                            </p>
-                        </div>
-                        <div className="px-6 py-5 space-y-4">
-                            {[
-                                { label: "PIN actual", value: pinActual, setter: setPinActual },
-                                { label: "PIN nuevo", value: pinNuevo, setter: setPinNuevo },
-                                { label: "Confirmar PIN nuevo", value: pinConfirm, setter: setPinConfirm },
-                            ].map(f => (
-                                <div key={f.label}>
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{f.label}</label>
-                                    <input type="password" maxLength={6} value={f.value}
-                                        onChange={e => f.setter(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                                        placeholder="••••••"
-                                        className="w-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
-                                </div>
-                            ))}
-                        </div>
-                        <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex gap-3 justify-end">
-                            <button onClick={() => setShowSettings(false)} disabled={savingPin}
-                                className="px-4 py-2 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all disabled:opacity-50">
-                                Cancelar
-                            </button>
-                            <button onClick={handleSavePin}
-                                disabled={savingPin || !pinActual || !pinNuevo || !pinConfirm}
-                                className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 transition-all disabled:opacity-50 flex items-center gap-2">
-                                {savingPin ? <><svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Guardando...</> : "Guardar"}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
         </NavProvider>
         </LineasProvider>

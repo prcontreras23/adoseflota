@@ -3,74 +3,93 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import toast from "react-hot-toast";
 
-interface AccessPin {
+// Accesos a Flota con el usuario de SIGA (antes: PIN en access_pins).
+// Las cuentas se crean en SIGA → Configuración → Usuarios; aquí solo se decide
+// quién entra a Flota y qué pestañas ve. Administrador = gestionar_usuarios en
+// SIGA. La base hace cumplir las pestañas (políticas RLS de flota).
+
+interface Perfil {
     id: string;
     nombre: string;
-    pin: string;
-    email: string;
-    es_admin: boolean;
-    permisos: string[];
+    email: string | null;
+    activo: boolean | null;
+    permisos: Record<string, unknown> | null;
+}
+
+interface Acceso {
+    user_id: string;
+    pestanas: string[];
     activo: boolean;
-    created_at: string;
+}
+
+interface Fila {
+    perfil: Perfil;
+    acceso: Acceso | null;
+    es_admin: boolean;
 }
 
 const ALL_TABS = [
-    { id: "dashboard",  label: "Resumen",        desc: "Panel de estadísticas generales" },
+    { id: "dashboard",  label: "Resumen",        desc: "Panel y propuesta Altice" },
     { id: "perfiles",   label: "Perfiles",        desc: "Editar perfiles de cada línea" },
+    { id: "lineas",     label: "Líneas",          desc: "Tabla completa de líneas" },
     { id: "tareas",     label: "Tareas",          desc: "Gestionar tareas del proyecto" },
+    { id: "altice",     label: "Proceso Altice",  desc: "Pasos de la negociación" },
+    { id: "simulador",  label: "Simulador",       desc: "Simulador de planes y equipos" },
     { id: "notas",      label: "Notas",           desc: "Notas y comunicaciones internas" },
     { id: "almacen",    label: "Almacén",         desc: "Stock de dispositivos" },
     { id: "entregas",   label: "Entregas",        desc: "Registrar entregas de equipos" },
-    { id: "usuarios",   label: "Usuarios",        desc: "Gestionar usuarios y accesos" },
+    { id: "mensajeswa", label: "Mensajes WA",     desc: "Mensajes de WhatsApp a titulares" },
+    { id: "usuarios",   label: "Usuarios",        desc: "Ver quién tiene acceso" },
     { id: "documentos", label: "Documentos",      desc: "Documentos y archivos del proyecto" },
-    { id: "config",     label: "Configuración",   desc: "Ajustes generales de la aplicación" },
+    { id: "config",     label: "Configuración",   desc: "Listas y ajustes de la aplicación" },
 ];
-
-const VACIO = { nombre: "", pin: "", email: "", es_admin: false, permisos: ["entregas"] as string[], activo: true };
 
 const IcoPlus = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
 const IcoEdit = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>;
 const IcoShield = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>;
 const IcoUser = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>;
-const IcoEye = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>;
-const IcoEyeOff = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>;
 const IcoX = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
 
 export default function UsuariosTab() {
-    const [users, setUsers] = useState<AccessPin[]>([]);
+    const [filas, setFilas] = useState<Fila[]>([]);
     const [loading, setLoading] = useState(true);
-    const [showModal, setShowModal] = useState(false);
-    const [editingId, setEditingId] = useState<string | null>(null);
-    const [form, setForm] = useState({ ...VACIO });
+    const [soyAdmin, setSoyAdmin] = useState(false);
+    const [editando, setEditando] = useState<Fila | null>(null);
+    const [form, setForm] = useState<{ user_id: string; permisos: string[] }>({ user_id: "", permisos: ["entregas"] });
     const [saving, setSaving] = useState(false);
-    const [showPin, setShowPin] = useState(false);
-    const [sessionId, setSessionId] = useState<string | null>(null);
 
     useEffect(() => {
         const raw = localStorage.getItem("flota_session");
-        if (raw) try { setSessionId(JSON.parse(raw).id); } catch { /* ignore */ }
+        if (raw) try { setSoyAdmin(!!JSON.parse(raw).es_admin); } catch { /* ignore */ }
         loadUsers();
     }, []);
 
     async function loadUsers() {
         setLoading(true);
-        const { data } = await supabase.from("access_pins").select("*").order("created_at");
-        setUsers((data ?? []) as AccessPin[]);
+        const [{ data: perfiles }, { data: accesos }] = await Promise.all([
+            supabase.schema("public").from("profiles").select("id, nombre, email, activo, permisos").order("nombre"),
+            supabase.from("accesos").select("user_id, pestanas, activo"),
+        ]);
+        const porId = new Map((accesos ?? []).map((a: Acceso) => [a.user_id, a]));
+        setFilas(((perfiles ?? []) as Perfil[]).map(p => ({
+            perfil: p,
+            acceso: porId.get(p.id) ?? null,
+            es_admin: !!p.permisos?.gestionar_usuarios,
+        })));
         setLoading(false);
     }
 
+    const conAcceso = filas.filter(f => f.es_admin || f.acceso);
+    const sinAcceso = filas.filter(f => !f.es_admin && !f.acceso && f.perfil.activo !== false);
+
     function openCreate() {
-        setEditingId(null);
-        setForm({ ...VACIO });
-        setShowPin(false);
-        setShowModal(true);
+        setEditando(null);
+        setForm({ user_id: sinAcceso[0]?.perfil.id ?? "", permisos: ["entregas"] });
     }
 
-    function openEdit(u: AccessPin) {
-        setEditingId(u.id);
-        setForm({ nombre: u.nombre, pin: u.pin, email: u.email ?? "", es_admin: u.es_admin, permisos: [...u.permisos], activo: u.activo });
-        setShowPin(false);
-        setShowModal(true);
+    function openEdit(f: Fila) {
+        setEditando(f);
+        setForm({ user_id: f.perfil.id, permisos: [...(f.acceso?.pestanas ?? [])] });
     }
 
     function togglePermiso(id: string) {
@@ -82,67 +101,48 @@ export default function UsuariosTab() {
         }));
     }
 
-    function toggleAdmin(checked: boolean) {
-        setForm(prev => ({
-            ...prev,
-            es_admin: checked,
-            permisos: checked ? ALL_TABS.map(t => t.id) : prev.permisos,
-        }));
-    }
-
     async function handleSave() {
-        if (!form.nombre.trim()) { toast.error("El nombre es obligatorio"); return; }
-        if (!/^\d{6}$/.test(form.pin)) { toast.error("El PIN debe ser exactamente 6 dígitos"); return; }
-        if (!form.es_admin && form.permisos.length === 0) { toast.error("Selecciona al menos una sección"); return; }
-
+        if (!form.user_id) { toast.error("Elige la persona"); return; }
+        if (form.permisos.length === 0) { toast.error("Selecciona al menos una sección"); return; }
         setSaving(true);
-        const payload = {
-            nombre: form.nombre.trim(),
-            pin: form.pin,
-            email: form.email.trim().toLowerCase(),
-            es_admin: form.es_admin,
-            permisos: form.es_admin ? ALL_TABS.map(t => t.id) : form.permisos,
-            activo: form.activo,
-        };
-
-        if (editingId) {
-            const { error } = await supabase.from("access_pins").update(payload).eq("id", editingId);
-            if (error) { toast.error("Error al guardar"); setSaving(false); return; }
-            toast.success("Usuario actualizado");
-        } else {
-            const { data: existing } = await supabase.from("access_pins").select("id").eq("pin", form.pin).maybeSingle();
-            if (existing) { toast.error("Ese PIN ya está en uso"); setSaving(false); return; }
-            const { error } = await supabase.from("access_pins").insert(payload);
-            if (error) { toast.error("Error al crear usuario"); setSaving(false); return; }
-            toast.success("Usuario creado");
-        }
-
+        const { error } = await supabase.from("accesos").upsert({
+            user_id: form.user_id,
+            pestanas: form.permisos,
+            activo: editando?.acceso?.activo ?? true,
+        });
         setSaving(false);
-        setShowModal(false);
+        if (error) { toast.error("No se pudo guardar. Solo el administrador asigna accesos."); return; }
+        toast.success(editando ? "Acceso actualizado" : "Acceso asignado");
+        setEditando(null);
+        setForm({ user_id: "", permisos: [] });
         loadUsers();
     }
 
-    async function toggleActivo(u: AccessPin) {
-        if (u.id === sessionId) { toast.error("No puedes desactivarte a ti mismo"); return; }
-        await supabase.from("access_pins").update({ activo: !u.activo }).eq("id", u.id);
-        setUsers(prev => prev.map(x => x.id === u.id ? { ...x, activo: !x.activo } : x));
-        toast.success(u.activo ? "Usuario desactivado" : "Usuario activado");
+    async function toggleActivo(f: Fila) {
+        if (!f.acceso) return;
+        const { error } = await supabase.from("accesos").update({ activo: !f.acceso.activo }).eq("user_id", f.perfil.id);
+        if (error) { toast.error("No se pudo cambiar"); return; }
+        toast.success(f.acceso.activo ? "Acceso desactivado" : "Acceso activado");
+        loadUsers();
     }
 
+    const showModal = form.user_id !== "" || editando !== null;
     const inputCls = "w-full border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
 
     return (
         <div className="space-y-5">
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-xl font-bold text-slate-800 dark:text-white">Gestión de usuarios</h2>
+                    <h2 className="text-xl font-bold text-slate-800 dark:text-white">Accesos a Flota</h2>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                        Crea usuarios y define qué secciones puede ver cada uno
+                        Se entra con el usuario de SIGA. Las cuentas nuevas se crean en SIGA → Configuración → Usuarios.
                     </p>
                 </div>
-                <button onClick={openCreate} className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm">
-                    <IcoPlus /> Nuevo usuario
-                </button>
+                {soyAdmin && sinAcceso.length > 0 && (
+                    <button onClick={openCreate} className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm">
+                        <IcoPlus /> Dar acceso
+                    </button>
+                )}
             </div>
 
             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
@@ -150,8 +150,8 @@ export default function UsuariosTab() {
                     <div className="flex items-center justify-center py-16">
                         <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
                     </div>
-                ) : users.length === 0 ? (
-                    <div className="text-center py-16 text-slate-400 text-sm">No hay usuarios</div>
+                ) : conAcceso.length === 0 ? (
+                    <div className="text-center py-16 text-slate-400 text-sm">Nadie tiene acceso todavía</div>
                 ) : (
                     <table className="w-full text-sm">
                         <thead className="bg-slate-50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-700">
@@ -162,7 +162,7 @@ export default function UsuariosTab() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">
-                            {users.map(u => (
+                            {conAcceso.map(f => { const u = { id: f.perfil.id, nombre: f.perfil.nombre ?? "", email: f.perfil.email, es_admin: f.es_admin, permisos: f.acceso?.pestanas ?? [], activo: f.es_admin || !!f.acceso?.activo }; return (
                                 <tr key={u.id} className={`transition-colors ${u.activo ? "hover:bg-slate-50 dark:hover:bg-slate-700/20" : "opacity-50"}`}>
                                     <td className="p-3.5">
                                         <div className="flex items-center gap-2.5">
@@ -189,7 +189,7 @@ export default function UsuariosTab() {
                                     <td className="p-3.5">
                                         <div className="flex flex-wrap gap-1">
                                             {u.es_admin ? (
-                                                <span className="text-xs text-slate-500 italic">Todas las secciones</span>
+                                                <span className="text-xs text-slate-500 italic">Todas (gestionar_usuarios en SIGA)</span>
                                             ) : u.permisos.length === 0 ? (
                                                 <span className="text-xs text-red-400">Sin acceso</span>
                                             ) : u.permisos.map(p => {
@@ -206,20 +206,21 @@ export default function UsuariosTab() {
                                         </span>
                                     </td>
                                     <td className="p-3.5">
+                                        {soyAdmin && !f.es_admin && (
                                         <div className="flex items-center gap-1.5">
-                                            <button onClick={() => openEdit(u)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 transition-colors">
+                                            <button onClick={() => openEdit(f)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 transition-colors">
                                                 <IcoEdit /> Editar
                                             </button>
                                             <button
-                                                onClick={() => toggleActivo(u)}
-                                                disabled={u.id === sessionId}
-                                                className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${u.activo ? "bg-slate-100 dark:bg-slate-700 text-slate-500 hover:bg-rose-50 hover:text-rose-600" : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"}`}>
+                                                onClick={() => toggleActivo(f)}
+                                                className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${u.activo ? "bg-slate-100 dark:bg-slate-700 text-slate-500 hover:bg-rose-50 hover:text-rose-600" : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"}`}>
                                                 {u.activo ? "Desactivar" : "Activar"}
                                             </button>
                                         </div>
+                                        )}
                                     </td>
                                 </tr>
-                            ))}
+                            ); })}
                         </tbody>
                     </table>
                 )}
@@ -227,56 +228,28 @@ export default function UsuariosTab() {
 
             {showModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowModal(false)} />
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setEditando(null); setForm({ user_id: "", permisos: [] }); }} />
                     <div className="relative bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md border border-slate-200 dark:border-slate-700 overflow-hidden">
                         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-700">
                             <h3 className="font-bold text-slate-800 dark:text-white text-base">
-                                {editingId ? "Editar usuario" : "Nuevo usuario"}
+                                {editando ? `Acceso de ${editando.perfil.nombre}` : "Dar acceso a Flota"}
                             </h3>
-                            <button onClick={() => setShowModal(false)} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                            <button onClick={() => { setEditando(null); setForm({ user_id: "", permisos: [] }); }} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
                                 <IcoX />
                             </button>
                         </div>
 
                         <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
+                            {!editando && (
                             <div>
-                                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5 block">Nombre</label>
-                                <input value={form.nombre} onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))} placeholder="Ej. Juan Pérez" className={inputCls} />
+                                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5 block">Persona (usuario de SIGA)</label>
+                                <select value={form.user_id} onChange={e => setForm(p => ({ ...p, user_id: e.target.value }))} className={inputCls}>
+                                    {sinAcceso.map(f => (
+                                        <option key={f.perfil.id} value={f.perfil.id}>{f.perfil.nombre} · {f.perfil.email}</option>
+                                    ))}
+                                </select>
                             </div>
-
-                            <div>
-                                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5 block">Correo electrónico <span className="text-slate-400 font-normal normal-case">(para recuperar PIN)</span></label>
-                                <input value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} type="email" placeholder="usuario@correo.com" className={inputCls} />
-                            </div>
-
-                            <div>
-                                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5 block">PIN de acceso (6 dígitos)</label>
-                                <div className="relative">
-                                    <input
-                                        value={form.pin}
-                                        onChange={e => setForm(p => ({ ...p, pin: e.target.value.replace(/\D/g, "").slice(0, 6) }))}
-                                        type={showPin ? "text" : "password"}
-                                        placeholder="••••••"
-                                        maxLength={6}
-                                        className={`${inputCls} pr-10 font-mono tracking-[0.4em]`}
-                                    />
-                                    <button type="button" onClick={() => setShowPin(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                                        {showPin ? <IcoEyeOff /> : <IcoEye />}
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="flex items-center justify-between p-3.5 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
-                                <div>
-                                    <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5"><IcoShield /> Administrador completo</p>
-                                    <p className="text-xs text-slate-500 mt-0.5">Acceso total a todas las secciones</p>
-                                </div>
-                                <button type="button" onClick={() => toggleAdmin(!form.es_admin)} className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${form.es_admin ? "bg-blue-600" : "bg-slate-300 dark:bg-slate-600"}`}>
-                                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${form.es_admin ? "translate-x-5" : "translate-x-0"}`} />
-                                </button>
-                            </div>
-
-                            {!form.es_admin && (
+                            )}
                                 <div>
                                     <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2 block">Secciones con acceso</label>
                                     <div className="grid grid-cols-2 gap-2">
@@ -297,15 +270,14 @@ export default function UsuariosTab() {
                                         })}
                                     </div>
                                 </div>
-                            )}
                         </div>
 
                         <div className="px-5 py-4 border-t border-slate-100 dark:border-slate-700 flex gap-2.5 justify-end">
-                            <button onClick={() => setShowModal(false)} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 transition-colors">
+                            <button onClick={() => { setEditando(null); setForm({ user_id: "", permisos: [] }); }} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 transition-colors">
                                 Cancelar
                             </button>
                             <button onClick={handleSave} disabled={saving} className="px-5 py-2 rounded-lg text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-sm">
-                                {saving ? "Guardando..." : editingId ? "Guardar cambios" : "Crear usuario"}
+                                {saving ? "Guardando..." : editando ? "Guardar cambios" : "Dar acceso"}
                             </button>
                         </div>
                     </div>
