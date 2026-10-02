@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { cargarSesion, cerrarSesion } from "@/lib/sesion";
+import LogoSiga from "@/components/LogoSiga";
 
 // Flota entra con el mismo usuario y contraseña de SIGA. Si ya hay sesión de
 // SIGA en este navegador, entra directo sin pedir nada.
@@ -48,64 +49,59 @@ export default function LoginPage() {
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-950 via-blue-900 to-slate-900 p-4">
-            <div className="absolute top-0 left-0 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute bottom-0 right-0 w-96 h-96 bg-blue-400/10 rounded-full blur-3xl pointer-events-none" />
-
-            <div className="relative w-full max-w-xs">
-                <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl p-8 shadow-2xl">
-                    <div className="flex flex-col items-center mb-7">
-                        <div className="bg-white rounded-2xl p-3 mb-4 shadow-lg">
-                            <img src="/flota/logo-adose.png" alt="ADOSE Logo" className="h-14 w-auto object-contain" />
-                        </div>
-                        <h1 className="text-white font-bold text-xl text-center leading-tight">ADOSE Flota 2026</h1>
-                        <p className="text-blue-200 text-sm mt-1 text-center">
-                            {sinAcceso ? "Sin acceso a Flota" : "Entre con su usuario de SIGA"}
-                        </p>
+        <div className="min-h-screen flex items-center justify-center bg-[#fbfbfd] p-5">
+            <div className="w-full max-w-sm">
+                <div className="overflow-hidden rounded border border-slate-200 bg-white">
+                    <div className="flex items-center gap-3 bg-[#02365e] px-8 py-5">
+                        <LogoSiga alto={22} />
+                        <span className="h-5 w-px bg-white/25" />
+                        <span className="text-[15px] font-semibold text-white">Flota Móvil</span>
                     </div>
-
-                    {sinAcceso ? (
-                        <div className="space-y-4 text-center">
-                            <p className="text-white/80 text-sm">
-                                {sinAcceso} entró a SIGA, pero no tiene acceso a Flota. Pídalo a la Secretaría Ejecutiva.
-                            </p>
-                            <button onClick={usarOtraCuenta} disabled={loading}
-                                className="w-full py-2.5 rounded-xl border border-white/20 text-white/80 hover:text-white text-sm transition-colors disabled:opacity-50">
-                                Entrar con otra cuenta
-                            </button>
-                        </div>
-                    ) : (
-                        <form onSubmit={handleSubmit} className="space-y-3">
-                            <input
-                                type="email" autoComplete="username" value={email}
-                                onChange={e => { setEmail(e.target.value); setError(""); }}
-                                placeholder="Correo"
-                                className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2.5 text-white text-sm placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                            />
-                            <input
-                                type="password" autoComplete="current-password" value={password}
-                                onChange={e => { setPassword(e.target.value); setError(""); }}
-                                placeholder="Contraseña"
-                                className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2.5 text-white text-sm placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                            />
-                            <div className="h-5 text-center">
-                                {error && <p className="text-red-400 text-sm font-medium">{error}</p>}
+                    <div className="p-8">
+                        {sinAcceso ? (
+                            <div className="space-y-4">
+                                <p className="text-[13.5px] leading-relaxed text-slate-600">
+                                    {sinAcceso} entró a SIGA, pero no tiene acceso a Flota. Pídalo a la Secretaría Ejecutiva.
+                                </p>
+                                <button onClick={usarOtraCuenta} disabled={loading}
+                                    className="w-full py-2.5 rounded border border-[#858fa3] bg-white text-[13px] font-medium text-slate-800 hover:bg-[#f3f6f9] disabled:opacity-50">
+                                    Entrar con otra cuenta
+                                </button>
                             </div>
-                            <button type="submit" disabled={loading || !email.trim() || !password}
-                                className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition-colors disabled:opacity-50">
-                                {loading ? "Entrando…" : "Entrar"}
-                            </button>
-                        </form>
-                    )}
+                        ) : (
+                            <form onSubmit={handleSubmit}>
+                                <p className="mb-5 text-[13px] leading-relaxed text-slate-600">
+                                    Entre con el mismo correo y contraseña de SIGA.
+                                </p>
+                                <label className="mb-3 block">
+                                    <span className="mb-1 block text-[12px] font-semibold text-slate-800">Correo</span>
+                                    <input
+                                        type="email" autoComplete="username" value={email} autoFocus
+                                        onChange={e => { setEmail(e.target.value); setError(""); }}
+                                        className="w-full rounded border border-[#858fa3] bg-white px-3 py-2 text-[13px] text-slate-800 outline-none focus:border-[#02365e] focus:ring-2 focus:ring-[#02365e]/15"
+                                    />
+                                </label>
+                                <label className="mb-4 block">
+                                    <span className="mb-1 block text-[12px] font-semibold text-slate-800">Contraseña</span>
+                                    <input
+                                        type="password" autoComplete="current-password" value={password}
+                                        onChange={e => { setPassword(e.target.value); setError(""); }}
+                                        className="w-full rounded border border-[#858fa3] bg-white px-3 py-2 text-[13px] text-slate-800 outline-none focus:border-[#02365e] focus:ring-2 focus:ring-[#02365e]/15"
+                                    />
+                                </label>
+                                {error && <p className="mb-3 text-[13px] text-[#a3324a]">{error}</p>}
+                                <button type="submit" disabled={loading || !email.trim() || !password}
+                                    className="w-full py-2.5 rounded bg-[#02365e] hover:bg-[#0a4a7d] text-white text-[13px] font-semibold transition-colors disabled:opacity-50">
+                                    {loading ? "Entrando…" : "Entrar"}
+                                </button>
+                            </form>
+                        )}
+                    </div>
                 </div>
-
                 {/* El restablecimiento de contraseña vive en SIGA (raíz del dominio) */}
-                <a href="/" className="block w-full text-center text-blue-300/60 hover:text-blue-300 text-xs mt-4 transition-colors">
-                    ¿Olvidó su contraseña? Use «¿Olvidó su contraseña?» en SIGA
+                <a href="/" className="block w-full text-center text-[12.5px] text-slate-600 hover:text-[#02365e] mt-4">
+                    ¿Olvidó su contraseña? Cámbiela desde la entrada de SIGA
                 </a>
-                <p className="text-center text-blue-400/40 text-xs mt-6">
-                    © 2026 ADOSE · Todos los derechos reservados
-                </p>
             </div>
         </div>
     );

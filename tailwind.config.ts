@@ -9,7 +9,101 @@ const config: Config = {
     ],
     theme: {
         extend: {
+            // Estilo de SIGA (tokens --siga-* del index.html de padron-de-iglesias):
+            // slate pasa a los grises azulados de SIGA, blue e indigo al azul
+            // institucional #02365e. Así las ~2,000 clases de la app toman la
+            // paleta sin reescribir cada pantalla.
+            fontFamily: { sans: ["var(--font-dm-sans)", "DM Sans", "system-ui", "sans-serif"] },
+            boxShadow: { sm: "none", DEFAULT: "none", md: "none" },
             colors: {
+                slate: {
+                    50: "#f7f8fb", 100: "#f3f6f9", 200: "#e3e7f0", 300: "#c9cfdb",
+                    400: "#737d94", 500: "#616b86", 600: "#5a6785", 700: "#3d4866",
+                    800: "#14203c", 900: "#0e1830", 950: "#0a1222",
+                },
+                blue: {
+                    50: "#ecf2f7", 100: "#dce7f1", 200: "#b9cfe2", 300: "#8fb0cc",
+                    400: "#3b6a8f", 500: "#0a4a7d", 600: "#02365e", 700: "#022b4b",
+                    800: "#01223b", 900: "#011a2e", 950: "#011222",
+                },
+                indigo: {
+                    50: "#ecf2f7", 100: "#dce7f1", 200: "#b9cfe2", 300: "#8fb0cc",
+                    400: "#3b6a8f", 500: "#0a4a7d", 600: "#02365e", 700: "#022b4b",
+                    800: "#01223b", 900: "#011a2e", 950: "#011222",
+                },
+                // Los demás tonos se llevan a la familia de SIGA: morados al azul,
+                // verdes apagados, ámbar y naranja al oro, rojos al rojo de SIGA.
+                purple: {
+                    50: "#ecf2f7", 100: "#dce7f1", 200: "#b9cfe2", 300: "#8fb0cc",
+                    400: "#3b6a8f", 500: "#0a4a7d", 600: "#02365e", 700: "#022b4b",
+                    800: "#01223b", 900: "#011a2e", 950: "#011222",
+                },
+                violet: {
+                    50: "#ecf2f7", 100: "#dce7f1", 200: "#b9cfe2", 300: "#8fb0cc",
+                    400: "#3b6a8f", 500: "#0a4a7d", 600: "#02365e", 700: "#022b4b",
+                    800: "#01223b", 900: "#011a2e", 950: "#011222",
+                },
+                fuchsia: {
+                    50: "#ecf2f7", 100: "#dce7f1", 200: "#b9cfe2", 300: "#8fb0cc",
+                    400: "#3b6a8f", 500: "#0a4a7d", 600: "#02365e", 700: "#022b4b",
+                    800: "#01223b", 900: "#011a2e", 950: "#011222",
+                },
+                sky: {
+                    50: "#ecf2f7", 100: "#dce7f1", 200: "#b9cfe2", 300: "#8fb0cc",
+                    400: "#3b6a8f", 500: "#0a4a7d", 600: "#02365e", 700: "#022b4b",
+                    800: "#01223b", 900: "#011a2e", 950: "#011222",
+                },
+                cyan: {
+                    50: "#ecf2f7", 100: "#dce7f1", 200: "#b9cfe2", 300: "#8fb0cc",
+                    400: "#3b6a8f", 500: "#0a4a7d", 600: "#02365e", 700: "#022b4b",
+                    800: "#01223b", 900: "#011a2e", 950: "#011222",
+                },
+                emerald: {
+                    50: "#eef5f1", 100: "#dcebe2", 200: "#b8d6c4", 300: "#8dbaa0",
+                    400: "#5e9a78", 500: "#3d7d5a", 600: "#2f6b4f", 700: "#255840",
+                    800: "#1c4632", 900: "#143424", 950: "#0c2217",
+                },
+                green: {
+                    50: "#eef5f1", 100: "#dcebe2", 200: "#b8d6c4", 300: "#8dbaa0",
+                    400: "#5e9a78", 500: "#3d7d5a", 600: "#2f6b4f", 700: "#255840",
+                    800: "#1c4632", 900: "#143424", 950: "#0c2217",
+                },
+                teal: {
+                    50: "#eef5f1", 100: "#dcebe2", 200: "#b8d6c4", 300: "#8dbaa0",
+                    400: "#5e9a78", 500: "#3d7d5a", 600: "#2f6b4f", 700: "#255840",
+                    800: "#1c4632", 900: "#143424", 950: "#0c2217",
+                },
+                amber: {
+                    50: "#fbf6ea", 100: "#f6ecd2", 200: "#ecd9a5", 300: "#dfc078",
+                    400: "#cfa34a", 500: "#b8860b", 600: "#9a7009", 700: "#8a6508",
+                    800: "#6b4f06", 900: "#4d3904", 950: "#332602",
+                },
+                yellow: {
+                    50: "#fbf6ea", 100: "#f6ecd2", 200: "#ecd9a5", 300: "#dfc078",
+                    400: "#cfa34a", 500: "#b8860b", 600: "#9a7009", 700: "#8a6508",
+                    800: "#6b4f06", 900: "#4d3904", 950: "#332602",
+                },
+                orange: {
+                    50: "#fbf6ea", 100: "#f6ecd2", 200: "#ecd9a5", 300: "#dfc078",
+                    400: "#cfa34a", 500: "#b8860b", 600: "#9a7009", 700: "#8a6508",
+                    800: "#6b4f06", 900: "#4d3904", 950: "#332602",
+                },
+                red: {
+                    50: "#fbf2f4", 100: "#f6e3e8", 200: "#ecc5cf", 300: "#dc9eae",
+                    400: "#c46c83", 500: "#b04a64", 600: "#a3324a", 700: "#8a2a3f",
+                    800: "#6f2233", 900: "#541a27", 950: "#38111a",
+                },
+                rose: {
+                    50: "#fbf2f4", 100: "#f6e3e8", 200: "#ecc5cf", 300: "#dc9eae",
+                    400: "#c46c83", 500: "#b04a64", 600: "#a3324a", 700: "#8a2a3f",
+                    800: "#6f2233", 900: "#541a27", 950: "#38111a",
+                },
+                pink: {
+                    50: "#fbf2f4", 100: "#f6e3e8", 200: "#ecc5cf", 300: "#dc9eae",
+                    400: "#c46c83", 500: "#b04a64", 600: "#a3324a", 700: "#8a2a3f",
+                    800: "#6f2233", 900: "#541a27", 950: "#38111a",
+                },
+                siga: { azul: "#02365e", "azul-claro": "#ecf2f7", oro: "#b8860b", "oro-texto": "#8a6508", rojo: "#a3324a", fondo: "#fbfbfd" },
                 border: "hsl(var(--border))",
                 input: "hsl(var(--input))",
                 ring: "hsl(var(--ring))",
@@ -44,10 +138,9 @@ const config: Config = {
                     red: "#E30613",
                 },
             },
+            // Radio de 4 px en todo lo que no es circular, como SIGA.
             borderRadius: {
-                lg: "var(--radius)",
-                md: "calc(var(--radius) - 2px)",
-                sm: "calc(var(--radius) - 4px)",
+                sm: "2px", md: "4px", lg: "4px", xl: "4px", "2xl": "4px", "3xl": "4px",
             },
             keyframes: {
                 "accordion-down": { from: { height: "0" }, to: { height: "var(--radix-accordion-content-height)" } },

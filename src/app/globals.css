@@ -4,26 +4,27 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 220 14% 11%;
+    /* Estilo de SIGA */
+    --background: 240 33% 99%;
+    --foreground: 222 50% 16%;
     --card: 0 0% 100%;
-    --card-foreground: 220 14% 11%;
+    --card-foreground: 222 50% 16%;
     --popover: 0 0% 100%;
-    --popover-foreground: 220 14% 11%;
-    --primary: 213 100% 50%;
+    --popover-foreground: 222 50% 16%;
+    --primary: 206 96% 19%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 220 14% 11%;
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 46%;
-    --accent: 213 100% 97%;
-    --accent-foreground: 213 100% 40%;
-    --destructive: 0 84% 60%;
+    --secondary: 210 33% 97%;
+    --secondary-foreground: 222 50% 16%;
+    --muted: 210 33% 97%;
+    --muted-foreground: 223 18% 44%;
+    --accent: 206 40% 95%;
+    --accent-foreground: 206 96% 19%;
+    --destructive: 346 53% 42%;
     --destructive-foreground: 0 0% 100%;
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 213 100% 50%;
-    --radius: 0.75rem;
+    --border: 222 27% 92%;
+    --input: 220 12% 58%;
+    --ring: 206 96% 19%;
+    --radius: 0.25rem;
   }
 
   .dark {
@@ -56,8 +57,8 @@
 
 /* Custom scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { @apply bg-muted; }
-::-webkit-scrollbar-thumb { @apply bg-primary/40 rounded-full; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #c9cfdb; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { @apply bg-primary/70; }
 
 /* Status badges */

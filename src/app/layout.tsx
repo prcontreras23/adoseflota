@@ -1,23 +1,24 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { DM_Sans } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
 
-const inter = Inter({ subsets: ["latin"] });
+const dmSans = DM_Sans({ subsets: ["latin"], variable: "--font-dm-sans" });
 
 export const metadata: Metadata = {
-    title: "ADOSE Flota 2026",
-    description: "Gestión de flota móvil corporativa - Unión Adventista Sureste",
+    title: "Flota Móvil — SIGA",
+    description: "Flota móvil de la Asociación Dominicana del Sureste",
+    // El ícono lo sirve SIGA desde la raíz del dominio.
     icons: {
-        icon: "/flota/logo-adose.png",
-        apple: "/flota/logo-adose.png",
+        icon: "/icono-siga.png",
+        apple: "/apple-touch-icon.png",
     },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
     return (
-        <html lang="es" className="dark" suppressHydrationWarning>
-            <body className={inter.className}>
+        <html lang="es" className={dmSans.variable} suppressHydrationWarning>
+            <body className={`${dmSans.className} bg-[#fbfbfd] text-[#14203c]`}>
                 {children}
                 <Toaster
                     position="top-right"
