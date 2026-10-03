@@ -163,7 +163,7 @@ export default function AdminDashboard() {
         <div className="min-h-screen bg-[#fbfbfd]">
 
             {/* ── Barra azul de SGA ───────────────────────────────────────── */}
-            <header className="fixed top-0 inset-x-0 z-40 h-[52px] bg-[#02365e]">
+            <header className="fixed top-0 inset-x-0 z-40 h-[52px] bg-[#02365e] shadow-[inset_0_-4px_0_#408491]">
                 <div className="h-full flex items-center gap-3 px-4 sm:px-6">
                     <button onClick={() => setSidebarOpen(true)} aria-label="Abrir el menú"
                         className="lg:hidden -ml-1 w-9 h-9 rounded flex items-center justify-center text-white hover:bg-white/10">

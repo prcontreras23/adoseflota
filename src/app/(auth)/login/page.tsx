@@ -52,7 +52,7 @@ export default function LoginPage() {
         <div className="min-h-screen flex items-center justify-center bg-[#fbfbfd] p-5">
             <div className="w-full max-w-sm">
                 <div className="overflow-hidden rounded border border-slate-200 bg-white">
-                    <div className="flex items-center gap-3 bg-[#02365e] px-8 py-5">
+                    <div className="flex items-center gap-3 bg-[#02365e] px-8 py-5 shadow-[inset_0_-4px_0_#408491]">
                         <LogoSiga alto={22} />
                         <span className="h-5 w-px bg-white/25" />
                         <span className="text-[15px] font-semibold text-white">Flota Móvil</span>
