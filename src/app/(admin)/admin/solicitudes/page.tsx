@@ -162,18 +162,18 @@ export default function AdminDashboard() {
         <NavProvider onNavigate={setActiveTab}>
         <div className="min-h-screen bg-[#fbfbfd]">
 
-            {/* ── Barra azul de SIGA ───────────────────────────────────────── */}
+            {/* ── Barra azul de SGA ───────────────────────────────────────── */}
             <header className="fixed top-0 inset-x-0 z-40 h-[52px] bg-[#02365e]">
                 <div className="h-full flex items-center gap-3 px-4 sm:px-6">
                     <button onClick={() => setSidebarOpen(true)} aria-label="Abrir el menú"
                         className="lg:hidden -ml-1 w-9 h-9 rounded flex items-center justify-center text-white hover:bg-white/10">
                         {Icon.menu}
                     </button>
-                    <a href="/" title="Ir a SIGA" className="flex items-center"><LogoSiga /></a>
+                    <a href="/" title="Ir a SGA" className="flex items-center"><LogoSiga /></a>
                     <span className="h-5 w-px bg-white/25" />
                     <span className="text-[14px] font-semibold text-white">Flota Móvil</span>
                     <div className="ml-auto flex items-center gap-4">
-                        <a href="/" className="hidden sm:inline text-[12.5px] text-white/80 hover:text-white">Volver a SIGA</a>
+                        <a href="/" className="hidden sm:inline text-[12.5px] text-white/80 hover:text-white">Volver a SGA</a>
                         <span className="hidden md:inline text-[12.5px] text-white/80">
                             {toProperCase(user?.nombre ?? "")}{user?.es_admin ? " · Administrador" : ""}
                         </span>

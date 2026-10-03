@@ -61,7 +61,7 @@ export default function LoginPage() {
                         {sinAcceso ? (
                             <div className="space-y-4">
                                 <p className="text-[13.5px] leading-relaxed text-slate-600">
-                                    {sinAcceso} entró a SIGA, pero no tiene acceso a Flota. Pídalo a la Secretaría Ejecutiva.
+                                    {sinAcceso} entró a SGA, pero no tiene acceso a Flota. Pídalo a la Secretaría Ejecutiva.
                                 </p>
                                 <button onClick={usarOtraCuenta} disabled={loading}
                                     className="w-full py-2.5 rounded border border-[#858fa3] bg-white text-[13px] font-medium text-slate-800 hover:bg-[#f3f6f9] disabled:opacity-50">
@@ -71,7 +71,7 @@ export default function LoginPage() {
                         ) : (
                             <form onSubmit={handleSubmit}>
                                 <p className="mb-5 text-[13px] leading-relaxed text-slate-600">
-                                    Entre con el mismo correo y contraseña de SIGA.
+                                    Entre con el mismo correo y contraseña de SGA.
                                 </p>
                                 <label className="mb-3 block">
                                     <span className="mb-1 block text-[12px] font-semibold text-slate-800">Correo</span>
@@ -98,9 +98,9 @@ export default function LoginPage() {
                         )}
                     </div>
                 </div>
-                {/* El restablecimiento de contraseña vive en SIGA (raíz del dominio) */}
+                {/* El restablecimiento de contraseña vive en SGA (raíz del dominio) */}
                 <a href="/" className="block w-full text-center text-[12.5px] text-slate-600 hover:text-[#02365e] mt-4">
-                    ¿Olvidó su contraseña? Cámbiela desde la entrada de SIGA
+                    ¿Olvidó su contraseña? Cámbiela desde la entrada de SGA
                 </a>
             </div>
         </div>

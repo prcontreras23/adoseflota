@@ -7,5 +7,5 @@ const LOGO = process.env.NODE_ENV === "development"
 
 export default function LogoSiga({ alto = 20 }: { alto?: number }) {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={LOGO} alt="SIGA" style={{ height: alto, width: "auto", filter: "brightness(0) invert(1)" }} />;
+    return <img src={LOGO} alt="SGA" style={{ height: alto, width: "auto", filter: "brightness(0) invert(1)" }} />;
 }

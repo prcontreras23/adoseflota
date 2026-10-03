@@ -135,7 +135,7 @@ export default function UsuariosTab() {
                 <div>
                     <h2 className="text-xl font-bold text-slate-800 dark:text-white">Accesos a Flota</h2>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                        Se entra con el usuario de SIGA. Las cuentas nuevas se crean en SIGA → Configuración → Usuarios.
+                        Se entra con el usuario de SGA. Las cuentas nuevas se crean en SGA → Configuración → Usuarios.
                     </p>
                 </div>
                 {soyAdmin && sinAcceso.length > 0 && (
@@ -189,7 +189,7 @@ export default function UsuariosTab() {
                                     <td className="p-3.5">
                                         <div className="flex flex-wrap gap-1">
                                             {u.es_admin ? (
-                                                <span className="text-xs text-slate-500 italic">Todas (gestionar_usuarios en SIGA)</span>
+                                                <span className="text-xs text-slate-500 italic">Todas (gestionar_usuarios en SGA)</span>
                                             ) : u.permisos.length === 0 ? (
                                                 <span className="text-xs text-red-400">Sin acceso</span>
                                             ) : u.permisos.map(p => {
@@ -242,7 +242,7 @@ export default function UsuariosTab() {
                         <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
                             {!editando && (
                             <div>
-                                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5 block">Persona (usuario de SIGA)</label>
+                                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5 block">Persona (usuario de SGA)</label>
                                 <select value={form.user_id} onChange={e => setForm(p => ({ ...p, user_id: e.target.value }))} className={inputCls}>
                                     {sinAcceso.map(f => (
                                         <option key={f.perfil.id} value={f.perfil.id}>{f.perfil.nombre} · {f.perfil.email}</option>

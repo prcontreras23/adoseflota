@@ -6,7 +6,7 @@ import { Toaster } from "react-hot-toast";
 const dmSans = DM_Sans({ subsets: ["latin"], variable: "--font-dm-sans" });
 
 export const metadata: Metadata = {
-    title: "Flota Móvil — SIGA",
+    title: "Flota Móvil — SGA",
     description: "Flota móvil de la Asociación Dominicana del Sureste",
     // El ícono lo sirve SIGA desde la raíz del dominio.
     icons: {
